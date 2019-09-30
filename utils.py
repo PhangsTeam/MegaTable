@@ -127,10 +127,10 @@ class VoronoiTessTable(HiddenTable):
         FITS header that defines the footprint of the Voronoi diagram.
     seeds_ra : array_like, optional
         If the user would like to specify the seed locations,
-        this would be their R.A. coordinates (in degree)
+        this would be their R.A. coordinates (in degrees)
     seeds_dec : array_like, optional
         If the user would like to specify the seed locations,
-        this would be their Declination coordinates (in degree)
+        this would be their Declination coordinates (in degrees)
     cell_shape : {'square', 'hexagon'}, optional
         If the seed locations are to be automatically generated,
         this keyword specifies the shape of the Voronoi cell.
@@ -142,7 +142,7 @@ class VoronoiTessTable(HiddenTable):
         If None, the minimum absolute value of the 'CDELT' entry
         in the input header will be used.
     ref_radec : two_tuple, optional
-        (RA, Dec) coordinate of the reference location (in degree).
+        (RA, Dec) coordinate of the reference location (in degrees).
         As all calculations are done in the angular separation frame,
         this keyword defines the "origin" of this (dx, dy) coordinate.
         If None, the 'CRVAL' entry in the input header will be used.
@@ -173,12 +173,14 @@ class VoronoiTessTable(HiddenTable):
             else:
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
             # record metadata
-            self._table.meta['COMMENT'] = 'VoronoiTessTable'
-            for key in header:
-                self._table.meta[key] = header[key]
+            self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
+            for key in self._wcs.to_header():
+                self._table.meta[key] = self._wcs.to_header()[key]
+            self._table.meta['NAXIS1'] = self._wcs._naxis[0]
+            self._table.meta['NAXIS2'] = self._wcs._naxis[1]
             self._table.meta['REF-RA'] = self._ref_coord.ra.value
             self._table.meta['REF-DEC'] = self._ref_coord.dec.value
-            self._table.meta['SEED-LOC'] = 'USER-DEFINED'
+            self._table.meta['TESSTYPE'] = 'USER-DEFINED'
             return
 
         # if seed locations are not specified, generate a list of
@@ -253,13 +255,15 @@ class VoronoiTessTable(HiddenTable):
                 mask[ind] = True
         self._table = self[mask]
         # record metadata
-        self._table.meta['COMMENT'] = 'VoronoiTessTable'
-        for key in header:
-            self._table.meta[key] = header[key]
+        self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
+        for key in self._wcs.to_header():
+            self._table.meta[key] = self._wcs.to_header()[key]
+        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
+        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
         self._table.meta['REF-RA'] = self._ref_coord.ra.value
         self._table.meta['REF-DEC'] = self._ref_coord.dec.value
-        self._table.meta['SEED-LOC'] = (
-            f"AUTO-GENERATED {cell_shape} CELLS")
+        self._table.meta['TESSTYPE'] = (
+            f"AUTO-GENERATED ({cell_shape.upper()} CELLS)")
 
     #-----------------------------------------------------------------
 
@@ -586,7 +590,7 @@ class VoronoiTessTable(HiddenTable):
             Default is to keep, which allows one to reconstruct
             the VoronoiTessTable by reading the file with
             `VoronoiTessTable.read`. Also when keep_metadata=True,
-            output format must be 'ecsv'.
+            output format must be 'ascii.ecsv'.
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
@@ -596,11 +600,11 @@ class VoronoiTessTable(HiddenTable):
             t.write(filename, **kwargs)
         else:
             if 'format' in kwargs:
-                if kwargs['format'] not in ('ecsv', 'ascii.ecsv'):
+                if kwargs['format'] != 'ascii.ecsv':
                     warnings.warn(
-                        "Overwrite keyword 'format' to 'ecsv' as "
-                        "keep_metadata=True")
-            kwargs['format'] = 'ecsv'
+                        "Overwrite keyword 'format' to 'ascii.ecsv' "
+                        "when keep_metadata=True")
+            kwargs['format'] = 'ascii.ecsv'
             self._table.write(filename, **kwargs)
 
     #-----------------------------------------------------------------
@@ -621,21 +625,24 @@ class VoronoiTessTable(HiddenTable):
         ------
         table : VonoroiTessTable
         """
-        vtt = cls(ra=[], dec=[])
+        
         if 'format' in kwargs:
-            warnings.warn(
-                "When reading VonoroiTessTable from file, "
-                "format must be 'ecsv'")
-            _ = kwargs.pop('format')
-        vtt._table = Table.read(filename, format='ecsv', **kwargs)
-        if not 'COMMENT' in vtt._table.meta:
+            if kwargs['format'] != 'ascii.ecsv':
+                warnings.warn(
+                    "Overwrite keyword 'format' to 'ascii.ecsv' "
+                    "when reading VonoroiTessTable from file.")
+        kwargs['format'] = 'ascii.ecsv'
+        t = Table.read(filename, **kwargs)
+        if not 'TBLTYPE' in t.meta:
             raise ValueError("Input file not recognized")
-        if vtt._table.meta['COMMENT'] != 'VoronoiTessTable':
+        if t.meta['TBLTYPE'] != 'VoronoiTessTable':
             raise ValueError("Input file not recognized")
-        vtt._wcs = WCS(fits.Header(vtt._table.meta)).celestial
-        vtt._ref_coord = SkyCoord(
-            self._table.meta['REF-RA'] * u.deg,
-            self._table.meta['REF-DEC'] * u.deg)
+
+        vtt = cls(
+            fits.Header(t.meta), seeds_ra=[], seeds_dec=[],
+            ref_radec=(t.meta['REF-RA'], t.meta['REF-DEC']))
+        vtt._table = t
+
         return vtt
 
     #-----------------------------------------------------------------

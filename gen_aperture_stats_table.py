@@ -6,7 +6,7 @@ import numpy as np
 from astropy import units as u
 from astropy.table import Table
 from astropy.io import fits
-from .utils import VoronoiTessTable
+from mega_table.utils import VoronoiTessTable
 
 # --------------------------------------------------------------------
 
@@ -57,9 +57,9 @@ def get_data_path(datatype, galname=None, lin_res=None):
         if datatypes[1] == 'env_mask':
             # S4G morphological maps
             basedir /= 'environmental_masks'
-            fname_seq = [galname, 'mask'] + datatype[2:]
+            fname_seq = [galname, 'mask'] + datatypes[2:]
         else:
-            fname_seq = [galname] + datatype[1:]
+            fname_seq = [galname, 'S4G'] + datatypes[1:]
             if lin_res is not None:
                 fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
 
@@ -101,9 +101,9 @@ if __name__ == '__main__':
     regions = ('disk', 'bulge', 'bars', 'rings', 'lenses', 'sp_arms')
 
     # working directory
-    WORKDIR = PHANGSDIR / 'mega-tables'
-    catfile = WORKDIR / 'catalog.ecsv'
-    logfile = WORKDIR / Path(__file__).stem+'.log'
+    WORKdir = Path(os.getenv('PHANGSWORKDIR')) / 'mega-tables'
+    catfile = WORKdir / 'catalog.ecsv'
+    logfile = WORKdir / (str(Path(__file__).stem)+'.log')
     logging = False
 
     # (linear) size of the averaging apertures
@@ -139,7 +139,7 @@ if __name__ == '__main__':
             continue
         if (row['CO_SURVEY'] == '-'):
             continue
-
+        if name != 'NGC0628': continue
         print(f"Processing data for {name}")
 
         # initialize a VoronoiTessTable
@@ -155,8 +155,8 @@ if __name__ == '__main__':
         infile = get_data_path(
             'ALMA:CO:mom0:strict', name, lin_res=apersz)
         vtt.resample_image(
-            infile, colname='I_'+line,
-            unit='header', #unit=u.Unit('K cm-3'),
+            infile, colname='I_CO21',
+            unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
 
         # add HI data in table
@@ -167,12 +167,12 @@ if __name__ == '__main__':
         else:
             vtt.resample_image(
                 infile, colname='I_21cm',
-                unit='header', #unit=u.Unit('K cm-3'),
+                unit='header', #unit=u.Unit('K km s-1'),
                 fill_outside=np.nan)
         infile = get_data_path('HI:mom0', name)
         vtt.resample_image(
             infile, colname='I_21cm_native',
-            unit='header', #unit=u.Unit('K cm-3'),
+            unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
 
         # add Z0MGS data in table
@@ -197,7 +197,7 @@ if __name__ == '__main__':
             'S4G:stellar', name, lin_res=apersz)
         vtt.resample_image(
             infile, colname='I_stellar',
-            unit='header', #unit=u.Unit('mJy sr-1'),
+            unit='header', #unit=u.Unit('MJy sr-1'),
             fill_outside=np.nan)
 
     if logging:

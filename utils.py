@@ -35,8 +35,11 @@ class HiddenTable(object):
     def __len__(self):
         return len(self._table)
 
-    def __getitem__(self, index):
-        return self._table[index]
+    def __getitem__(self, key):
+        return self._table[key]
+
+    def __setitem__(self, key, value):
+        self._table[key] = value
 
     def __init__(self, table=None):
         if table is not None:
@@ -147,12 +150,13 @@ class VoronoiTessTable(HiddenTable):
 
     __name__ = "VoronoiTessTable"
 
+    #-----------------------------------------------------------------
+
     def __init__(
             self, header, seeds_ra=None, seeds_dec=None,
             cell_shape='square', seed_spacing=None, ref_radec=None):
-        #-------------------------------------------------------------
+
         # if seed locations are specified, write them into the table
-        #-------------------------------------------------------------
         if seeds_ra is not None and seeds_dec is not None:
             t = Table()
             t['RA'] = np.atleast_1d(seeds_ra)*u.deg
@@ -176,10 +180,9 @@ class VoronoiTessTable(HiddenTable):
             self._table.meta['REF-DEC'] = self._ref_coord.dec.value
             self._table.meta['SEED-LOC'] = 'USER-DEFINED'
             return
-        #-------------------------------------------------------------
+
         # if seed locations are not specified, generate a list of
         # locations based on specified cell shape and seed spacing
-        #-------------------------------------------------------------
         super().__init__()
         # extract celestial WCS information from header
         self._header = header
@@ -258,6 +261,8 @@ class VoronoiTessTable(HiddenTable):
         self._table.meta['SEED-LOC'] = (
             f"AUTO-GENERATED {cell_shape} CELLS")
 
+    #-----------------------------------------------------------------
+
     def find_locs_in_cells(self, ra, dec):
         """
         Find out which cells do the input locations belong to.
@@ -305,26 +310,43 @@ class VoronoiTessTable(HiddenTable):
 
         return indices.reshape(ra.shape)
 
+    #-----------------------------------------------------------------
+
     def _reduce_input(self, image, ihdu, header):
         """
         Reduce any combination of input values to (data, header, wcs).
+
+        Parameters
+        ----------
+        image : str, fits.HDUList, fits.HDU, or np.ndarray
+            The image to be resampled.
+        ihdu : int, optional
+            If 'image' is a str or an HDUList, this keyword should
+            specify which HDU (extension) to use (default=0)
+        header : astropy.fits.Header, optional
+            If 'image' is an ndarray, this keyword should be a FITS
+            header providing the WCS information.
+
+        Returns
+        -------
+        data : np.ndarray
+        hdr : fits.Header object
+        wcs : astropy.wcs.WCS object
         """
-        HDU_TYPES = tuple(
-            [fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU])
-        if isinstance(image, str):
-            hdul = fits.open(image)
-            data = np.copy(hdul[ihdu].data)
-            hdr = hdul[ihdu].header.copy()
-            hdul.close()
+        if isinstance(image, np.ndarray):
+            data = image
+            hdr = header
+        elif isinstance(image, tuple([fits.PrimaryHDU, fits.ImageHDU,
+                                      fits.CompImageHDU])):
+            data = image.data
+            hdr = image.header
         elif isinstance(image, fits.HDUList):
             data = np.copy(image[ihdu].data)
             hdr = image[ihdu].header.copy()
-        elif isinstance(image, HDU_TYPES):
-            data = image.data
-            hdr = image.header
         else:
-            data = image
-            hdr = header
+            with fits.open(image) as hdul:
+                data = np.copy(hdul[ihdu].data)
+                hdr = hdul[ihdu].header.copy()
         wcs = WCS(hdr)
         if not (data.ndim == hdr['NAXIS'] == 2):
             raise ValueError(
@@ -337,12 +359,17 @@ class VoronoiTessTable(HiddenTable):
                 "Input header have unexpected axis type")
         return data, hdr, wcs
 
+    #-----------------------------------------------------------------
+
     def resample_image(
             self, image, ihdu=0, header=None,
-            colname='new_col', unit='', fill_outside='nearest'):
+            colname='new_col', unit='',
+            fill_outside='nearest'):
         """
         Resample an image at the location of the Voronoi seeds.
 
+        Parameters
+        ----------
         image : str, fits.HDUList, fits.HDU, or np.ndarray
             The image to be resampled.
         ihdu : int, optional
@@ -354,9 +381,9 @@ class VoronoiTessTable(HiddenTable):
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : astropy.unit.Unit, optional
-            Physical unit of the output values. If None (default),
-            they are assumed to be dimensionless.
+        unit : str or astropy.unit.Unit, optional
+            Physical unit of the output values (default='').
+            If unit='header', the 'BUNIT' entry in the header is used.
         fill_outside : {'nearest', float}, optional
             The behavior outside the footprint of the input image.
             If fill_outside='nearest', all seeds outside the footprint
@@ -389,7 +416,12 @@ class VoronoiTessTable(HiddenTable):
 
         # save the resampled values as a new column in the table
         self._table[colname] = sub_data
-        self._table[colname].unit = u.Unit(unit)
+        if unit == 'header':
+            self._table[colname].unit = u.Unit(hdr['BUNIT'])
+        else:
+            self._table[colname].unit = u.Unit(unit)
+
+    #-----------------------------------------------------------------
 
     def _nanaverage(self, a, weights=None, **kwargs):
         if weights is None:
@@ -402,6 +434,8 @@ class VoronoiTessTable(HiddenTable):
         else:
             return np.average(a[flag], weights=w[flag], **kwargs)
 
+    #-----------------------------------------------------------------
+
     def calc_image_stats(
             self, image, ihdu=0, header=None, weight=None,
             colname='new_col', unit='',
@@ -409,6 +443,8 @@ class VoronoiTessTable(HiddenTable):
         """
         Calculate statistics of an image within each cell.
 
+        Parameters
+        ----------
         image : str, fits.HDUList, fits.HDU, or np.ndarray
             The image to be resampled.
         ihdu : int, optional
@@ -425,9 +461,9 @@ class VoronoiTessTable(HiddenTable):
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : astropy.unit.Unit, optional
-            Physical unit of the output values. If None (default),
-            they are assumed to be dimensionless.
+        unit : str or astropy.unit.Unit, optional
+            Physical unit of the output values (default='').
+            If unit='header', the 'BUNIT' entry in the header is used.
         stat_func : callable, optional
             A function that accepts an array of values, and return a
             scalar value (which is the calculated statistics). If
@@ -467,7 +503,12 @@ class VoronoiTessTable(HiddenTable):
 
         # save the summed values as a new column in the table
         self._table[colname] = arr
-        self._table[colname].unit = u.Unit(unit)
+        if unit == 'header':
+            self._table[colname].unit = u.Unit(hdr['BUNIT'])
+        else:
+            self._table[colname].unit = u.Unit(unit)
+
+    #-----------------------------------------------------------------
 
     def calc_catalog_stats(
             self, value, ra, dec, weight=None,
@@ -476,6 +517,8 @@ class VoronoiTessTable(HiddenTable):
         """
         Calculate statistics of a catalog entry within each cell.
 
+        Parameters
+        ----------
         value : np.ndarray
             Values in the catalog entry.
         ra : np.ndarray
@@ -490,9 +533,8 @@ class VoronoiTessTable(HiddenTable):
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : astropy.unit.Unit, optional
-            Physical unit of the output values. If None (default),
-            they are assumed to be dimensionless.
+        unit : str or astropy.unit.Unit, optional
+            Physical unit of the output values (default='').
         stat_func : callable, optional
             A function that accepts an array of values, and return a
             scalar value (which is the calculated statistics). If
@@ -529,6 +571,8 @@ class VoronoiTessTable(HiddenTable):
         self._table[colname] = arr
         self._table[colname].unit = u.Unit(unit)
 
+    #-----------------------------------------------------------------
+
     def write(self, filename, keep_metadata=True, **kwargs):
         """
         Write a VoronoiTessTable to a file.
@@ -558,6 +602,8 @@ class VoronoiTessTable(HiddenTable):
                         "keep_metadata=True")
             kwargs['format'] = 'ecsv'
             self._table.write(filename, **kwargs)
+
+    #-----------------------------------------------------------------
 
     @classmethod
     def read(cls, filename, **kwargs):
@@ -591,6 +637,8 @@ class VoronoiTessTable(HiddenTable):
             self._table.meta['REF-RA'] * u.deg,
             self._table.meta['REF-DEC'] * u.deg)
         return vtt
+
+    #-----------------------------------------------------------------
 
     def show_seeds_on_sky(
             self, ax=None, image=None, ffigkw={}, **scatterkw):
@@ -632,3 +680,7 @@ class VoronoiTessTable(HiddenTable):
                     self['DEC'].quantity.value,
                     **scatterkw)
                 return ax
+
+
+######################################################################
+######################################################################

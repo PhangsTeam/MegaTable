@@ -102,9 +102,10 @@ if __name__ == '__main__':
     regions = ('disk', 'bulge', 'bars', 'rings', 'lenses', 'sp_arms')
 
     # working directory
-    WORKdir = Path(os.getenv('PHANGSWORKDIR')) / 'mega-tables'
-    catfile = WORKdir / 'catalog.ecsv'
-    logfile = WORKdir / (str(Path(__file__).stem)+'.log')
+    PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
+    workdir = PHANGSdir / 'mega-tables'
+    catfile = PHANGSdir / 'sample_v1p3.ecsv'
+    logfile = workdir / (str(Path(__file__).stem)+'.log')
     logging = False
 
     # (linear) size of the averaging apertures
@@ -122,23 +123,26 @@ if __name__ == '__main__':
         sys.stdout = log
 
     catalog = Table.read(catfile)
+    catalog = catalog[catalog['ALMA'] == 1]
 
     for row in catalog:
 
         # galaxy parameters
         name = row['NAME'].strip()
-        dist = row['DIST'] * u.Mpc
         ctr_radec = np.array([row['RA_DEG'], row['DEC_DEG']]) * u.deg
+        dist = row['DIST'] * u.Mpc
+        incl = row['INCL'] * u.deg
+        posang = row['POSANG'] * u.deg
 
-        # skip "bad" targets
-        if name in (
-            # Excluding edge-on objects:
-            'NGC0253', 'NGC0891', 'NGC3623', 'NGC4565', 'NGC4945',
-            # # Excluding objects with P.A. = NaN
-            # 'NGC0278', 'NGC3239', 'NGC3344', 'NGC3599',
-            ):
+        # skip targets with bad geometrical information
+        if not ((incl >= 0*u.deg) and (incl < 90*u.deg) and
+                np.isfinite(posang)):
             continue
-        if (row['CO_SURVEY'] == '-'):
+
+        vttfile = (workdir /
+                   f"{name}_hex_{apersz.to('kpc').value:.0f}kpc.ecsv")
+        # skip targets with aperture statistics table already on disk
+        if vttfile.is_file():
             continue
 
         print(f"Processing data for {name}")
@@ -146,18 +150,23 @@ if __name__ == '__main__':
         # initialize a VoronoiTessTable
         infile = get_data_path(
             'ALMA:CO:tpeak', name, lin_res=apersz)
+        if not infile.is_file():
+            print(f"No CO low resolution data found")
+            continue
+        apersz_deg = (apersz/dist*u.rad).to('deg').value
         with fits.open(infile) as hdul:
             vtt = VoronoiTessTable(
                 hdul[0].header, cell_shape='hexagon',
                 ref_radec=ctr_radec.value,
-                seed_spacing=(apersz/dist*u.rad).to('deg').value)
+                seed_spacing=apersz_deg)
 
         # add galactic radii and projected angles in table
         radii, projang = deproject(
-            center_coord=ctr_radec, incl=row['INCL'], pa=row['POSANG'],
+            center_coord=ctr_radec, incl=incl.value, pa=posang.value,
             ra=vtt['RA'], dec=vtt['DEC'])
         vtt['r_gal'] = (radii * u.deg).to('arcsec')
         vtt['phi_gal'] = projang * u.deg
+        # sort rows by galactic radii
         vtt[:] = vtt[np.argsort(vtt['r_gal'])]
 
         # add low resolution CO data in table
@@ -167,6 +176,10 @@ if __name__ == '__main__':
             infile, colname='I_CO21',
             unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
+        # mask rows where low resolution 'I_CO21' is NaN
+        vtt.clean(discard_NaN='I_CO21')
+        if len(vtt) == 0:
+            continue
 
         # add HI data in table
         infile = get_data_path(
@@ -179,10 +192,33 @@ if __name__ == '__main__':
                 unit='header', #unit=u.Unit('K km s-1'),
                 fill_outside=np.nan)
         infile = get_data_path('HI:mom0', name)
-        vtt.resample_image(
-            infile, colname='I_21cm_native',
-            unit='header', #unit=u.Unit('K km s-1'),
-            fill_outside=np.nan)
+        if not infile.is_file():
+            vtt['I_21cm_natres'] = np.full(len(vtt), np.nan)
+        else:
+            vtt.resample_image(
+                infile, colname='I_21cm_natres',
+                unit='header', #unit=u.Unit('K km s-1'),
+                fill_outside=np.nan)
+
+        # add S4G data in table
+        infile = get_data_path(
+            'S4G:ICA3p6um', name, lin_res=apersz)
+        if not infile.is_file():
+            vtt['I_3p6um_ICA'] = np.full(len(vtt), np.nan)
+        else:
+            vtt.resample_image(
+                infile, colname='I_3p6um_ICA',
+                unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
+                fill_outside=np.nan)
+        infile = get_data_path(
+            'S4G:3p6um', name, lin_res=apersz)
+        if not infile.is_file():
+            vtt['I_3p6um_raw'] = np.full(len(vtt), np.nan)
+        else:
+            vtt.resample_image(
+                infile, colname='I_3p6um_raw',
+                unit='header', #unit=u.Unit('MJy sr-1'),
+                fill_outside=np.nan)
 
         # add Z0MGS data in table
         infile = get_data_path(
@@ -196,18 +232,16 @@ if __name__ == '__main__':
                 fill_outside=np.nan)
         infile = get_data_path(
             'Z0MGS:SFR:W3ONLY', name, lin_res=apersz)
-        vtt.resample_image(
-            infile, colname='SigSFR_W3ONLY',
-            unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
-            fill_outside=np.nan)
+        if not infile.is_file():
+            vtt['SigSFR_W3ONLY'] = np.full(len(vtt), np.nan)
+        else:
+            vtt.resample_image(
+                infile, colname='SigSFR_W3ONLY',
+                unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
+                fill_outside=np.nan)
 
-        # add S4G data in table
-        infile = get_data_path(
-            'S4G:stellar', name, lin_res=apersz)
-        vtt.resample_image(
-            infile, colname='I_stellar',
-            unit='header', #unit=u.Unit('MJy sr-1'),
-            fill_outside=np.nan)
+        # write aperture statistics table to disk
+        vtt.write(vttfile)
 
     if logging:
         sys.stdout = orig_stdout

@@ -6,6 +6,7 @@ import numpy as np
 from astropy import units as u
 from astropy.table import Table
 from astropy.io import fits
+from AlmaTools.utils import deproject
 from mega_table.utils import VoronoiTessTable
 
 # --------------------------------------------------------------------
@@ -139,7 +140,7 @@ if __name__ == '__main__':
             continue
         if (row['CO_SURVEY'] == '-'):
             continue
-        if name != 'NGC0628': continue
+
         print(f"Processing data for {name}")
 
         # initialize a VoronoiTessTable
@@ -150,6 +151,14 @@ if __name__ == '__main__':
                 hdul[0].header, cell_shape='hexagon',
                 ref_radec=ctr_radec.value,
                 seed_spacing=(apersz/dist*u.rad).to('deg').value)
+
+        # add galactic radii and projected angles in table
+        radii, projang = deproject(
+            center_coord=ctr_radec, incl=row['INCL'], pa=row['POSANG'],
+            ra=vtt['RA'], dec=vtt['DEC'])
+        vtt['r_gal'] = (radii * u.deg).to('arcsec')
+        vtt['phi_gal'] = projang * u.deg
+        vtt[:] = vtt[np.argsort(vtt['r_gal'])]
 
         # add low resolution CO data in table
         infile = get_data_path(

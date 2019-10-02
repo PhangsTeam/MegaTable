@@ -22,7 +22,10 @@ def get_data_path(datatype, galname=None, lin_res=None):
     # PHANGS data parent directory
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
-    if datatypes[0] == 'ALMA':
+    if datatypes[0] == 'sample_table':
+        return PHANGSdir / 'sample_v1p3.ecsv'
+
+    elif datatypes[0] == 'ALMA':
         # PHANGS-ALMA data
         basedir = PHANGSdir / 'ALMA'
         if datatypes[1] == 'CO':
@@ -118,11 +121,31 @@ def add_CPROPS_stat_to_table():
 ######################################################################
 ######################################################################
 
-
 if __name__ == '__main__':
 
-    # ignore warnings
+    # ----------------------------------------------------------------
+
+    # working directory
+    workdir = Path(__file__).parent
+
+    # warnings & logging settings
     warnings.filterwarnings('ignore')
+    logging = False
+    if logging:
+        # output log to a file
+        orig_stdout = sys.stdout
+        log = open(workdir/(str(Path(__file__).stem)+'.log'), 'w')
+        sys.stdout = log
+
+    # ----------------------------------------------------------------
+
+    # averaging aperture (linear) size
+    apersz = 1 * u.kpc
+
+    # averaging aperture shape
+    aperture_shape = 'hexagon'
+
+    # ----------------------------------------------------------------
 
     # (linear) resolutions of the PHANGS-ALMA data
     lin_res = np.array([60, 90, 120, 150]) * u.pc
@@ -130,23 +153,10 @@ if __name__ == '__main__':
     # list of morphological regions in environmental masks
     regions = ('disk', 'bulge', 'bars', 'rings', 'lenses', 'sp_arms')
 
-    # working directory
-    PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
-    workdir = PHANGSdir / 'mega-tables'
-    logfile = workdir / (str(Path(__file__).stem)+'.log')
-    logging = False
-
-    # (linear) size of the averaging apertures
-    apersz = 1 * u.kpc
-
-    if logging:
-        # output log to a file
-        orig_stdout = sys.stdout
-        log = open(logfile, 'w')
-        sys.stdout = log
+    # ----------------------------------------------------------------
 
     # read PHANGS sample table
-    catalog = Table.read(PHANGSdir / 'sample_v1p3.ecsv')
+    catalog = Table.read(get_data_path('sample_table'))
     # only keep targets with the 'ALMA' tag
     catalog = catalog[catalog['ALMA'] == 1]
 
@@ -166,7 +176,8 @@ if __name__ == '__main__':
             continue
 
         vttfile = (workdir /
-                   f"{name}_hex_{apersz.to('kpc').value:.0f}kpc.ecsv")
+                   f"{name}_{aperture_shape}_"
+                   f"{apersz.to('kpc').value:.0f}kpc.ecsv")
         # skip targets with aperture statistics table already on disk
         if vttfile.is_file():
             continue
@@ -184,7 +195,7 @@ if __name__ == '__main__':
         apersz_deg = (apersz/dist*u.rad).to('deg').value
         with fits.open(infile) as hdul:
             vtt = VoronoiTessTable(
-                hdul[0].header, cell_shape='hexagon',
+                hdul[0].header, cell_shape=aperture_shape,
                 ref_radec=ctr_radec.value,
                 seed_spacing=apersz_deg)
 
@@ -274,6 +285,8 @@ if __name__ == '__main__':
 
         print(f"Finished processing data for {name}!")
         print("")
+
+    # ----------------------------------------------------------------
 
     if logging:
         # shift back to original log output location

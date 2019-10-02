@@ -173,13 +173,13 @@ class VoronoiTessTable(HiddenTable):
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
             # record metadata
             self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-            for key in self._wcs.to_header():
-                self._table.meta[key] = self._wcs.to_header()[key]
-            self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-            self._table.meta['NAXIS2'] = self._wcs._naxis[1]
+            self._table.meta['TESSTYPE'] = 'USER-DEFINED'
             self._table.meta['REF-RA'] = self._ref_coord.ra.value
             self._table.meta['REF-DEC'] = self._ref_coord.dec.value
-            self._table.meta['TESSTYPE'] = 'USER-DEFINED'
+            self._table.meta['NAXIS1'] = self._wcs._naxis[0]
+            self._table.meta['NAXIS2'] = self._wcs._naxis[1]
+            for key in self._wcs.to_header():
+                self._table.meta[key] = self._wcs.to_header()[key]
             return
 
         # if seed locations are not specified, generate a list of
@@ -255,14 +255,14 @@ class VoronoiTessTable(HiddenTable):
         self._table = self[mask]
         # record metadata
         self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-        for key in self._wcs.to_header():
-            self._table.meta[key] = self._wcs.to_header()[key]
-        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
-        self._table.meta['REF-RA'] = self._ref_coord.ra.value
-        self._table.meta['REF-DEC'] = self._ref_coord.dec.value
         self._table.meta['TESSTYPE'] = (
             f"AUTO-GENERATED ({cell_shape.upper()} CELLS)")
+        self._table.meta['REF-RA'] = self._ref_coord.ra.value
+        self._table.meta['REF-DEC'] = self._ref_coord.dec.value
+        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
+        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
+        for key in self._wcs.to_header():
+            self._table.meta[key] = self._wcs.to_header()[key]
 
     #-----------------------------------------------------------------
 
@@ -426,16 +426,13 @@ class VoronoiTessTable(HiddenTable):
 
     #-----------------------------------------------------------------
 
-    def _nanaverage(self, a, weights=None, **kwargs):
-        if weights is None:
-            w = np.ones_like(a)
-        else:
-            w = weights.astype('float')
-        flag = ~np.isnan(a) & ~np.isnan(w)
-        if flag.sum() == 0:
+    def _nanaverage(self, a, **kwargs):
+        avg = np.ma.average(
+            np.ma.array(a, mask=np.isnan(a)), **kwargs)
+        if isinstance(avg, np.ma.core.MaskedConstant):
             return np.nan
         else:
-            return np.average(a[flag], weights=w[flag], **kwargs)
+            return avg
 
     #-----------------------------------------------------------------
 

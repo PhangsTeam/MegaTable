@@ -84,11 +84,12 @@ def add_resampled_image_to_table(
 
 def add_env_frac_to_table(
     vtt, envfile, wtfile, colname='new_col', **kwargs):
-    if not (envfile.isfile() and wtfile.isfile()):
+    if not (envfile.is_file() and wtfile.is_file()):
         vtt[colname] = np.full(len(vtt), np.nan)
     else:
         with fits.open(wtfile) as hdul:
             wtmap = hdul[0].data.copy()
+            wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
             wthdr = hdul[0].header.copy()
         with fits.open(envfile) as hdul:
             envmap, footprint = reproject_interp(
@@ -173,10 +174,12 @@ if __name__ == '__main__':
         print(f"Processing data for {name}")
 
         # initialize a VoronoiTessTable
+        print("  Initializing data table")
         infile = get_data_path(
             'ALMA:CO:tpeak', name, lin_res=apersz)
         if not infile.is_file():
-            print(f"No CO low resolution data found")
+            print(f"No CO low resolution data found for {name}")
+            print("")
             continue
         apersz_deg = (apersz/dist*u.rad).to('deg').value
         with fits.open(infile) as hdul:
@@ -186,6 +189,7 @@ if __name__ == '__main__':
                 seed_spacing=apersz_deg)
 
         # add galactic radii and projected angles in table
+        print("  Calculating r_gal and phi_gal")
         radii, projang = deproject(
             center_coord=ctr_radec, incl=incl.value, pa=posang.value,
             ra=vtt['RA'], dec=vtt['DEC'])
@@ -195,6 +199,7 @@ if __name__ == '__main__':
         vtt[:] = vtt[np.argsort(vtt['r_gal'])]
 
         # add low resolution CO data in table
+        print("  Resampling low resolution CO data")
         infile = get_data_path(
             'ALMA:CO:mom0:strict', name, lin_res=apersz)
         vtt.resample_image(
@@ -204,9 +209,12 @@ if __name__ == '__main__':
         # mask rows where low resolution 'I_CO21' is NaN
         vtt.clean(discard_NaN='I_CO21')
         if len(vtt) == 0:
+            print(f"No CO detection in any aperture -- skip {name}")
+            print("")
             continue
 
         # add HI data in table
+        print("  Resampling HI data")
         infile = get_data_path(
             'HI:mom0', name, lin_res=apersz)
         add_resampled_image_to_table(
@@ -221,6 +229,7 @@ if __name__ == '__main__':
             fill_outside=np.nan)
 
         # add S4G data in table
+        print("  Resampling S4G data")
         infile = get_data_path(
             'S4G:ICA3p6um', name, lin_res=apersz)
         add_resampled_image_to_table(
@@ -235,6 +244,7 @@ if __name__ == '__main__':
             fill_outside=np.nan)
 
         # add Z0MGS data in table
+        print("  Resampling Z0MGS data")
         infile = get_data_path(
             'Z0MGS:SFR:NUVW3', name, lin_res=apersz)
         add_resampled_image_to_table(
@@ -249,6 +259,8 @@ if __name__ == '__main__':
             fill_outside=np.nan)
 
         # add environmental fraction (CO flux weighted) in table
+        print("  Calculating (CO flux weighted) "
+              "environmental fraction")
         wtfile = get_data_path(
             'ALMA:CO:mom0:strict', name, lin_res=lin_res[-1])
         for reg in regions:
@@ -257,7 +269,11 @@ if __name__ == '__main__':
                 vtt, envfile, wtfile, colname='frac_'+reg)
 
         # write table to disk
+        print("  Writing table to disk")
         vtt.write(vttfile)
+
+        print(f"Finished processing data for {name}!")
+        print("")
 
     if logging:
         # shift back to original log output location

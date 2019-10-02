@@ -7,7 +7,8 @@ from astropy import units as u
 from astropy.table import Table
 from astropy.io import fits
 from reproject import reproject_interp
-from mega_table.utils import VoronoiTessTable, deproject
+from mega_table.table import VoronoiTessTable
+from mega_table.utils import deproject
 
 # --------------------------------------------------------------------
 

@@ -76,10 +76,14 @@ def get_data_path(datatype, galname=None, lin_res=None):
 
 def add_resampled_image_to_table(
     vtt, infile, colname='new_col', **kwargs):
+
     if not infile.is_file():
         vtt[colname] = np.full(len(vtt), np.nan)
-    else:
-        vtt.resample_image(infile, colname=colname, **kwargs)
+        return
+
+    vtt.resample_image(infile, colname=colname, **kwargs)
+
+    return
 
 
 # --------------------------------------------------------------------
@@ -87,28 +91,124 @@ def add_resampled_image_to_table(
 
 def add_env_frac_to_table(
     vtt, envfile, wtfile, colname='new_col', **kwargs):
+
     if not (envfile.is_file() and wtfile.is_file()):
         vtt[colname] = np.full(len(vtt), np.nan)
-    else:
-        with fits.open(wtfile) as hdul:
-            wtmap = hdul[0].data.copy()
-            wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
-            wthdr = hdul[0].header.copy()
-        with fits.open(envfile) as hdul:
-            envmap, footprint = reproject_interp(
-                hdul[0], wthdr, order=0)
-        envmap[~footprint.astype('?')] = 0
-        envbimap = (envmap > 0).astype('float')
-        vtt.calc_image_stats(
-            envbimap, header=wthdr, weight=wtmap,
-            colname=colname, **kwargs)
+        return
+
+    with fits.open(wtfile) as hdul:
+        wtmap = hdul[0].data.copy()
+        wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
+        wthdr = hdul[0].header.copy()
+    with fits.open(envfile) as hdul:
+        envmap, footprint = reproject_interp(
+            hdul[0], wthdr, order=0)
+    envmap[~footprint.astype('?')] = 0
+    envbimap = (envmap > 0).astype('float')
+    vtt.calc_image_stats(
+        envbimap, header=wthdr, weight=wtmap,
+        colname=colname, **kwargs)
+
+    return
 
 
 # --------------------------------------------------------------------
 
 
-def add_CO_stat_to_table():
-    pass
+def add_CO_stat_to_table(vtt, bm0file, sm0file, sewfile, res):
+
+    rstr = f"{res.to('pc').value:.0f}pc"
+    cols = [
+        # sums
+        (f"Area_CO21_total_{rstr}", 'steradian'),
+        (f"F_CO21_broad_{rstr}", 'K km s-1 steradian'),
+        (f"Area_CO21_strict_{rstr}", 'steradian'),
+        (f"F_CO21_strict_{rstr}", 'K km s-1 steradian'),
+        # area weighted averages
+        (f"A<I_CO21_{rstr}>", 'K km s-1'),
+        (f"A<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
+        (f"A<vdisp_CO21_{rstr}>", 'km s-1'),
+        (f"A<vdisp^2_CO21_{rstr}>", 'km2 s-2'),
+        (f"A<I*vdisp^2_CO21_{rstr}>", 'K km3 s-3'),
+        (f"A<vdisp^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+        # CO flux weighted averages
+        (f"F<I_CO21_{rstr}>", 'K km s-1'),
+        (f"F<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
+        (f"F<vdisp_CO21_{rstr}>", 'km s-1'),
+        (f"F<vdisp^2_CO21_{rstr}>", 'km2 s-2'),
+        (f"F<I*vdisp^2_CO21_{rstr}>", 'K km3 s-3'),
+        (f"F<vdisp^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+        ]
+
+    # no data file found: add placeholder (empty) columns to table
+    if not (bm0file.is_file() and sm0file.is_file() and
+            sewfile.is_file()):
+        for col, unit in cols:
+            vtt[col] = np.full(len(vtt), np.nan)
+        return
+
+    # read files
+    with fits.open(bm0file) as hdul:
+        bm0map = hdul[0].data.copy()
+        hdr = hdul[0].header.copy()
+    with fits.open(sm0file) as hdul:
+        sm0map = hdul[0].data.copy()
+        if sm0map.shape != bm0map.shape:
+            raise ValueError("Input maps have inconsistent shape")
+    with fits.open(sewfile) as hdul:
+        sewmap = hdul[0].data.copy()
+        if sewmap.shape != bm0map.shape:
+            raise ValueError("Input maps have inconsistent shape")
+    bm0map[np.isnan(bm0map)] = 0
+    sm0map[np.isnan(sm0map)] = 0
+    sewmap[np.isnan(sewmap)] = 0
+
+    # pixel size (in steradian)
+    pixsz = (np.deg2rad(np.abs(hdr['CDELT1'])) *
+             np.deg2rad(np.abs(hdr['CDELT2'])))
+
+    # maps corresponding to each column
+    maps = [
+        # sums
+        np.ones_like(bm0map).astype('float')*pixsz,
+        bm0map*pixsz,
+        (sm0map > 0).astype('float')*pixsz,
+        sm0map*pixsz,
+        # area weighted averages
+        sm0map,
+        sm0map**2,
+        sewmap,
+        sewmap**2,
+        sm0map*sewmap**2,
+        sewmap**2/sm0map,
+        # CO flux weighted averages
+        sm0map,
+        sm0map**2,
+        sewmap,
+        sewmap**2,
+        sm0map*sewmap**2,
+        sewmap**2/sm0map,
+    ]
+
+    # calculate statistics and add into table
+    for (col, unit), map in zip(cols, maps):
+        if col[:2] == 'A<':
+            # area-weighted average
+            vtt.calc_image_stats(
+                map, header=hdr,
+                colname=col, unit=unit)
+        elif col[:2] == 'F<':
+            # CO flux-weighted average
+            vtt.calc_image_stats(
+                map, header=hdr, weight=sm0map,
+                colname=col, unit=unit)
+        else:
+            # sum
+            vtt.calc_image_stats(
+                map, header=hdr, stat_func=np.nansum,
+                colname=col, unit=unit)
+
+    return
 
 
 # --------------------------------------------------------------------
@@ -186,8 +286,7 @@ if __name__ == '__main__':
 
         # initialize a VoronoiTessTable
         print("  Initializing data table")
-        infile = get_data_path(
-            'ALMA:CO:tpeak', name, lin_res=apersz)
+        infile = get_data_path('ALMA:CO:tpeak', name, apersz)
         if not infile.is_file():
             print(f"No CO low resolution data found for {name}")
             print("")
@@ -211,23 +310,24 @@ if __name__ == '__main__':
 
         # add low resolution CO data in table
         print("  Resampling low resolution CO data")
-        infile = get_data_path(
-            'ALMA:CO:mom0:strict', name, lin_res=apersz)
+        infile = get_data_path('ALMA:CO:mom0:strict', name, apersz)
         vtt.resample_image(
             infile, colname='I_CO21',
             unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
+        if np.isfinite(vtt['I_CO21']).sum() == 0:
+            print(f"No CO detection in any aperture -- skip {name}")
+            print("")
+            continue
 
         # add HI data in table
         print("  Resampling HI data")
-        infile = get_data_path(
-            'HI:mom0', name, lin_res=apersz)
+        infile = get_data_path('HI:mom0', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm',
             unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
-        infile = get_data_path(
-            'HI:mom0', name)
+        infile = get_data_path('HI:mom0', name)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm_native',
             unit='header', #unit=u.Unit('K km s-1'),
@@ -235,14 +335,12 @@ if __name__ == '__main__':
 
         # add S4G data in table
         print("  Resampling S4G data")
-        infile = get_data_path(
-            'S4G:ICA3p6um', name, lin_res=apersz)
+        infile = get_data_path('S4G:ICA3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_ICA',
             unit='header', #unit=u.Unit('MJy sr-1'),
             fill_outside=np.nan)
-        infile = get_data_path(
-            'S4G:3p6um', name, lin_res=apersz)
+        infile = get_data_path('S4G:3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_raw',
             unit='header', #unit=u.Unit('MJy sr-1'),
@@ -250,14 +348,12 @@ if __name__ == '__main__':
 
         # add Z0MGS data in table
         print("  Resampling Z0MGS data")
-        infile = get_data_path(
-            'Z0MGS:SFR:NUVW3', name, lin_res=apersz)
+        infile = get_data_path('Z0MGS:SFR:NUVW3', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='SigSFR_NUVW3',
             unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
             fill_outside=np.nan)
-        infile = get_data_path(
-            'Z0MGS:SFR:W3ONLY', name, lin_res=apersz)
+        infile = get_data_path('Z0MGS:SFR:W3ONLY', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='SigSFR_W3ONLY',
             unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
@@ -266,20 +362,25 @@ if __name__ == '__main__':
         # add environmental fraction (CO flux weighted) in table
         print("  Calculating (CO flux weighted) "
               "environmental fraction")
-        wtfile = get_data_path(
-            'ALMA:CO:mom0:strict', name, lin_res=lin_res[-1])
+        res = lin_res[-1]
+        wtfile = get_data_path('ALMA:CO:mom0:strict', name, res)
         for reg in regions:
             envfile = get_data_path('S4G:env_mask:'+reg, name)
             add_env_frac_to_table(
                 vtt, envfile, wtfile, colname='frac_'+reg)
 
+        # add statistics of high resolution CO data in table
+        print("  Calculating statistics of high resolution CO data")
+        for res in lin_res:
+            bm0file = get_data_path('ALMA:CO:mom0:broad', name, res)
+            sm0file = get_data_path('ALMA:CO:mom0:strict', name, res)
+            sewfile = get_data_path('ALMA:CO:ew:strict', name, res)
+            add_CO_stat_to_table(
+                vtt, bm0file, sm0file, sewfile, res)
+
         # mask rows where low resolution 'I_CO21' is NaN
         # This step has to be the last step!!
         vtt.clean(discard_NaN='I_CO21')
-        if len(vtt) == 0:
-            print(f"No CO detection in any aperture -- skip {name}")
-            print("")
-            continue
 
         # write table to disk
         print("  Writing table to disk")

@@ -217,12 +217,6 @@ if __name__ == '__main__':
             infile, colname='I_CO21',
             unit='header', #unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
-        # mask rows where low resolution 'I_CO21' is NaN
-        vtt.clean(discard_NaN='I_CO21')
-        if len(vtt) == 0:
-            print(f"No CO detection in any aperture -- skip {name}")
-            print("")
-            continue
 
         # add HI data in table
         print("  Resampling HI data")
@@ -278,6 +272,14 @@ if __name__ == '__main__':
             envfile = get_data_path('S4G:env_mask:'+reg, name)
             add_env_frac_to_table(
                 vtt, envfile, wtfile, colname='frac_'+reg)
+
+        # mask rows where low resolution 'I_CO21' is NaN
+        # This step has to be the last step!!
+        vtt.clean(discard_NaN='I_CO21')
+        if len(vtt) == 0:
+            print(f"No CO detection in any aperture -- skip {name}")
+            print("")
+            continue
 
         # write table to disk
         print("  Writing table to disk")

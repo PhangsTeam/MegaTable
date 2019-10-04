@@ -115,15 +115,17 @@ def add_env_frac_to_table(
 # --------------------------------------------------------------------
 
 
-def add_CO_stat_to_table(vtt, bm0file, sm0file, sewfile, res):
+def add_CO_stat_to_table(
+    vtt, bm0file, sm0file, sewfile, res, **kwargs):
 
     rstr = f"{res.to('pc').value:.0f}pc"
     cols = [
         # sums
-        (f"Area_CO21_total_{rstr}", 'steradian'),
-        (f"F_CO21_broad_{rstr}", 'K km s-1 steradian'),
-        (f"Area_CO21_strict_{rstr}", 'steradian'),
-        (f"F_CO21_strict_{rstr}", 'K km s-1 steradian'),
+        (f"Area_CO21_total_{rstr}", 'arcsec2'),
+        (f"Area_CO21_broad_{rstr}", 'arcsec2'),
+        (f"Area_CO21_strict_{rstr}", 'arcsec2'),
+        (f"Flux_CO21_broad_{rstr}", 'K km s-1 arcsec2'),
+        (f"Flux_CO21_strict_{rstr}", 'K km s-1 arcsec2'),
         # area weighted averages
         (f"A<I_CO21_{rstr}>", 'K km s-1'),
         (f"A<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
@@ -159,28 +161,33 @@ def add_CO_stat_to_table(vtt, bm0file, sm0file, sewfile, res):
         sewmap = hdul[0].data.copy()
         if sewmap.shape != bm0map.shape:
             raise ValueError("Input maps have inconsistent shape")
-    bm0map[np.isnan(bm0map)] = 0
-    sm0map[np.isnan(sm0map)] = 0
-    sewmap[np.isnan(sewmap)] = 0
+    bm0map[~np.isfinite(bm0map)] = 0
+    nanmap = np.ones_like(bm0map).astype('float')
+    nanmap[~np.isfinite(sm0map) | (sm0map <= 0) |
+           ~np.isfinite(sewmap) | (sewmap <= 0)] = np.nan
+    sm0map[np.isnan(nanmap)] = 0
+    sewmap[np.isnan(nanmap)] = 0
 
-    # pixel size (in steradian)
-    pixsz = (np.deg2rad(np.abs(hdr['CDELT1'])) *
-             np.deg2rad(np.abs(hdr['CDELT2'])))
+    # pixel size (in arcsec^2)
+    pixsz = np.abs(
+        hdr['CDELT1'] * hdr['CDELT2'] * u.deg**2
+        ).to('arcsec2').value
 
     # maps corresponding to each column
     maps = [
         # sums
         np.ones_like(bm0map).astype('float')*pixsz,
-        bm0map*pixsz,
+        (bm0map != 0).astype('float')*pixsz,
         (sm0map > 0).astype('float')*pixsz,
+        bm0map*pixsz,
         sm0map*pixsz,
-        # area weighted averages
-        sm0map,
-        sm0map**2,
-        sewmap,
-        sewmap**2,
-        sm0map*sewmap**2,
-        sewmap**2/sm0map,
+        # area weighted averages (among regions w/ CO detection)
+        sm0map * nanmap,
+        sm0map**2 * nanmap,
+        sewmap * nanmap,
+        sewmap**2 * nanmap,
+        sm0map*sewmap**2 * nanmap,
+        sewmap**2/sm0map * nanmap,
         # CO flux weighted averages
         sm0map,
         sm0map**2,
@@ -195,18 +202,18 @@ def add_CO_stat_to_table(vtt, bm0file, sm0file, sewfile, res):
         if col[:2] == 'A<':
             # area-weighted average
             vtt.calc_image_stats(
-                map, header=hdr,
-                colname=col, unit=unit)
+                map, header=hdr, weight=None,
+                colname=col, unit=unit, **kwargs)
         elif col[:2] == 'F<':
             # CO flux-weighted average
             vtt.calc_image_stats(
                 map, header=hdr, weight=sm0map,
-                colname=col, unit=unit)
+                colname=col, unit=unit, **kwargs)
         else:
             # sum
             vtt.calc_image_stats(
                 map, header=hdr, stat_func=np.nansum,
-                colname=col, unit=unit)
+                colname=col, unit=unit, **kwargs)
 
     return
 

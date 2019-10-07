@@ -6,7 +6,6 @@ from astropy.table import Table
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-from .utils import nanaverage
 
 ######################################################################
 ######################################################################
@@ -427,9 +426,9 @@ class VoronoiTessTable(HiddenTable):
     #-----------------------------------------------------------------
 
     def calc_image_stats(
-            self, image, ihdu=0, header=None, weight=None,
-            colname='new_col', unit='',
-            stat_func=None, **kwargs):
+            self, image, ihdu=0, header=None,
+            stat_func=None, weight=None,
+            colname='new_col', unit='', **kwargs):
         """
         Calculate statistics of an image within each cell.
 
@@ -443,6 +442,12 @@ class VoronoiTessTable(HiddenTable):
         header : astropy.fits.Header, optional
             If 'image' is an ndarray, this keyword should be a FITS
             header providing the WCS information.
+        stat_func : callable
+            A function that accepts an array of values, and return a
+            scalar value (which is the calculated statistics). If
+            'weight' is not None, this function should also accept a
+            keyword named 'weights', which specifies the statistical
+            weight of each value in the array.
         weight : np.ndarray, optional
             If not None, this keyword should be an ndarray specifying
             the statistical weight of each pixel in the input image.
@@ -454,12 +459,6 @@ class VoronoiTessTable(HiddenTable):
         unit : str or astropy.unit.Unit, optional
             Physical unit of the output values (default='').
             If unit='header', the 'BUNIT' entry in the header is used.
-        stat_func : callable, optional
-            A function that accepts an array of values, and return a
-            scalar value (which is the calculated statistics). If
-            'weight' is not None, this function should also accept a
-            keyword named 'weights', which specifies the statistical
-            weight of each value in the array.
         **kwargs
             Keyword arguments to be passed to 'stat_func'
         """
@@ -475,18 +474,16 @@ class VoronoiTessTable(HiddenTable):
         indices = self.find_locs_in_cells(ramap, decmap)
 
         # calculate weighted statistics within each cell
-        if stat_func is None:
-            func = nanaverage
-        else:
-            func = stat_func
+        if not callable(stat_func):
+            raise ValueError("Invalid input for 'stat_func'")
         arr = np.full(len(self), np.nan)
         for ind in range(len(self)):
             if weight is None:
-                arr[ind] = func(
+                arr[ind] = stat_func(
                     data.astype('float')[indices == ind],
                     **kwargs)
             else:
-                arr[ind] = func(
+                arr[ind] = stat_func(
                     data.astype('float')[indices == ind],
                     weights=weights.astype('float')[indices == ind],
                     **kwargs)
@@ -501,9 +498,8 @@ class VoronoiTessTable(HiddenTable):
     #-----------------------------------------------------------------
 
     def calc_catalog_stats(
-            self, value, ra, dec, weight=None,
-            colname='new_col', unit='',
-            stat_func=None, **kwargs):
+            self, value, ra, dec, stat_func=None, weight=None,
+            colname='new_col', unit='', **kwargs):
         """
         Calculate statistics of a catalog entry within each cell.
 
@@ -515,6 +511,12 @@ class VoronoiTessTable(HiddenTable):
             RA coordinates corresponding to each row of the catalog.
         dec : np.ndarray
             Dec coordinates corresponding to each row of the catalog.
+        stat_func : callable
+            A function that accepts an array of values, and return a
+            scalar value (which is the calculated statistics). If
+            'weight' is not None, this function should also accept a
+            keyword named 'weights', which specifies the statistical
+            weight of each value in the array.
         weight : np.ndarray, optional
             If not None, this keyword should be an ndarray specifying
             the statistical weight of each row in the catalog.
@@ -525,12 +527,6 @@ class VoronoiTessTable(HiddenTable):
             Default: 'new_col'
         unit : str or astropy.unit.Unit, optional
             Physical unit of the output values (default='').
-        stat_func : callable, optional
-            A function that accepts an array of values, and return a
-            scalar value (which is the calculated statistics). If
-            'weight' is not None, this function should also accept a
-            keyword named 'weights', which specifies the statistical
-            weight of each value in the array.
         **kwargs
             Keyword arguments to be passed to 'stat_func'
         """
@@ -541,18 +537,16 @@ class VoronoiTessTable(HiddenTable):
         indices = self.find_locs_in_cells(ra, dec)
 
         # calculate weighted statistics within each cell
-        if stat_func is None:
-            func = nanaverage
-        else:
-            func = stat_func
+        if not callable(stat_func):
+            raise ValueError("Invalid input for 'stat_func'")
         arr = np.full(len(self), np.nan)
         for ind in range(len(self)):
             if weight is None:
-                arr[ind] = func(
+                arr[ind] = stat_func(
                     value.astype('float')[indices == ind],
                     **kwargs)
             else:
-                arr[ind] = func(
+                arr[ind] = stat_func(
                     value.astype('float')[indices == ind],
                     weights=weights.astype('float')[indices == ind],
                     **kwargs)

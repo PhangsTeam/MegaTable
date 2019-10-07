@@ -257,7 +257,7 @@ def add_cprops_stats_to_table(
 
     # read CPROPS file
     try:
-        t_cat = Table.read(catfile)
+        t_cat = Table.read(cpropsfile)
     except ValueError as e:
         print(e)
         return
@@ -474,6 +474,7 @@ if __name__ == '__main__':
         res = lin_res[-1]
         wtfile = get_data_path('ALMA:CO:mom0:strict', name, res)
         for reg in regions:
+            print(f"   > fraction of {reg}")
             envfile = get_data_path('S4G:env_mask:'+reg, name)
             add_env_frac_to_table(
                 vtt, envfile, wtfile, colname='frac_'+reg)
@@ -481,7 +482,7 @@ if __name__ == '__main__':
         # add statistics of high resolution CO data in table
         print("  Calculating statistics of high resolution CO data")
         for res in lin_res:
-            print(f"    @ {res.to('pc').value:.0f}pc")
+            print(f"    @ {res.to('pc').value:.0f}pc resolution")
             bm0file = get_data_path('ALMA:CO:mom0:broad', name, res)
             sm0file = get_data_path('ALMA:CO:mom0:strict', name, res)
             sewfile = get_data_path('ALMA:CO:ew:strict', name, res)
@@ -491,7 +492,7 @@ if __name__ == '__main__':
         # add statistics of CPROPS clouds in table
         print("  Calculating statistics of CPROPS clouds")
         for res in lin_res:
-            print(f"    @ {res.to('pc').value:.0f}pc")
+            print(f"    @ {res.to('pc').value:.0f}pc resolution")
             cpropsfile = get_data_path('ALMA:CPROPS', name, res)
             add_cprops_stats_to_table(
                 vtt, cpropsfile, res)

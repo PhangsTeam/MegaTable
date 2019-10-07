@@ -531,7 +531,7 @@ class VoronoiTessTable(HiddenTable):
             Keyword arguments to be passed to 'stat_func'
         """
         if weight is not None:
-            weights = np.broadcast_to(weight, data.shape)
+            weights = np.broadcast_to(weight, value.shape)
 
         # find rows in cells
         indices = self.find_locs_in_cells(ra, dec)

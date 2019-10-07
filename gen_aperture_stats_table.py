@@ -8,7 +8,7 @@ from astropy.table import Table
 from astropy.io import fits
 from reproject import reproject_interp
 from mega_table.table import VoronoiTessTable
-from mega_table.utils import deproject
+from mega_table.utils import deproject, nanaverage
 
 # --------------------------------------------------------------------
 
@@ -75,13 +75,13 @@ def get_data_path(datatype, galname=None, lin_res=None):
 
 
 def add_resampled_image_to_table(
-    vtt, infile, colname='new_col', **kwargs):
+    t, infile, colname='new_col', **kwargs):
 
     if not infile.is_file():
-        vtt[colname] = np.full(len(vtt), np.nan)
+        t[colname] = np.full(len(t), np.nan)
         return
 
-    vtt.resample_image(infile, colname=colname, **kwargs)
+    t.resample_image(infile, colname=colname, **kwargs)
 
     return
 
@@ -90,10 +90,10 @@ def add_resampled_image_to_table(
 
 
 def add_env_frac_to_table(
-    vtt, envfile, wtfile, colname='new_col', **kwargs):
+    t, envfile, wtfile, colname='new_col', **kwargs):
 
     if not (envfile.is_file() and wtfile.is_file()):
-        vtt[colname] = np.full(len(vtt), np.nan)
+        t[colname] = np.full(len(t), np.nan)
         return
 
     with fits.open(wtfile) as hdul:
@@ -105,7 +105,7 @@ def add_env_frac_to_table(
             hdul[0], wthdr, order=0)
     envmap[~footprint.astype('?')] = 0
     envbimap = (envmap > 0).astype('float')
-    vtt.calc_image_stats(
+    t.calc_image_stats(
         envbimap, header=wthdr, weight=wtmap,
         colname=colname, **kwargs)
 
@@ -115,8 +115,8 @@ def add_env_frac_to_table(
 # --------------------------------------------------------------------
 
 
-def add_CO_stat_to_table(
-    vtt, bm0file, sm0file, sewfile, res, **kwargs):
+def add_CO_stats_to_table(
+    t, bm0file, sm0file, sewfile, res, **kwargs):
 
     rstr = f"{res.to('pc').value:.0f}pc"
     cols = [
@@ -126,47 +126,47 @@ def add_CO_stat_to_table(
         (f"Area_CO21_strict_{rstr}", 'arcsec2'),
         (f"Flux_CO21_broad_{rstr}", 'K km s-1 arcsec2'),
         (f"Flux_CO21_strict_{rstr}", 'K km s-1 arcsec2'),
-        # area weighted averages
+        # area-weighted averages
         (f"A<I_CO21_{rstr}>", 'K km s-1'),
         (f"A<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
-        (f"A<vdisp_CO21_{rstr}>", 'km s-1'),
-        (f"A<vdisp^2_CO21_{rstr}>", 'km2 s-2'),
-        (f"A<I*vdisp^2_CO21_{rstr}>", 'K km3 s-3'),
-        (f"A<vdisp^2/I_CO21_{rstr}>", 'km s-1 K-1'),
-        # CO flux weighted averages
+        (f"A<sigv_CO21_{rstr}>", 'km s-1'),
+        (f"A<sigv^2_CO21_{rstr}>", 'km2 s-2'),
+        (f"A<I*sigv^2_CO21_{rstr}>", 'K km3 s-3'),
+        (f"A<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+        # CO flux-weighted averages
         (f"F<I_CO21_{rstr}>", 'K km s-1'),
         (f"F<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
-        (f"F<vdisp_CO21_{rstr}>", 'km s-1'),
-        (f"F<vdisp^2_CO21_{rstr}>", 'km2 s-2'),
-        (f"F<I*vdisp^2_CO21_{rstr}>", 'K km3 s-3'),
-        (f"F<vdisp^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+        (f"F<sigv_CO21_{rstr}>", 'km s-1'),
+        (f"F<sigv^2_CO21_{rstr}>", 'km2 s-2'),
+        (f"F<I*sigv^2_CO21_{rstr}>", 'K km3 s-3'),
+        (f"F<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
         ]
 
-    # no data file found: add placeholder (empty) columns to table
+    # if no data file found: add placeholder (empty) columns
     if not (bm0file.is_file() and sm0file.is_file() and
             sewfile.is_file()):
         for col, unit in cols:
-            vtt[col] = np.full(len(vtt), np.nan)
+            t[col] = np.full(len(t), np.nan)
         return
 
     # read files
     with fits.open(bm0file) as hdul:
-        bm0map = hdul[0].data.copy()
+        bm0_map = hdul[0].data.copy()
         hdr = hdul[0].header.copy()
     with fits.open(sm0file) as hdul:
-        sm0map = hdul[0].data.copy()
-        if sm0map.shape != bm0map.shape:
+        sm0_map = hdul[0].data.copy()
+        if sm0_map.shape != bm0_map.shape:
             raise ValueError("Input maps have inconsistent shape")
     with fits.open(sewfile) as hdul:
-        sewmap = hdul[0].data.copy()
-        if sewmap.shape != bm0map.shape:
+        sew_map = hdul[0].data.copy()
+        if sew_map.shape != bm0_map.shape:
             raise ValueError("Input maps have inconsistent shape")
-    bm0map[~np.isfinite(bm0map)] = 0
-    nanmap = np.ones_like(bm0map).astype('float')
-    nanmap[~np.isfinite(sm0map) | (sm0map <= 0) |
-           ~np.isfinite(sewmap) | (sewmap <= 0)] = np.nan
-    sm0map[np.isnan(nanmap)] = 0
-    sewmap[np.isnan(nanmap)] = 0
+    bm0_map[~np.isfinite(bm0_map)] = 0
+    nan_map = np.ones_like(bm0_map).astype('float')
+    nan_map[~np.isfinite(sm0_map) | (sm0_map <= 0) |
+           ~np.isfinite(sew_map) | (sew_map <= 0)] = np.nan
+    sm0_map[np.isnan(nan_map)] = 0
+    sew_map[np.isnan(nan_map)] = 0
 
     # pixel size (in arcsec^2)
     pixsz = np.abs(
@@ -176,42 +176,42 @@ def add_CO_stat_to_table(
     # maps corresponding to each column
     maps = [
         # sums
-        np.ones_like(bm0map).astype('float')*pixsz,
-        (bm0map != 0).astype('float')*pixsz,
-        (sm0map > 0).astype('float')*pixsz,
-        bm0map*pixsz,
-        sm0map*pixsz,
-        # area weighted averages (among regions w/ CO detection)
-        sm0map * nanmap,
-        sm0map**2 * nanmap,
-        sewmap * nanmap,
-        sewmap**2 * nanmap,
-        sm0map*sewmap**2 * nanmap,
-        sewmap**2/sm0map * nanmap,
-        # CO flux weighted averages
-        sm0map,
-        sm0map**2,
-        sewmap,
-        sewmap**2,
-        sm0map*sewmap**2,
-        sewmap**2/sm0map,
+        np.ones_like(bm0_map).astype('float')*pixsz,
+        (bm0_map != 0).astype('float')*pixsz,
+        (sm0_map > 0).astype('float')*pixsz,
+        bm0_map*pixsz,
+        sm0_map*pixsz,
+        # area-weighted averages (among regions w/ CO detection)
+        sm0_map * nan_map,
+        sm0_map**2 * nan_map,
+        sew_map * nan_map,
+        sew_map**2 * nan_map,
+        sm0_map*sew_map**2 * nan_map,
+        sew_map**2/sm0_map * nan_map,
+        # CO flux-weighted averages
+        sm0_map,
+        sm0_map**2,
+        sew_map,
+        sew_map**2,
+        sm0_map*sew_map**2,
+        sew_map**2/sm0_map,
     ]
 
     # calculate statistics and add into table
     for (col, unit), map in zip(cols, maps):
         if col[:2] == 'A<':
             # area-weighted average
-            vtt.calc_image_stats(
-                map, header=hdr, weight=None,
+            t.calc_image_stats(
+                map, header=hdr, stat_func=nanaverage, weight=None,
                 colname=col, unit=unit, **kwargs)
         elif col[:2] == 'F<':
             # CO flux-weighted average
-            vtt.calc_image_stats(
-                map, header=hdr, weight=sm0map,
+            t.calc_image_stats(
+                map, header=hdr, stat_func=nanaverage, weight=sm0_map,
                 colname=col, unit=unit, **kwargs)
         else:
             # sum
-            vtt.calc_image_stats(
+            t.calc_image_stats(
                 map, header=hdr, stat_func=np.nansum,
                 colname=col, unit=unit, **kwargs)
 
@@ -221,8 +221,110 @@ def add_CO_stat_to_table(
 # --------------------------------------------------------------------
 
 
-def add_CPROPS_stat_to_table():
-    pass
+def add_cprops_stats_to_table(
+    t, cpropsfile, res, **kwargs):
+
+    rstr = f"{res.to('pc').value:.0f}pc"
+    cols = [
+        # sums
+        (f"Ncloud_CPROPS_total_{rstr}", ''),
+        (f"Flux_CPROPS_total_{rstr}", 'K km s-1 arcsec2'),
+        # uniformly weighted averages
+        (f"U<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
+        (f"U<R_CPROPS_{rstr}>", 'arcsec'),
+        (f"U<F/R^2_CPROPS_{rstr}>", 'K km s-1'),
+        (f"U<F^2/R^4_CPROPS_{rstr}>", 'K2 km2 s-2'),
+        (f"U<sigv_CPROPS_{rstr}>", 'km s-1'),
+        (f"U<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+        (f"U<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
+        (f"U<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
+        # CO flux-weighted averages
+        (f"F<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
+        (f"F<R_CPROPS_{rstr}>", 'arcsec'),
+        (f"F<I_CPROPS_{rstr}>", 'K km s-1'),
+        (f"F<I^2_CPROPS_{rstr}>", 'K2 km2 s-2'),
+        (f"F<sigv_CPROPS_{rstr}>", 'km s-1'),
+        (f"F<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+        (f"F<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
+        (f"F<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
+    ]
+
+    # if no CPROPS file found: add placeholder (empty) columns
+    if not cpropsfile.is_file():
+        for col, unit in cols:
+            t[col] = np.full(len(t), np.nan)
+        return
+
+    # read CPROPS file
+    try:
+        t_cat = Table.read(catfile)
+    except ValueError as e:
+        print(e)
+        return
+    ra_cat = t_cat['XCTR_DEG'].quantity.value
+    dec_cat = t_cat['YCTR_DEG'].quantity.value
+    flux_cat = (
+        t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
+        u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
+    sigv_cat = t_cat['SIGV_KMS'].quantity.value
+    radius_cat = (  # expressed in Solomon+87 convention (w/ 1.91)
+        t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
+        u.rad).to('arcsec').value
+    # radius_cat = (  # expressed in terms of Gaussian HWHM
+    #     t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] / t['RMSTORAD'] *
+    #     np.sqrt(2*np.log(2)) * u.rad).to('arcsec').value
+    wt_arr = flux_cat.copy()
+    wt_arr[~np.isfinite(radius_cat)] = 0
+    flux_cat[~np.isfinite(radius_cat)] = np.nan
+    sigv_cat[~np.isfinite(radius_cat)] = np.nan
+    rad_cat[~np.isfinite(radius_cat)] = np.nan
+
+    # entries corresponding to each column
+    entries = [
+        # sums
+        np.isfinite(flux_cat).astype('int'),
+        flux_cat,
+        # uniformly weighted averages
+        flux_cat,
+        rad_cat,
+        flux_cat/rad_cat**2,
+        flux_cat**2/rad_cat**4,
+        sigv_cat,
+        sigv_cat**2,
+        flux_cat*sigv_cat**2/rad_cat**3,
+        rad_cat*sigv_cat**2/flux_cat,
+        # CO flux-weighted averages
+        flux_cat,
+        rad_cat,
+        flux_cat/rad_cat**2,
+        flux_cat**2/rad_cat**4,
+        sigv_cat,
+        sigv_cat**2,
+        flux_cat*sigv_cat**2/rad_cat**3,
+        rad_cat*sigv_cat**2/flux_cat,
+    ]
+
+    # calculate statistics and add into table
+    for (col, unit), entry in zip(cols, entries):
+        if col[:2] == 'U<':
+            # area-weighted average
+            t.calc_catalog_stats(
+                entry, ra_cat, dec_cat,
+                stat_func=nanaverage, weight=None,
+                colname=col, unit=unit, **kwargs)
+        elif col[:2] == 'F<':
+            # CO flux-weighted average
+            t.calc_catalog_stats(
+                entry, ra_cat, dec_cat,
+                stat_func=nanaverage, weight=wt_arr,
+                colname=col, unit=unit, **kwargs)
+        else:
+            # sum
+            t.calc_catalog_stats(
+                entry, ra_cat, dec_cat, stat_func=np.nansum,
+                colname=col, unit=unit, **kwargs)
+
+    return
 
 
 ######################################################################
@@ -366,8 +468,8 @@ if __name__ == '__main__':
             unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
             fill_outside=np.nan)
 
-        # add environmental fraction (CO flux weighted) in table
-        print("  Calculating (CO flux weighted) "
+        # add environmental fraction (CO flux-weighted) in table
+        print("  Calculating (CO flux-weighted) "
               "environmental fraction")
         res = lin_res[-1]
         wtfile = get_data_path('ALMA:CO:mom0:strict', name, res)
@@ -382,11 +484,18 @@ if __name__ == '__main__':
             bm0file = get_data_path('ALMA:CO:mom0:broad', name, res)
             sm0file = get_data_path('ALMA:CO:mom0:strict', name, res)
             sewfile = get_data_path('ALMA:CO:ew:strict', name, res)
-            add_CO_stat_to_table(
+            add_CO_stats_to_table(
                 vtt, bm0file, sm0file, sewfile, res)
 
+        # add statistics of CPROPS clouds in table
+        print("  Calculating statistics of CPROPS clouds")
+        for res in lin_res:
+            cpropsfile = get_data_path('ALMA:CPROPS', name, res)
+            add_cprops_stats_to_table(
+                vtt, cpropsfile, res)
+
         # mask rows where low resolution 'I_CO21' is NaN
-        # This step has to be the last step!!
+        # This has to be the last step!!
         vtt.clean(discard_NaN='I_CO21')
 
         # write table to disk

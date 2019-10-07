@@ -106,7 +106,7 @@ def add_env_frac_to_table(
     envmap[~footprint.astype('?')] = 0
     envbimap = (envmap > 0).astype('float')
     t.calc_image_stats(
-        envbimap, header=wthdr, weight=wtmap,
+        envbimap, header=wthdr, stat_func=nanaverage, weight=wtmap,
         colname=colname, **kwargs)
 
     return
@@ -481,6 +481,7 @@ if __name__ == '__main__':
         # add statistics of high resolution CO data in table
         print("  Calculating statistics of high resolution CO data")
         for res in lin_res:
+            print(f"    @ {res.to('pc').value:.0f}pc")
             bm0file = get_data_path('ALMA:CO:mom0:broad', name, res)
             sm0file = get_data_path('ALMA:CO:mom0:strict', name, res)
             sewfile = get_data_path('ALMA:CO:ew:strict', name, res)
@@ -490,6 +491,7 @@ if __name__ == '__main__':
         # add statistics of CPROPS clouds in table
         print("  Calculating statistics of CPROPS clouds")
         for res in lin_res:
+            print(f"    @ {res.to('pc').value:.0f}pc")
             cpropsfile = get_data_path('ALMA:CPROPS', name, res)
             add_cprops_stats_to_table(
                 vtt, cpropsfile, res)

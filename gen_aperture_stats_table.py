@@ -267,17 +267,17 @@ def add_cprops_stats_to_table(
         t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
         u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
     sigv_cat = t_cat['SIGV_KMS'].quantity.value
-    radius_cat = (  # expressed in Solomon+87 convention (w/ 1.91)
+    rad_cat = (  # expressed in Solomon+87 convention (w/ 1.91)
         t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
         u.rad).to('arcsec').value
     # radius_cat = (  # expressed in terms of Gaussian HWHM
     #     t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] / t['RMSTORAD'] *
     #     np.sqrt(2*np.log(2)) * u.rad).to('arcsec').value
     wt_arr = flux_cat.copy()
-    wt_arr[~np.isfinite(radius_cat)] = 0
-    flux_cat[~np.isfinite(radius_cat)] = np.nan
-    sigv_cat[~np.isfinite(radius_cat)] = np.nan
-    rad_cat[~np.isfinite(radius_cat)] = np.nan
+    wt_arr[~np.isfinite(rad_cat)] = 0
+    flux_cat[~np.isfinite(rad_cat)] = np.nan
+    sigv_cat[~np.isfinite(rad_cat)] = np.nan
+    rad_cat[~np.isfinite(rad_cat)] = np.nan
 
     # entries corresponding to each column
     entries = [
@@ -474,7 +474,7 @@ if __name__ == '__main__':
         res = lin_res[-1]
         wtfile = get_data_path('ALMA:CO:mom0:strict', name, res)
         for reg in regions:
-            print(f"   > fraction of {reg}")
+            print(f"    > fraction of {reg}")
             envfile = get_data_path('S4G:env_mask:'+reg, name)
             add_env_frac_to_table(
                 vtt, envfile, wtfile, colname='frac_'+reg)

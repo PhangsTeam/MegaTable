@@ -6,7 +6,7 @@ from astropy.table import Table
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-
+from .utils import nanaverage
 
 ######################################################################
 ######################################################################
@@ -426,16 +426,6 @@ class VoronoiTessTable(HiddenTable):
 
     #-----------------------------------------------------------------
 
-    def _nanaverage(self, a, **kwargs):
-        avg = np.ma.average(
-            np.ma.array(a, mask=np.isnan(a)), **kwargs)
-        if isinstance(avg, np.ma.core.MaskedConstant):
-            return np.nan
-        else:
-            return avg
-
-    #-----------------------------------------------------------------
-
     def calc_image_stats(
             self, image, ihdu=0, header=None, weight=None,
             colname='new_col', unit='',
@@ -486,7 +476,7 @@ class VoronoiTessTable(HiddenTable):
 
         # calculate weighted statistics within each cell
         if stat_func is None:
-            func = self._nanaverage
+            func = nanaverage
         else:
             func = stat_func
         arr = np.full(len(self), np.nan)
@@ -552,7 +542,7 @@ class VoronoiTessTable(HiddenTable):
 
         # calculate weighted statistics within each cell
         if stat_func is None:
-            func = self._nanaverage
+            func = nanaverage
         else:
             func = stat_func
         arr = np.full(len(self), np.nan)

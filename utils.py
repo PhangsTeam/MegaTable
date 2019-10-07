@@ -128,3 +128,27 @@ def deproject(
         return radius_deg, projang_deg, dx_deg, dy_deg
     else:
         return radius_deg, projang_deg
+
+
+#---------------------------------------------------------------------
+
+
+def nanaverage(a, **kwargs):
+    """
+    Compute the weighted average along the specified axis, ignoring NaNs.
+
+    Parameters
+    ----------
+    a : array_like
+        Array containing data to be averaged.
+    **kwargs
+        Keyword arguments to be passed to `~numpy.ma.average`
+
+    Return
+    ------
+    avg : ndarray or scalar
+        Return the average along the specified axis.
+    """
+    avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
+    avg = np.ma.filled(avg, np.nan)
+    return avg if avg.size > 1 else avg.item()

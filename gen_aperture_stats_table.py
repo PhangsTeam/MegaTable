@@ -3,10 +3,11 @@ import sys
 from pathlib import Path
 import warnings
 import numpy as np
-from astropy import units as u
+from astropy import units as u, constants as const
 from astropy.table import Table
 from astropy.io import fits
 from reproject import reproject_interp
+from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import VoronoiTessTable
 from mega_table.utils import deproject, nanaverage
 
@@ -75,13 +76,13 @@ def get_data_path(datatype, galname=None, lin_res=None):
 
 
 def add_resampled_image_to_table(
-    t, infile, colname='new_col', **kwargs):
+    t, infile, colname='new_col', unit=u.Unit(''), **kwargs):
 
     if not infile.is_file():
-        t[colname] = np.full(len(t), np.nan)
+        t[colname] = np.full(len(t), np.nan) * unit
         return
 
-    t.resample_image(infile, colname=colname, **kwargs)
+    t.resample_image(infile, colname=colname, unit='header', **kwargs)
 
     return
 
@@ -146,7 +147,7 @@ def add_CO_stats_to_table(
     if not (bm0file.is_file() and sm0file.is_file() and
             sewfile.is_file()):
         for col, unit in cols:
-            t[col] = np.full(len(t), np.nan)
+            t[col] = np.full(len(t), np.nan) * u.Unit(unit)
         return
 
     # read files
@@ -227,13 +228,14 @@ def add_cprops_stats_to_table(
     rstr = f"{res.to('pc').value:.0f}pc"
     cols = [
         # sums
-        (f"Ncloud_CPROPS_total_{rstr}", ''),
+        (f"Nobj_CPROPS_{rstr}", ''),
         (f"Flux_CPROPS_total_{rstr}", 'K km s-1 arcsec2'),
         # uniformly weighted averages
         (f"U<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
         (f"U<R_CPROPS_{rstr}>", 'arcsec'),
         (f"U<F/R^2_CPROPS_{rstr}>", 'K km s-1'),
         (f"U<F^2/R^4_CPROPS_{rstr}>", 'K2 km2 s-2'),
+        (f"U<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
         (f"U<sigv_CPROPS_{rstr}>", 'km s-1'),
         (f"U<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
         (f"U<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
@@ -241,8 +243,9 @@ def add_cprops_stats_to_table(
         # CO flux-weighted averages
         (f"F<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
         (f"F<R_CPROPS_{rstr}>", 'arcsec'),
-        (f"F<I_CPROPS_{rstr}>", 'K km s-1'),
-        (f"F<I^2_CPROPS_{rstr}>", 'K2 km2 s-2'),
+        (f"F<F/R^2_CPROPS_{rstr}>", 'K km s-1'),
+        (f"F<F^2/R^4_CPROPS_{rstr}>", 'K2 km2 s-2'),
+        (f"F<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
         (f"F<sigv_CPROPS_{rstr}>", 'km s-1'),
         (f"F<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
         (f"F<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
@@ -252,7 +255,7 @@ def add_cprops_stats_to_table(
     # if no CPROPS file found: add placeholder (empty) columns
     if not cpropsfile.is_file():
         for col, unit in cols:
-            t[col] = np.full(len(t), np.nan)
+            t[col] = np.full(len(t), np.nan) * u.Unit(unit)
         return
 
     # read CPROPS file
@@ -267,12 +270,9 @@ def add_cprops_stats_to_table(
         t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
         u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
     sigv_cat = t_cat['SIGV_KMS'].quantity.value
-    rad_cat = (  # expressed in Solomon+87 convention (w/ 1.91)
+    rad_cat = (  # expressed in Solomon+87 convention
         t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
         u.rad).to('arcsec').value
-    # radius_cat = (  # expressed in terms of Gaussian HWHM
-    #     t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] / t['RMSTORAD'] *
-    #     np.sqrt(2*np.log(2)) * u.rad).to('arcsec').value
     wt_arr = flux_cat.copy()
     wt_arr[~np.isfinite(rad_cat)] = 0
     flux_cat[~np.isfinite(rad_cat)] = np.nan
@@ -289,6 +289,7 @@ def add_cprops_stats_to_table(
         rad_cat,
         flux_cat/rad_cat**2,
         flux_cat**2/rad_cat**4,
+        flux_cat/rad_cat,
         sigv_cat,
         sigv_cat**2,
         flux_cat*sigv_cat**2/rad_cat**3,
@@ -298,6 +299,7 @@ def add_cprops_stats_to_table(
         rad_cat,
         flux_cat/rad_cat**2,
         flux_cat**2/rad_cat**4,
+        flux_cat/rad_cat,
         sigv_cat,
         sigv_cat**2,
         flux_cat*sigv_cat**2/rad_cat**3,
@@ -327,8 +329,357 @@ def add_cprops_stats_to_table(
     return
 
 
+# --------------------------------------------------------------------
+
+
+def get_R21():
+    return 0.7  # CO(2-1)/CO(1-0) ratio
+
+
+def get_alpha21cm(include_He=True):
+    if include_He:  # include the extra 35% mass of Helium
+        alpha21cm =  1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
+    else:
+        alpha21cm = 1.46e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
+    return alpha21cm
+
+
+def get_alpha3p6um(ref='MS14'):
+    if ref == 'MS14':  # Y3.6 = 0.47 Msun/Lsun
+        alpha3p6um = 330 * u.Msun/u.pc**2/(u.MJy/u.sr)
+    elif ref == 'Q15':  # Y3.6 = 0.6 Msun/Lsun
+        alpha3p6um = 420 * u.Msun/u.pc**2/(u.MJy/u.sr)
+    else:
+        raise ValueError("")
+    return alpha3p6um
+
+
+def get_h_star(Rstar, diskshape='flat', Rgal=None):
+    # see Leroy+08 and Ostriker+10
+    flat_ratio = 7.3  # Kregel+02
+    if diskshape == 'flat':
+        hstar = Rstar / flat_ratio
+    elif diskshape == 'flared':
+        hstar = Rstar / flat_ratio * np.exp(
+            (Rgal/Rstar).to('').value - 1)
+    else:
+        raise ValueError("`diskshape` must be 'flat' or 'flared'")
+    return hstar
+
+
+def gen_phys_props_table(vtt, params, append_raw_data=False):
+
+    # initiate new table
+    t_phys = Table()
+    for key in params:
+        t_phys.meta[key] = params[key]
+
+    # galaxy global parameters
+    gal_cosi = np.cos(np.deg2rad(params['INCL']))
+    gal_dist = params['DIST'] * u.Mpc
+    gal_Mstar = 10**params['LOGMSTAR'] * u.Msun
+    gal_Rstar = params['RSTAR'] * u.kpc
+    gal_Reff = params['REFF_W1'] * u.kpc
+
+    # coordinates
+    t_phys['RA'] = vtt['RA'].quantity.to('deg')
+    t_phys['DEC'] = vtt['DEC'].quantity.to('deg')
+    t_phys['r_gal'] = r_gal = (
+        vtt['rang_gal'].quantity.to('rad').value * gal_dist).to('kpc')
+    t_phys['phi_gal'] = vtt['phi_gal'].quantity.to('deg')
+
+    # metallicity
+    t_phys['log(O/H)_PP04'] = predict_metallicity(
+        gal_Mstar, calibrator='O3N2(PP04)', MZR='Sanchez+19',
+        Rgal=r_gal, Re=gal_Reff, gradient='Sanchez+14')
+    t_phys['Zprime'] = Zprime = 10**(t_phys['log(O/H)_PP04'] - 8.69)
+
+    # SFR surface density
+    for key in ('Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY'):
+        t_phys[key] = vtt[key].quantity.to('Msun kpc-2 yr-1')
+        if (np.isfinite(t_phys[key]) != 0 and
+            'Sigma_SFR' not in t_phys.colnames):
+            t_phys['Sigma_SFR'] = t_phys[key].quantity
+    if 'Sigma_SFR' not in t_phys.colnames:
+        t_phys['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
+    Sigma_SFR = t_phys['Sigma_SFR'].quantity
+
+    # stellar mass surface densities
+    alpha3p6um = get_alpha3p6um(ref='MS14')
+    for key in ('I_3p6um_ICA', 'I_3p6um_raw'):
+        newkey = 'Sigma_star'+key[-4:]
+        t_phys[newkey] = (
+            vtt[key].quantity * cosi * alpha3p6um).to('Msun/pc^2')
+        if (np.isfinite(t_phys[newkey]) != 0 and
+            'Sigma_star' not in t_phys.colnames):
+            t_phys['Sigma_star'] = t_phys[newkey].quantity
+    if 'Sigma_star' not in t_phys.colnames:
+        t_phys['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
+    Sigma_star = t_phys['Sigma_star'].quantity
+
+    # stellar mass volume density near disk mid-plane
+    t_phys['rho_star'] = rho_star = (
+        t_phys['Sigma_star'] / 4 /
+        get_h_star(gal_Rstar, diskshape='flat')
+    ).to('Msun pc-3')
+    t_phys['rho_star_flared'] = rho_star_flared = (
+        t_phys['Sigma_star'] / 4 /
+        get_h_star(gal_Rstar, diskshape='flared', Rgal=r_gal)
+    ).to('Msun pc-3')
+
+    # HI mass surface density
+    alpha21cm = get_alpha21cm(include_He=True)
+    t_phys['Sigma_atom'] = (
+        vtt['I_21cm'].quantity * cosi * alpha21cm).to('Msun pc-2'))
+    if np.isfinite(t_phys['Sigma_atom']) == 0:
+        t_phys['Sigma_atom'] = (
+            vtt['I_21cm_raw'].quantity * cosi * alpha21cm
+        ).to('Msun pc-2'))
+    Sigma_atom = t_phys['Sigma_atom'].quantity
+
+    # H2 surface density (low resolution)
+    R21 = get_R21()
+    rstr_fid = f"{res_pcs[-1].to('pc').value:.0f}pc"  # 150 pc
+    ICO10kpc = vtt['I_CO21'].quantity * cosi / R21
+    ICO10GMC = vtt[f"F<I_CO21_{rstr_fid}>"].quantity / R21
+    t_phys['alphaCO10_MW'] = predict_alphaCO10(
+        prescription='constant')
+    t_phys['alphaCO10_PHANGS'] = predict_alphaCO10(
+        prescription='PHANGS', PHANGS_Zprime=Zprime)
+    t_phys['alphaCO10_N12'] = predict_alphaCO10(
+        prescription='Narayanan+12',
+        N12_Zprime=Zprime, N12_WCO10GMC=ICO10GMC)
+    t_phys['alphaCO10_B13'] = predict_alphaCO10(
+        prescription='Bolatto+13',
+        iterative=True, suppress_error=True,
+        B13_Zprime=Zprime, B13_Sigmakpc=Sigma_atom+Sigma_star,
+        B13_WCO10kpc=ICO10kpc, B13_WCO10GMC=ICO10GMC)
+    alphaCO21 = t_phys['alphaCO10_PHANGS'].quantity / R21
+    t_phys['Sigma_mol'] = (
+        vtt['I_CO21'].quantity * cosi * alphaCO21).to('Msun pc-2')
+    Sigma_mol = t_phys['Sigma_mol'].quantity
+
+    # CO contribution by environments
+    for reg in regions:
+        t_phys[f"frac_{reg}"] = vtt[f"frac_{reg}"].quantity
+    # if no environment masks are available:
+    # manually flag all data points (for now)  # <--------------------
+    if ((np.isfinite(t_phys['frac_bulge']).sum() == 0) and
+        (np.isfinite(t_phys['frac_bars']).sum() == 0)):
+        t_phys['frac_bulge'] = 1.
+
+    # CO map statistics
+    for res_pc in res_pcs:
+        R_cloud = res_pc / 2
+        rstr = f"{res_pc.to('pc').value:.0f}pc"
+        t_phys[f"fracA_CO21_{rstr}"] = (
+            vtt[f"Area_CO21_strict_{rstr}"].quantity /
+            vtt[f"Area_CO21_total_{rstr}"].quantity).to('')
+        t_phys[f"fracF_CO21_{rstr}"] = (
+            vtt[f"Flux_CO21_strict_{rstr}"].quantity /
+            vtt[f"Flux_CO21_broad_{rstr}"].quantity).to('')
+        t_phys[f"clumping_CO21_{rstr}"] = (
+            vtt[f"F<I_CO21_{rstr}>"].quantity /
+            vtt[f"A<I_CO21_{rstr}>"].quantity).to('')
+        t_phys[f"A<Sigma_mol_pix_{rstr}>"] = (
+            vtt[f"A<I_CO21_{rstr}>"].quantity *
+            alphaCO21).to('Msun pc-2')
+        t_phys[f"F<Sigma_mol_pix_{rstr}>"] = (
+            vtt[f"F<I_CO21_{rstr}>"].quantity *
+            alphaCO21).to('Msun pc-2')
+        t_phys[f"A<vdisp_mol_pix_{rstr}>"] = (
+            vtt[f"A<sigv_CO21_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"F<vdisp_mol_pix_{rstr}>"] = (
+            vtt[f"F<sigv_CO21_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"A<P_turb_pix_{rstr}>"] = (  # Eq.4 in Sun+20
+            (3/2) * vtt[f"A<I*sigv^2_CO21_{rstr}>"].quantity /
+            (2*R_cloud) * alphaCO21 / const.k_B).to('K cm-3')
+        t_phys[f"F<P_turb_pix_{rstr}>"] = (  # Eq.4 in Sun+20
+            (3/2) * vtt[f"F<I*sigv^2_CO21_{rstr}>"].quantity /
+            (2*R_cloud) * alphaCO21 / const.k_B).to('K cm-3')
+        t_phys[f"A<alpha_vir_pix_{rstr}>"] = (  # Eq.13 in Sun+18
+            5 * np.log(2) / (10/9 * np.pi * const.G) *
+            vtt[f"A<sigv^2/I_CO21_{rstr}>"].quantity / R_cloud /
+            alphaCO21).to('')
+        t_phys[f"F<alpha_vir_pix_{rstr}>"] = (  # Eq.13 in Sun+18
+            5 * np.log(2) / (10/9 * np.pi * const.G) *
+            vtt[f"F<sigv^2/I_CO21_{rstr}>"].quantity / R_cloud /
+            alphaCO21).to('')
+
+    # CPROPS cloud statistics
+    R_factor = np.sqrt(5) / 1.91  # Rosolowsky&Leroy06: Section 3.1
+    for res_pc in res_pcs:
+        rstr = f"{res_pc.to('pc').value:.0f}pc"
+        t_phys[f"Nobj_CPROPS_{rstr}"] = (
+            vtt[f"Nobj_CPROPS_{rstr}"].quantity).to('')
+        t_phys[f"fracF_CPROPS_{rstr}"] = (
+            vtt[f"Flux_CPROPS_total_{rstr}"].quantity /
+            vtt[f"Flux_CO21_broad_{rstr}"].quantity).to('')
+        t_phys[f"U<M_mol_CPROPS_{rstr}>"] = (  # F [=] K*km/s arcsec2
+            vtt[f"U<F_CPROPS_{rstr}>"].quantity * alphaCO21 *
+            gal_dist**2 / u.sr).to('Msun')
+        t_phys[f"F<M_mol_CPROPS_{rstr}>"] = (  # F [=] K*km/s arcsec2
+            vtt[f"F<F_CPROPS_{rstr}>"].quantity * alphaCO21 *
+            gal_dist**2 / u.sr).to('Msun')
+        t_phys[f"U<R_CPROPS_{rstr}>"] = (  # R [=] arcsec
+            vtt[f"U<R_CPROPS_{rstr}>"].quantity *
+            gal_dist / u.rad).to('pc')
+        t_phys[f"F<R_CPROPS_{rstr}>"] = (  # R [=] arcsec
+            vtt[f"F<R_CPROPS_{rstr}>"].quantity *
+            gal_dist / u.rad).to('pc')
+        t_phys[f"U<Sigma_mol_CPROPS_{rstr}>"] = (
+            vtt[f"U<F/R^2_CPROPS_{rstr}>"].quantity * alphaCO21 /
+            (np.pi*R_factor**2)).to('Msun pc-2')
+        t_phys[f"F<Sigma_mol_CPROPS_{rstr}>"] = (
+            vtt[f"F<F/R^2_CPROPS_{rstr}>"].quantity * alphaCO21 /
+            (np.pi*R_factor**2)).to('Msun pc-2')
+        t_phys[f"U<vdisp_mol_CPROPS_{rstr}>"] = (
+            vtt[f"U<sigv_CPROPS_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"F<vdisp_mol_CPROPS_{rstr}>"] = (
+            vtt[f"F<sigv_CPROPS_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"U<P_turb_CPROPS_{rstr}>"] = (
+            3 / (4 * np.pi) *
+            vtt[f"U<F*sigv^2/R^3_CPROPS_{rstr}>"].quantity *
+            alphaCO21 / R_factor**3 / (gal_dist / u.rad) /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<P_turb_CPROPS_{rstr}>"] = (
+            3 / (4 * np.pi) *
+            vtt[f"F<F*sigv^2/R^3_CPROPS_{rstr}>"].quantity *
+            alphaCO21 / R_factor**3 / (gal_dist / u.rad) /
+            const.k_B).to('K cm-3')
+        t_phys[f"U<alpha_vir_CPROPS_{rstr}>"] = (  # Eq.6 in Sun+18
+            5 / const.G *
+            vtt[f"U<R*sigv^2/F_CPROPS_{rstr}>"].quantity /
+            alphaCO21 * R_factor / (gal_dist / u.rad)).to('')
+        t_phys[f"F<alpha_vir_CPROPS_{rstr}>"] = (  # Eq.6 in Sun+18
+            5 / const.G *
+            vtt[f"F<R*sigv^2/F_CPROPS_{rstr}>"].quantity /
+            alphaCO21 * R_factor / (gal_dist / u.rad)).to('')
+
+    # dynamical equilibrium pressure estimates
+    Sigma_gas = Sigma_mol + Sigma_atom
+    res_fid = res_pcs[-2].to('pc')  # 120 pc
+    rstr_fid = f"{res_fid.value:.0f}pc"
+    vdisp_mol_z = t_phys[f"F<vdisp_mol_pix_{rstr_fid}>"].quantity
+    vdisp_atom_z = 10 * u.Unit('km s-1')
+    vdisp_z = (
+        (vdisp_mol_z * Sigma_mol + vdisp_atom_z * Sigma_atom) /
+        Sigma_gas).to('km s-1')
+    t_phys["P_DE_classic"] = (
+        (np.pi * const.G / 2 * Sigma_gas**2 +
+         Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star)) /
+        const.k_B).to('K cm-3')
+    t_phys["P_DE_classic_flared"] = (
+        (np.pi * const.G / 2 * Sigma_gas**2 +
+         Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star_flared)) /
+        const.k_B).to('K cm-3')
+    t_phys["P_DE_classic_fixedsiggas"] = (
+        (np.pi * const.G / 2 * Sigma_gas**2 +
+         Sigma_gas * vdisp_atom_z * np.sqrt(2*const.G*rho_star)) /
+        const.k_B).to('K cm-3')
+    t_phys["W_atom"] = (
+        (np.pi * const.G / 2 * Sigma_atom**2 +
+         np.pi * const.G * Sigma_atom * Sigma_mol +
+         Sigma_atom * vdisp_atom_z * np.sqrt(2*const.G*rho_star)) /
+        const.k_B).to('K cm-3')
+    t_phys["P_DE_smooth"] = (
+        (np.pi * const.G / 2 * Sigma_mol**2 +
+         np.pi * const.G * Sigma_mol * rho_star * res_fid/2) /
+        const.k_B).to('K cm-3') + t_phys['W_atom'].quantity
+    for res_pc in res_pcs:
+        R_cloud = res_pc / 2
+        rstr = f"{res_pc.to('pc').value:.0f}pc"
+        t_phys[f"A<W_cloud_self_pix_{rstr}>"] = (
+            3/8 * np.pi * const.G *
+            vtt[f"A<I^2_CO21_{rstr}>"].quantity * alphaCO21**2 /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_self_pix_{rstr}>"] = (
+            3/8 * np.pi * const.G *
+            vtt[f"F<I^2_CO21_{rstr}>"].quantity * alphaCO21**2 /
+            const.k_B).to('K cm-3')
+        t_phys[f"A<W_cloud_mol_pix_{rstr}>"] = (
+            np.pi * const.G / 2 * Sigma_mol *
+            t_phys[f"A<Sigma_mol_pix_{rstr}>"] /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_mol_pix_{rstr}>"] = (
+            np.pi * const.G / 2 * Sigma_mol *
+            t_phys[f"F<Sigma_mol_pix_{rstr}>"] /
+            const.k_B).to('K cm-3')
+        t_phys[f"A<W_cloud_star_pix_{rstr}>"] = (
+            3/2 * np.pi * const.G * rho_star * R_cloud *
+            t_phys[f"A<Sigma_mol_pix_{rstr}>"] /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_star_pix_{rstr}>"] = (
+            3/2 * np.pi * const.G * rho_star * R_cloud *
+            t_phys[f"F<Sigma_mol_pix_{rstr}>"] /
+            const.k_B).to('K cm-3')
+        t_phys[f"A<P_DE_pix_{rstr}>"] = (
+            t_phys[f"A<W_cloud_self_pix_{rstr}>"].quantity +
+            t_phys[f"A<W_cloud_mol_pix_{rstr}>"].quantity +
+            t_phys[f"A<W_cloud_star_pix_{rstr}>"].quantity +
+            t_phys["W_atom"].quantity)
+        t_phys[f"F<P_DE_pix_{rstr}>"] = (
+            t_phys[f"F<W_cloud_self_pix_{rstr}>"].quantity +
+            t_phys[f"F<W_cloud_mol_pix_{rstr}>"].quantity +
+            t_phys[f"F<W_cloud_star_pix_{rstr}>"].quantity +
+            t_phys["W_atom"].quantity)
+    for res_pc in res_pcs:
+        rstr = f"{res_pc.to('pc').value:.0f}pc"
+        t_phys[f"U<W_cloud_self_CPROPS_{rstr}>"] = (
+            3 * const.G / 8 / np.pi *
+            vtt[f"U<F^2/R^4_CPROPS_{rstr}>"].quantity *
+            alphaCO21**2 / R_factor**4 /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_self_CPROPS_{rstr}>"] = (
+            3 * const.G / 8 / np.pi *
+            vtt[f"F<F^2/R^4_CPROPS_{rstr}>"].quantity *
+            alphaCO21**2 / R_factor**4 /
+            const.k_B).to('K cm-3')
+        t_phys[f"U<W_cloud_mol_CPROPS_{rstr}>"] = (
+            np.pi * const.G / 2 * Sigma_mol *
+            t_phys[f"U<Sigma_mol_CPROPS_{rstr}>"].quantity /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_mol_CPROPS_{rstr}>"] = (
+            np.pi * const.G / 2 * Sigma_mol *
+            t_phys[f"F<Sigma_mol_CPROPS_{rstr}>"].quantity /
+            const.k_B).to('K cm-3')
+        t_phys[f"U<W_cloud_star_CPROPS_{rstr}>"] = (
+            3/2 * const.G * rho_star *
+            vtt[f"U<F/R_CPROPS_{rstr}>"].quantity *
+            alphaCO21 / R_factor * (gal_dist / u.rad) /
+            const.k_B).to('K cm-3')
+        t_phys[f"F<W_cloud_star_CPROPS_{rstr}>"] = (
+            3/2 * const.G * rho_star *
+            vtt[f"F<F/R_CPROPS_{rstr}>"].quantity *
+            alphaCO21 / R_factor * (gal_dist / u.rad) /
+            const.k_B).to('K cm-3')
+        t_phys[f"U<P_DE_CPROPS_{rstr}>"] = (
+            t_phys[f"U<W_cloud_self_CPROPS_{rstr}>"].quantity +
+            t_phys[f"U<W_cloud_mol_CPROPS_{rstr}>"].quantity +
+            t_phys[f"U<W_cloud_star_CPROPS_{rstr}>"].quantity +
+            t_phys["W_atom"].quantity)
+        t_phys[f"F<P_DE_CPROPS_{rstr}>"] = (
+            t_phys[f"F<W_cloud_self_CPROPS_{rstr}>"].quantity +
+            t_phys[f"F<W_cloud_mol_CPROPS_{rstr}>"].quantity +
+            t_phys[f"F<W_cloud_star_CPROPS_{rstr}>"].quantity +
+            t_phys["W_atom"].quantity)
+
+    if append_raw_data:
+        for key in vtt.colnames:
+            if key not in t_phys.colnames:
+                t_phys[key] = vtt[key].quantity
+
+    return t_phys
+
+
 ######################################################################
 ######################################################################
+##
+##  Pipeline main body starts from here
+##
+######################################################################
+######################################################################
+
 
 if __name__ == '__main__':
 
@@ -369,7 +720,7 @@ if __name__ == '__main__':
     # only keep targets with the 'ALMA' tag
     catalog = catalog[catalog['ALMA'] == 1]
 
-    # loop through the sample table
+    # loop through sample table
     for row in catalog:
 
         # galaxy parameters
@@ -389,6 +740,7 @@ if __name__ == '__main__':
                    f"{apersz.to('kpc').value:.0f}kpc.ecsv")
         # skip targets with aperture statistics table already on disk
         if vttfile.is_file():
+            print(f"Table file already on disk - skipping {name}")
             continue
 
         print(f"Processing data for {name}")
@@ -412,7 +764,7 @@ if __name__ == '__main__':
         radii, projang = deproject(
             center_coord=ctr_radec, incl=incl.value, pa=posang.value,
             ra=vtt['RA'], dec=vtt['DEC'])
-        vtt['r_gal'] = (radii * u.deg).to('arcsec')
+        vtt['rang_gal'] = (radii * u.deg).to('arcsec')
         vtt['phi_gal'] = projang * u.deg
         # sort rows by galactic radii
         vtt[:] = vtt[np.argsort(vtt['r_gal'])]
@@ -434,12 +786,12 @@ if __name__ == '__main__':
         infile = get_data_path('HI:mom0', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm',
-            unit='header', #unit=u.Unit('K km s-1'),
+            unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
         infile = get_data_path('HI:mom0', name)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm_native',
-            unit='header', #unit=u.Unit('K km s-1'),
+            unit=u.Unit('K km s-1'),
             fill_outside=np.nan)
 
         # add S4G data in table
@@ -447,25 +799,25 @@ if __name__ == '__main__':
         infile = get_data_path('S4G:ICA3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_ICA',
-            unit='header', #unit=u.Unit('MJy sr-1'),
+            unit=u.Unit('MJy sr-1'),
             fill_outside=np.nan)
         infile = get_data_path('S4G:3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_raw',
-            unit='header', #unit=u.Unit('MJy sr-1'),
+            unit=u.Unit('MJy sr-1'),
             fill_outside=np.nan)
 
         # add Z0MGS data in table
         print("  Resampling Z0MGS data")
         infile = get_data_path('Z0MGS:SFR:NUVW3', name, apersz)
         add_resampled_image_to_table(
-            vtt, infile, colname='SigSFR_NUVW3',
-            unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
+            vtt, infile, colname='Sigma_SFR_NUVW3',
+            unit=u.Unit('Msun kpc-2 yr-1'),
             fill_outside=np.nan)
         infile = get_data_path('Z0MGS:SFR:W3ONLY', name, apersz)
         add_resampled_image_to_table(
-            vtt, infile, colname='SigSFR_W3ONLY',
-            unit='header', #unit=u.Unit('Msun kpc-2 yr-1'),
+            vtt, infile, colname='Sigma_SFR_W3ONLY',
+            unit=u.Unit('Msun kpc-2 yr-1'),
             fill_outside=np.nan)
 
         # add environmental fraction (CO flux-weighted) in table
@@ -504,9 +856,25 @@ if __name__ == '__main__':
         # write table to disk
         print("  Writing table to disk")
         vtt.write(vttfile)
+        del vtt
 
         print(f"Finished processing data for {name}!")
         print("")
+
+    # ----------------------------------------------------------------
+
+    for row in catalog:
+        # convert raw observables to physical properties
+        print("  Constructing physical property table")
+        name = row['NAME'].strip()
+        vttfile = (workdir /
+                   f"{name}_{aperture_shape}_"
+                   f"{apersz.to('kpc').value:.0f}kpc.ecsv")
+        vtt = Table.read(vttfile)
+        t_phys = gen_phys_props_table(vtt, row)
+        print(" Writing physical property table to disk")
+        t_phys.write(vttfile.replace('.', '_phys.'))
+        del vtt, t_phys
 
     # ----------------------------------------------------------------
 

@@ -24,7 +24,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
     if datatypes[0] == 'sample_table':
-        return PHANGSdir / 'sample_v1p3.ecsv'
+        return PHANGSdir / 'sample_v1p3_sup.ecsv'
 
     elif datatypes[0] == 'ALMA':
         # PHANGS-ALMA data
@@ -76,7 +76,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
 
 
 def add_resampled_image_to_table(
-    t, infile, colname='new_col', unit=u.Unit(''), **kwargs):
+        t, infile, colname='new_col', unit=u.Unit(''), **kwargs):
 
     if not infile.is_file():
         t[colname] = np.full(len(t), np.nan) * unit
@@ -91,7 +91,7 @@ def add_resampled_image_to_table(
 
 
 def add_env_frac_to_table(
-    t, envfile, wtfile, colname='new_col', **kwargs):
+        t, envfile, wtfile, colname='new_col', **kwargs):
 
     if not (envfile.is_file() and wtfile.is_file()):
         t[colname] = np.full(len(t), np.nan)
@@ -117,7 +117,7 @@ def add_env_frac_to_table(
 
 
 def add_CO_stats_to_table(
-    t, bm0file, sm0file, sewfile, res, **kwargs):
+        t, bm0file, sm0file, sewfile, res, **kwargs):
 
     rstr = f"{res.to('pc').value:.0f}pc"
     cols = [
@@ -141,7 +141,7 @@ def add_CO_stats_to_table(
         (f"F<sigv^2_CO21_{rstr}>", 'km2 s-2'),
         (f"F<I*sigv^2_CO21_{rstr}>", 'K km3 s-3'),
         (f"F<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
-        ]
+    ]
 
     # if no data file found: add placeholder (empty) columns
     if not (bm0file.is_file() and sm0file.is_file() and
@@ -165,14 +165,14 @@ def add_CO_stats_to_table(
     bm0_map[~np.isfinite(bm0_map)] = 0
     nan_map = np.ones_like(bm0_map).astype('float')
     nan_map[~np.isfinite(sm0_map) | (sm0_map <= 0) |
-           ~np.isfinite(sew_map) | (sew_map <= 0)] = np.nan
+            ~np.isfinite(sew_map) | (sew_map <= 0)] = np.nan
     sm0_map[np.isnan(nan_map)] = 0
     sew_map[np.isnan(nan_map)] = 0
 
     # pixel size (in arcsec^2)
     pixsz = np.abs(
         hdr['CDELT1'] * hdr['CDELT2'] * u.deg**2
-        ).to('arcsec2').value
+    ).to('arcsec2').value
 
     # maps corresponding to each column
     maps = [
@@ -223,7 +223,7 @@ def add_CO_stats_to_table(
 
 
 def add_cprops_stats_to_table(
-    t, cpropsfile, res, **kwargs):
+        t, cpropsfile, res, **kwargs):
 
     rstr = f"{res.to('pc').value:.0f}pc"
     cols = [
@@ -338,7 +338,7 @@ def get_R21():
 
 def get_alpha21cm(include_He=True):
     if include_He:  # include the extra 35% mass of Helium
-        alpha21cm =  1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
+        alpha21cm = 1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
     else:
         alpha21cm = 1.46e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
     return alpha21cm
@@ -367,19 +367,23 @@ def get_h_star(Rstar, diskshape='flat', Rgal=None):
     return hstar
 
 
-def gen_phys_props_table(vtt, params, append_raw_data=False):
+def gen_phys_props_table(
+        vtt, params, lin_res=None, append_raw_data=False):
 
     # initiate new table
     t_phys = Table()
-    for key in params:
+    t_phys.meta['NAME'] = str(params['NAME'].strip())
+    for key in (
+            'RA_DEG', 'DEC_DEG', 'DIST', 'INCL', 'POSANG',
+            'LOGMSTAR', 'RDISK_DEG', 'REFF_W1_DEG'):
         t_phys.meta[key] = params[key]
 
     # galaxy global parameters
     gal_cosi = np.cos(np.deg2rad(params['INCL']))
     gal_dist = params['DIST'] * u.Mpc
     gal_Mstar = 10**params['LOGMSTAR'] * u.Msun
-    gal_Rstar = params['RSTAR'] * u.kpc
-    gal_Reff = params['REFF_W1'] * u.kpc
+    gal_Rstar = (np.deg2rad(params['RDISK_DEG'])*gal_dist).to('kpc')
+    gal_Reff = (np.deg2rad(params['REFF_W1_DEG'])*gal_dist).to('kpc')
 
     # coordinates
     t_phys['RA'] = vtt['RA'].quantity.to('deg')
@@ -397,20 +401,20 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
     # SFR surface density
     for key in ('Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY'):
         t_phys[key] = vtt[key].quantity.to('Msun kpc-2 yr-1')
-        if (np.isfinite(t_phys[key]) != 0 and
+        if (np.isfinite(t_phys[key]).sum() != 0 and
             'Sigma_SFR' not in t_phys.colnames):
             t_phys['Sigma_SFR'] = t_phys[key].quantity
     if 'Sigma_SFR' not in t_phys.colnames:
         t_phys['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
-    Sigma_SFR = t_phys['Sigma_SFR'].quantity
 
     # stellar mass surface densities
     alpha3p6um = get_alpha3p6um(ref='MS14')
     for key in ('I_3p6um_ICA', 'I_3p6um_raw'):
         newkey = 'Sigma_star'+key[-4:]
         t_phys[newkey] = (
-            vtt[key].quantity * cosi * alpha3p6um).to('Msun/pc^2')
-        if (np.isfinite(t_phys[newkey]) != 0 and
+            vtt[key].quantity * gal_cosi * alpha3p6um
+        ).to('Msun/pc^2')
+        if (np.isfinite(t_phys[newkey]).sum() != 0 and
             'Sigma_star' not in t_phys.colnames):
             t_phys['Sigma_star'] = t_phys[newkey].quantity
     if 'Sigma_star' not in t_phys.colnames:
@@ -430,17 +434,18 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
     # HI mass surface density
     alpha21cm = get_alpha21cm(include_He=True)
     t_phys['Sigma_atom'] = (
-        vtt['I_21cm'].quantity * cosi * alpha21cm).to('Msun pc-2'))
-    if np.isfinite(t_phys['Sigma_atom']) == 0:
+        vtt['I_21cm'].quantity * gal_cosi * alpha21cm
+    ).to('Msun pc-2')
+    if np.isfinite(t_phys['Sigma_atom']).sum() == 0:
         t_phys['Sigma_atom'] = (
-            vtt['I_21cm_raw'].quantity * cosi * alpha21cm
-        ).to('Msun pc-2'))
+            vtt['I_21cm_native'].quantity * gal_cosi * alpha21cm
+        ).to('Msun pc-2')
     Sigma_atom = t_phys['Sigma_atom'].quantity
 
     # H2 surface density (low resolution)
     R21 = get_R21()
-    rstr_fid = f"{res_pcs[-1].to('pc').value:.0f}pc"  # 150 pc
-    ICO10kpc = vtt['I_CO21'].quantity * cosi / R21
+    rstr_fid = f"{lin_res[-1].to('pc').value:.0f}pc"  # 150 pc
+    ICO10kpc = vtt['I_CO21'].quantity * gal_cosi / R21
     ICO10GMC = vtt[f"F<I_CO21_{rstr_fid}>"].quantity / R21
     t_phys['alphaCO10_MW'] = predict_alphaCO10(
         prescription='constant')
@@ -456,7 +461,7 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
         B13_WCO10kpc=ICO10kpc, B13_WCO10GMC=ICO10GMC)
     alphaCO21 = t_phys['alphaCO10_PHANGS'].quantity / R21
     t_phys['Sigma_mol'] = (
-        vtt['I_CO21'].quantity * cosi * alphaCO21).to('Msun pc-2')
+        vtt['I_CO21'].quantity * gal_cosi * alphaCO21).to('Msun pc-2')
     Sigma_mol = t_phys['Sigma_mol'].quantity
 
     # CO contribution by environments
@@ -469,9 +474,9 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
         t_phys['frac_bulge'] = 1.
 
     # CO map statistics
-    for res_pc in res_pcs:
-        R_cloud = res_pc / 2
-        rstr = f"{res_pc.to('pc').value:.0f}pc"
+    for res in lin_res:
+        R_cloud = res / 2
+        rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"fracA_CO21_{rstr}"] = (
             vtt[f"Area_CO21_strict_{rstr}"].quantity /
             vtt[f"Area_CO21_total_{rstr}"].quantity).to('')
@@ -508,8 +513,8 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
 
     # CPROPS cloud statistics
     R_factor = np.sqrt(5) / 1.91  # Rosolowsky&Leroy06: Section 3.1
-    for res_pc in res_pcs:
-        rstr = f"{res_pc.to('pc').value:.0f}pc"
+    for res in lin_res:
+        rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"Nobj_CPROPS_{rstr}"] = (
             vtt[f"Nobj_CPROPS_{rstr}"].quantity).to('')
         t_phys[f"fracF_CPROPS_{rstr}"] = (
@@ -558,7 +563,7 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
 
     # dynamical equilibrium pressure estimates
     Sigma_gas = Sigma_mol + Sigma_atom
-    res_fid = res_pcs[-2].to('pc')  # 120 pc
+    res_fid = lin_res[-2].to('pc')  # 120 pc
     rstr_fid = f"{res_fid.value:.0f}pc"
     vdisp_mol_z = t_phys[f"F<vdisp_mol_pix_{rstr_fid}>"].quantity
     vdisp_atom_z = 10 * u.Unit('km s-1')
@@ -586,9 +591,9 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
         (np.pi * const.G / 2 * Sigma_mol**2 +
          np.pi * const.G * Sigma_mol * rho_star * res_fid/2) /
         const.k_B).to('K cm-3') + t_phys['W_atom'].quantity
-    for res_pc in res_pcs:
-        R_cloud = res_pc / 2
-        rstr = f"{res_pc.to('pc').value:.0f}pc"
+    for res in lin_res:
+        R_cloud = res / 2
+        rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"A<W_cloud_self_pix_{rstr}>"] = (
             3/8 * np.pi * const.G *
             vtt[f"A<I^2_CO21_{rstr}>"].quantity * alphaCO21**2 /
@@ -623,8 +628,8 @@ def gen_phys_props_table(vtt, params, append_raw_data=False):
             t_phys[f"F<W_cloud_mol_pix_{rstr}>"].quantity +
             t_phys[f"F<W_cloud_star_pix_{rstr}>"].quantity +
             t_phys["W_atom"].quantity)
-    for res_pc in res_pcs:
-        rstr = f"{res_pc.to('pc').value:.0f}pc"
+    for res in lin_res:
+        rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"U<W_cloud_self_CPROPS_{rstr}>"] = (
             3 * const.G / 8 / np.pi *
             vtt[f"U<F^2/R^4_CPROPS_{rstr}>"].quantity *
@@ -755,9 +760,8 @@ if __name__ == '__main__':
         apersz_deg = (apersz/dist*u.rad).to('deg').value
         with fits.open(infile) as hdul:
             vtt = VoronoiTessTable(
-                hdul[0].header, cell_shape=aperture_shape,
-                ref_radec=ctr_radec.value,
-                seed_spacing=apersz_deg)
+                hdul[0].header, ref_radec=ctr_radec.value,
+                cell_shape=aperture_shape, seed_spacing=apersz_deg)
 
         # add galactic radii and projected angles in table
         print("  Calculating r_gal and phi_gal")
@@ -767,15 +771,14 @@ if __name__ == '__main__':
         vtt['rang_gal'] = (radii * u.deg).to('arcsec')
         vtt['phi_gal'] = projang * u.deg
         # sort rows by galactic radii
-        vtt[:] = vtt[np.argsort(vtt['r_gal'])]
+        vtt[:] = vtt[np.argsort(vtt['rang_gal'])]
 
         # add low resolution CO data in table
         print("  Resampling low resolution CO data")
         infile = get_data_path('ALMA:CO:mom0:strict', name, apersz)
-        vtt.resample_image(
-            infile, colname='I_CO21',
-            unit='header', #unit=u.Unit('K km s-1'),
-            fill_outside=np.nan)
+        add_resampled_image_to_table(
+            vtt, infile, colname='I_CO21',
+            unit=u.Unit('K km s-1'), fill_outside=np.nan)
         if np.isfinite(vtt['I_CO21']).sum() == 0:
             print(f"No CO detection in any aperture -- skip {name}")
             print("")
@@ -786,39 +789,33 @@ if __name__ == '__main__':
         infile = get_data_path('HI:mom0', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm',
-            unit=u.Unit('K km s-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('K km s-1'), fill_outside=np.nan)
         infile = get_data_path('HI:mom0', name)
         add_resampled_image_to_table(
             vtt, infile, colname='I_21cm_native',
-            unit=u.Unit('K km s-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('K km s-1'), fill_outside=np.nan)
 
         # add S4G data in table
         print("  Resampling S4G data")
         infile = get_data_path('S4G:ICA3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_ICA',
-            unit=u.Unit('MJy sr-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('MJy sr-1'), fill_outside=np.nan)
         infile = get_data_path('S4G:3p6um', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='I_3p6um_raw',
-            unit=u.Unit('MJy sr-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('MJy sr-1'), fill_outside=np.nan)
 
         # add Z0MGS data in table
         print("  Resampling Z0MGS data")
         infile = get_data_path('Z0MGS:SFR:NUVW3', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='Sigma_SFR_NUVW3',
-            unit=u.Unit('Msun kpc-2 yr-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('Msun kpc-2 yr-1'), fill_outside=np.nan)
         infile = get_data_path('Z0MGS:SFR:W3ONLY', name, apersz)
         add_resampled_image_to_table(
             vtt, infile, colname='Sigma_SFR_W3ONLY',
-            unit=u.Unit('Msun kpc-2 yr-1'),
-            fill_outside=np.nan)
+            unit=u.Unit('Msun kpc-2 yr-1'), fill_outside=np.nan)
 
         # add environmental fraction (CO flux-weighted) in table
         print("  Calculating (CO flux-weighted) "
@@ -855,7 +852,7 @@ if __name__ == '__main__':
 
         # write table to disk
         print("  Writing table to disk")
-        vtt.write(vttfile)
+        vtt.write(vttfile, overwrite=True)
         del vtt
 
         print(f"Finished processing data for {name}!")
@@ -864,17 +861,27 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------
 
     for row in catalog:
-        # convert raw observables to physical properties
-        print("  Constructing physical property table")
+
         name = row['NAME'].strip()
         vttfile = (workdir /
                    f"{name}_{aperture_shape}_"
                    f"{apersz.to('kpc').value:.0f}kpc.ecsv")
+        physfile = (workdir /
+                    f"{name}_{aperture_shape}_"
+                    f"{apersz.to('kpc').value:.0f}kpc_phys.ecsv")
+        if (not vttfile.is_file() or physfile.is_file()):
+            continue
+
+        # convert raw observables to physical properties
+        print(f"Constructing physical property table for {name}")
         vtt = Table.read(vttfile)
-        t_phys = gen_phys_props_table(vtt, row)
-        print(" Writing physical property table to disk")
-        t_phys.write(vttfile.replace('.', '_phys.'))
+        t_phys = gen_phys_props_table(vtt, row, lin_res=lin_res)
+
+        # write table to disk
+        print("  Writing table to disk")
+        t_phys.write(physfile, overwrite=True)
         del vtt, t_phys
+        print("")
 
     # ----------------------------------------------------------------
 

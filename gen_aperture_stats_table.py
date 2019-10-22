@@ -238,6 +238,7 @@ def add_cprops_stats_to_table(
         (f"U<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
         (f"U<sigv_CPROPS_{rstr}>", 'km s-1'),
         (f"U<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+        (f"U<F*sigv^2/R^2_CPROPS_{rstr}>", 'K km3 s-3'),
         (f"U<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
         (f"U<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
         # CO flux-weighted averages
@@ -248,6 +249,7 @@ def add_cprops_stats_to_table(
         (f"F<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
         (f"F<sigv_CPROPS_{rstr}>", 'km s-1'),
         (f"F<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+        (f"F<F*sigv^2/R^2_CPROPS_{rstr}>", 'K km3 s-3'),
         (f"F<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
         (f"F<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
     ]
@@ -292,6 +294,7 @@ def add_cprops_stats_to_table(
         flux_cat/rad_cat,
         sigv_cat,
         sigv_cat**2,
+        flux_cat*sigv_cat**2/rad_cat**2,
         flux_cat*sigv_cat**2/rad_cat**3,
         rad_cat*sigv_cat**2/flux_cat,
         # CO flux-weighted averages
@@ -302,6 +305,7 @@ def add_cprops_stats_to_table(
         flux_cat/rad_cat,
         sigv_cat,
         sigv_cat**2,
+        flux_cat*sigv_cat**2/rad_cat**2,
         flux_cat*sigv_cat**2/rad_cat**3,
         rad_cat*sigv_cat**2/flux_cat,
     ]

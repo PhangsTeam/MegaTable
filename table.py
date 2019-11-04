@@ -1,672 +1,477 @@
-import warnings
+import os
+from pathlib import Path
 import numpy as np
-from scipy.spatial import cKDTree
 from astropy import units as u
 from astropy.table import Table
 from astropy.io import fits
-from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
+from .core import GeneralRegionTable, VoronoiTessTable
+from .utils import nanaverage
+
 
 ######################################################################
 ######################################################################
 
 
-class HiddenTable(object):
+class PhangsAlmaMixin(object):
 
     """
-    Use protected attribute to hide an astropy table.
+    Mixin class offering tools to deal with PHANGS-ALMA data products.
+    """
+
+    # ----------------------------------------------------------------
+
+    def calc_CO_stats(
+            self, bm0file, sm0file, sewfile, res, **kwargs):
+
+        rstr = f"{res.to('pc').value:.0f}pc"
+        cols = [
+            # sums
+            (f"Area_CO21_total_{rstr}", 'arcsec2'),
+            (f"Area_CO21_broad_{rstr}", 'arcsec2'),
+            (f"Area_CO21_strict_{rstr}", 'arcsec2'),
+            (f"Flux_CO21_broad_{rstr}", 'K km s-1 arcsec2'),
+            (f"Flux_CO21_strict_{rstr}", 'K km s-1 arcsec2'),
+            # area-weighted averages
+            (f"A<I_CO21_{rstr}>", 'K km s-1'),
+            (f"A<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
+            (f"A<sigv_CO21_{rstr}>", 'km s-1'),
+            (f"A<sigv^2_CO21_{rstr}>", 'km2 s-2'),
+            (f"A<I*sigv^2_CO21_{rstr}>", 'K km3 s-3'),
+            (f"A<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+            # CO flux-weighted averages
+            (f"F<I_CO21_{rstr}>", 'K km s-1'),
+            (f"F<I^2_CO21_{rstr}>", 'K2 km2 s-2'),
+            (f"F<sigv_CO21_{rstr}>", 'km s-1'),
+            (f"F<sigv^2_CO21_{rstr}>", 'km2 s-2'),
+            (f"F<I*sigv^2_CO21_{rstr}>", 'K km3 s-3'),
+            (f"F<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
+        ]
+
+        # if no data file found: add placeholder (empty) columns
+        if not (bm0file.is_file() and sm0file.is_file() and
+                sewfile.is_file()):
+            for col, unit in cols:
+                self[col] = np.full(len(self), np.nan) * u.Unit(unit)
+            return
+
+        # read files
+        with fits.open(bm0file) as hdul:
+            bm0_map = hdul[0].data.copy()
+            hdr = hdul[0].header.copy()
+        with fits.open(sm0file) as hdul:
+            sm0_map = hdul[0].data.copy()
+            if sm0_map.shape != bm0_map.shape:
+                raise ValueError("Input maps have inconsistent shape")
+        with fits.open(sewfile) as hdul:
+            sew_map = hdul[0].data.copy()
+            if sew_map.shape != bm0_map.shape:
+                raise ValueError("Input maps have inconsistent shape")
+        bm0_map[~np.isfinite(bm0_map)] = 0
+        nan_map = np.ones_like(bm0_map).astype('float')
+        nan_map[~np.isfinite(sm0_map) | (sm0_map <= 0) |
+                ~np.isfinite(sew_map) | (sew_map <= 0)] = np.nan
+        sm0_map[np.isnan(nan_map)] = 0
+        sew_map[np.isnan(nan_map)] = 0
+
+        # pixel size (in arcsec^2)
+        pixsz = np.abs(
+            hdr['CDELT1'] * hdr['CDELT2'] * u.deg**2
+        ).to('arcsec2').value
+
+        # maps corresponding to each column
+        maps = [
+            # sums
+            np.ones_like(bm0_map).astype('float')*pixsz,
+            (bm0_map != 0).astype('float')*pixsz,
+            (sm0_map > 0).astype('float')*pixsz,
+            bm0_map*pixsz,
+            sm0_map*pixsz,
+            # area-weighted averages (among regions w/ CO detection)
+            sm0_map * nan_map,
+            sm0_map**2 * nan_map,
+            sew_map * nan_map,
+            sew_map**2 * nan_map,
+            sm0_map*sew_map**2 * nan_map,
+            sew_map**2/sm0_map * nan_map,
+            # CO flux-weighted averages
+            sm0_map,
+            sm0_map**2,
+            sew_map,
+            sew_map**2,
+            sm0_map*sew_map**2,
+            sew_map**2/sm0_map,
+        ]
+
+        # calculate statistics and add into table
+        for (col, unit), map in zip(cols, maps):
+            if col[:2] == 'A<':
+                # area-weighted average
+                self.calc_image_stats(
+                    map, header=hdr, stat_func=nanaverage,
+                    weight=None, colname=col, unit=unit, **kwargs)
+            elif col[:2] == 'F<':
+                # CO flux-weighted average
+                self.calc_image_stats(
+                    map, header=hdr, stat_func=nanaverage,
+                    weight=sm0_map, colname=col, unit=unit, **kwargs)
+            else:
+                # sum
+                self.calc_image_stats(
+                    map, header=hdr, stat_func=np.nansum,
+                    colname=col, unit=unit, **kwargs)
+
+    # ----------------------------------------------------------------
+
+    def calc_cprops_stats(
+        self, cpropsfile, res, **kwargs):
+
+        rstr = f"{res.to('pc').value:.0f}pc"
+        cols = [
+            # sums
+            (f"Nobj_CPROPS_{rstr}", ''),
+            (f"Flux_CPROPS_total_{rstr}", 'K km s-1 arcsec2'),
+            # uniformly weighted averages
+            (f"U<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
+            (f"U<R_CPROPS_{rstr}>", 'arcsec'),
+            (f"U<F/R^2_CPROPS_{rstr}>", 'K km s-1'),
+            (f"U<F^2/R^4_CPROPS_{rstr}>", 'K2 km2 s-2'),
+            (f"U<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
+            (f"U<sigv_CPROPS_{rstr}>", 'km s-1'),
+            (f"U<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+            (f"U<F*sigv^2/R^2_CPROPS_{rstr}>", 'K km3 s-3'),
+            (f"U<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
+            (f"U<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
+            # CO flux-weighted averages
+            (f"F<F_CPROPS_{rstr}>", 'K km s-1 arcsec2'),
+            (f"F<R_CPROPS_{rstr}>", 'arcsec'),
+            (f"F<F/R^2_CPROPS_{rstr}>", 'K km s-1'),
+            (f"F<F^2/R^4_CPROPS_{rstr}>", 'K2 km2 s-2'),
+            (f"F<F/R_CPROPS_{rstr}>", 'K km s-1 arcsec'),
+            (f"F<sigv_CPROPS_{rstr}>", 'km s-1'),
+            (f"F<sigv^2_CPROPS_{rstr}>", 'km2 s-2'),
+            (f"F<F*sigv^2/R^2_CPROPS_{rstr}>", 'K km3 s-3'),
+            (f"F<F*sigv^2/R^3_CPROPS_{rstr}>", 'K km3 s-3 arcsec-1'),
+            (f"F<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
+        ]
+
+        # if no CPROPS file found: add placeholder (empty) columns
+        if not cpropsfile.is_file():
+            for col, unit in cols:
+                self[col] = np.full(len(self), np.nan) * u.Unit(unit)
+            return
+
+        # read CPROPS file
+        try:
+            t_cat = Table.read(cpropsfile)
+        except ValueError as e:
+            print(e)
+            return
+        ra_cat = t_cat['XCTR_DEG'].quantity.value
+        dec_cat = t_cat['YCTR_DEG'].quantity.value
+        flux_cat = (
+            t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
+            u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
+        sigv_cat = t_cat['SIGV_KMS'].quantity.value
+        rad_cat = (  # expressed in Solomon+87 convention
+            t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
+            u.rad).to('arcsec').value
+        wt_arr = flux_cat.copy()
+        wt_arr[~np.isfinite(rad_cat)] = 0
+        flux_cat[~np.isfinite(rad_cat)] = np.nan
+        sigv_cat[~np.isfinite(rad_cat)] = np.nan
+        rad_cat[~np.isfinite(rad_cat)] = np.nan
+
+        # entries corresponding to each column
+        entries = [
+            # sums
+            np.isfinite(flux_cat).astype('int'),
+            flux_cat,
+            # uniformly weighted averages
+            flux_cat,
+            rad_cat,
+            flux_cat/rad_cat**2,
+            flux_cat**2/rad_cat**4,
+            flux_cat/rad_cat,
+            sigv_cat,
+            sigv_cat**2,
+            flux_cat*sigv_cat**2/rad_cat**2,
+            flux_cat*sigv_cat**2/rad_cat**3,
+            rad_cat*sigv_cat**2/flux_cat,
+            # CO flux-weighted averages
+            flux_cat,
+            rad_cat,
+            flux_cat/rad_cat**2,
+            flux_cat**2/rad_cat**4,
+            flux_cat/rad_cat,
+            sigv_cat,
+            sigv_cat**2,
+            flux_cat*sigv_cat**2/rad_cat**2,
+            flux_cat*sigv_cat**2/rad_cat**3,
+            rad_cat*sigv_cat**2/flux_cat,
+        ]
+
+        # calculate statistics and add into table
+        for (col, unit), entry in zip(cols, entries):
+            if col[:2] == 'U<':
+                # area-weighted average
+                self.calc_catalog_stats(
+                    entry, ra_cat, dec_cat,
+                    stat_func=nanaverage, weight=None,
+                    colname=col, unit=unit, **kwargs)
+            elif col[:2] == 'F<':
+                # CO flux-weighted average
+                self.calc_catalog_stats(
+                    entry, ra_cat, dec_cat,
+                    stat_func=nanaverage, weight=wt_arr,
+                    colname=col, unit=unit, **kwargs)
+            else:
+                # sum
+                self.calc_catalog_stats(
+                    entry, ra_cat, dec_cat, stat_func=np.nansum,
+                    colname=col, unit=unit, **kwargs)
+
+
+######################################################################
+######################################################################
+
+
+class EnvMaskMixin(object):
+
+    """
+    Mixin class offering tools to deal with (S4G) environmental masks.
+    """
+
+    # ----------------------------------------------------------------
+
+    def calc_env_frac(
+            self, envfile, wtfile, colname='new_col', **kwargs):
+
+        from reproject import reproject_interp
+
+        if not (envfile.is_file() and wtfile.is_file()):
+            self[colname] = np.full(len(self), np.nan)
+            return
+
+        with fits.open(wtfile) as hdul:
+            wtmap = hdul[0].data.copy()
+            wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
+            wthdr = hdul[0].header.copy()
+        with fits.open(envfile) as hdul:
+            envmap, footprint = reproject_interp(
+                hdul[0], wthdr, order=0)
+        envmap[~footprint.astype('?')] = 0
+        envbimap = (envmap > 0).astype('float')
+        self.calc_image_stats(
+            envbimap, header=wthdr, stat_func=nanaverage,
+            weight=wtmap, colname=colname, **kwargs)
+
+
+######################################################################
+#
+# Radial Profiles
+#
+######################################################################
+
+
+class RadialMegaTable(
+        PhangsAlmaMixin, EnvMaskMixin, GeneralRegionTable):
+
+    """
+    Mega-table that quantifies a galaxy's radial profiles.
+
+    Each ring (annular region) corresponds to a row in the table.
+    Once a table is constructed, additional columns can be added
+    by calculating statistics of images within each ring.
 
     Parameters
     ----------
-    table : astropy.table.Table
-        The table to hide
+    gal_ra_deg : float, optional
+        Right Ascension coordinate of the galaxy center (in degrees).
+    gal_dec_deg : float, optional
+        Declination coordinate of the galaxy center (in degrees).
+    ring_width_deg : float
+        The (deprojected) width of each ring (in degrees).
+    gal_incl_deg : float, optional
+        Inclination angle of the galaxy (in degrees).
+        Default is 0 degree.
+    gal_pa_deg : float, optional
+        Position angle of the galaxy (in degrees; North through East).
+        Default is 0 degree.
+    max_rgal_deg : float, optional
+        The (deprojected) maximum galactic radius (in degrees)
+        covered by the radial profile.
+        Default is to cover out to 10 times the ring width.
     """
 
-    __name__ = "HiddenTable"
+    __name__ = "RadialMegaTable"
 
-    def __str__(self):
-        return self._table.__str__()
+    # ----------------------------------------------------------------
 
-    def __repr__(self):
-        return self._table.__repr__()
+    def __init__(
+            self, gal_ra_deg, gal_dec_deg, ring_width_deg,
+            gal_incl_deg=0, gal_pa_deg=0, max_rgal_deg=None):
 
-    def __len__(self):
-        return len(self._table)
+        from functools import partial
+        from .utils import deproject
 
-    def __getitem__(self, key):
-        return self._table[key]
-
-    def __setitem__(self, key, value):
-        self._table[key] = value
-
-    def __init__(self, table=None):
-        if table is not None:
-            self._table = table
+        if max_rgal_deg is None:
+            nring = 10
         else:
-            self._table = Table()
+            nring = int(np.ceil((max_rgal_deg / ring_width_deg)))
+
+        # function that determines whether a set of coordinates locate
+        # inside the ring between rmin and rmax
+        def coord2bool(
+                ra, dec, rmin=None, rmax=None,
+                gal_ra=None, gal_dec=None,
+                gal_incl=None, gal_pa=None):
+            projrad, projang = deproject(
+                center_ra=gal_ra, center_dec=gal_dec,
+                incl=gal_incl, pa=gal_pa, ra=ra, dec=dec)
+            return ((projrad >= rmin) & (projrad < rmax))
+
+        # ring names and definitions
+        ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
+        ring_defs = []
+        rbounds = np.arange(nring+1) * ring_width_deg
+        for rmin, rmax in zip(rbounds[:-1], rbounds[1:]):
+            ring_defs += [
+                partial(
+                    coord2bool, rmin=rmin, rmax=rmax,
+                    gal_ra=gal_ra_deg, gal_dec=gal_dec_deg,
+                    gal_incl=gal_incl_deg, gal_pa=gal_pa_deg)]
+
+        GeneralRegionTable.__init__(
+            self, ring_defs, names=ring_names)
+        self._table['rang_gal_min'] = rbounds[:-1] * u.deg
+        self._table['rang_gal_max'] = rbounds[1:] * u.deg
+
+    # ----------------------------------------------------------------
+
+    def calc_image_stats(
+            self, image, colname='new_col', unit=u.Unit(''),
+            **kwargs):
+
+        if (isinstance(image, (str, bytes, os.PathLike)) and
+            not Path(image).is_file()):
+            self[colname] = np.full(len(self), np.nan) * unit
+            return
+
+        GeneralRegionTable.calc_image_stats(
+            self, image, colname=colname, unit=unit, **kwargs)
+
+    # ----------------------------------------------------------------
 
     def clean(
             self, discard_NaN=None, keep_finite=None,
             discard_negative=None, keep_positive=None):
         """
-        Cleaning table rows that contain 'bad' column values.
+        Cleaning regions that contain 'bad' column values.
 
         Parameters
         ----------
         discard_NaN : None or string or array of string, optional
-            To remove rows containing NaNs in these column(s).
+            To remove regions showing NaN values in these column(s).
         keep_finite : None or string or array of string, optional
-            To remove NaNs and Infs in these column(s).
+            To remove regions showing NaNs or Infs values in these
+            column(s).
         discard_negative : None or string or array of string, optional
-            To remove negative values in these column(s).
-            (Note that NaNs and +Infs will not be removed)
+            To remove regions showing negative values in these
+            column(s). (Note that NaNs and +Infs will not be removed)
         keep_finite : None or string or array of string, optional
-            To only keep positive values in these column(s).
+            To only keep regions showing positive values in these
+            column(s).
         """
+        from itertools import compress
+        
         if discard_NaN is not None:
             for col in np.atleast_1d(discard_NaN):
-                self._table = self[~np.isnan(self[col])]
+                flag = np.isnan(self[col])
+                self._table = self[~flag]
+                self._region_defs = compress(self._region_defs, ~flag)
         if keep_finite is not None:
             for col in np.atleast_1d(keep_finite):
-                self._table = self[np.isfinite(self[col])]
+                flag = ~np.isfinite(self[col])
+                self._table = self[~flag]
+                self._region_defs = compress(self._region_defs, ~flag)
         if discard_negative is not None:
             for col in np.atleast_1d(discard_negative):
-                self._table = self[~(self[col] < 0)]
+                flag = self[col] < 0
+                self._table = self[~flag]
+                self._region_defs = compress(self._region_defs, ~flag)
         if keep_positive is not None:
             for col in np.atleast_1d(keep_positive):
-                self._table = self[self[col] > 0]
-
-    def write(self, filename, **kwargs):
-        """
-        Write the hidden table to a file.
-
-        Parameters
-        ----------
-        filename : string
-            Name of the file to write to.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.write`
-        """
-        self._table.write(filename, **kwargs)
-
-    @classmethod
-    def read(cls, filename, **kwargs):
-        """
-        Read table from a file and hide it in the protected attribute.
-
-        Parameters
-        ----------
-        filename : string
-            Name of the file to read.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.read`
-        """
-        return cls(table=Table.read(filename, **kwargs))
+                flag = ~(self[col] > 0)
+                self._table = self[~flag]
+                self._region_defs = compress(self._region_defs, ~flag)
 
 
 ######################################################################
+#
+# Hexagonal/Rectangular/User-defined Tessellations
+#
 ######################################################################
 
 
-class VoronoiTessTable(HiddenTable):
+class TessellMegaTable(
+        PhangsAlmaMixin, EnvMaskMixin, VoronoiTessTable):
 
     """
-    Table built from a Voronoi tessellation of an image footprint.
+    Mega-table built from a tessellation of a galaxy's sky footprint.
 
-    Each seed/cell in the Voronoi diagram maps to a row in the table.
-
+    Each cell/aperture in the tessellation maps to a row in the table.
     Once a table is constructed, additional columns can be added
-    by resampling images at the location of each seed, or
-    by calculating statistics of images within each Voronoi cell.
+    by calculating statistics of images within each cell/aperture, or
+    by resampling images at the location of each seed.
 
     Parameters
     ----------
     header : astropy.fits.Header
-        FITS header that defines the footprint of the Voronoi diagram.
-    seeds_ra : array_like, optional
-        If the user would like to specify the seed locations,
-        this would be their R.A. coordinates (in degrees)
-    seeds_dec : array_like, optional
-        If the user would like to specify the seed locations,
-        this would be their Declination coordinates (in degrees)
-    cell_shape : {'square', 'hexagon'}, optional
-        If the seed locations are to be automatically generated,
-        this keyword specifies the shape of the Voronoi cell.
-        Default: 'square', in which case the Voronoi diagram comprises
-        regularly spaced square cells.
-    seed_spacing : float, optional
-        If the seed locations are to be automatically generated,
-        this keyword specifies the spacing between adjacent seeds.
+        FITS header that defines the sky footprint of a galaxy.
+    cell_shape : {'hexagon', 'square'}, optional
+        The shape of the cell/aperture that comprise the tessellation.
+        Default: 'hexagon', in which case a hexagonal tiling is used.
+    cell_size_deg : float, optional
+        The angular size of the cells/aperture (defined as the
+        spacing between adjacent cell centers; in degrees).
         If None, the minimum absolute value of the 'CDELT' entry
         in the input header will be used.
-    ref_radec : two_tuple, optional
-        (RA, Dec) coordinate of the reference location (in degrees).
-        As all calculations are done in the angular separation frame,
-        this keyword defines the "origin" of this (dx, dy) coordinate.
+    gal_ra_deg : float, optional
+        Right Ascension coordinate of the galaxy center (in degrees).
+        This is only used as a reference coordinate for calculating
+        angular separation coordinates.
+        If None, the 'CRVAL' entry in the input header will be used.
+    gal_dec_deg : float, optional
+        Declination coordinate of the galaxy center (in degrees).
+        This is only used as a reference coordinate for calculating
+        angular separation coordinates.
         If None, the 'CRVAL' entry in the input header will be used.
     """
 
-    __name__ = "VoronoiTessTable"
+    __name__ = "TessellMegaTable"
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def __init__(
-            self, header, seeds_ra=None, seeds_dec=None,
-            cell_shape='square', seed_spacing=None, ref_radec=None):
+            self, header, cell_shape='hexagon', cell_size_deg=None,
+            gal_ra_deg=None, gal_dec_deg=None):
+        VoronoiTessTable.__init__(
+            self, header,
+            cell_shape=cell_shape, seed_spacing=cell_size_deg,
+            ref_radec=(gal_ra_deg, gal_dec_deg))
 
-        # if seed locations are specified, write them into the table
-        if seeds_ra is not None and seeds_dec is not None:
-            t = Table()
-            t['RA'] = np.atleast_1d(seeds_ra)*u.deg
-            t['DEC'] = np.atleast_1d(seeds_dec)*u.deg
-            super().__init__(t)
-            # extract celestial WCS information from header
-            self._wcs = WCS(header).celestial
-            if not self._wcs.axis_type_names == ['RA', 'DEC']:
-                raise ValueError(
-                    "Input header have unexpected axis type")
-            # find the sky coordinate of the reference point
-            if ref_radec is None:
-                self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
-            else:
-                self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-            # record metadata
-            self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-            self._table.meta['TESSTYPE'] = 'USER-DEFINED'
-            self._table.meta['REF-RA'] = self._ref_coord.ra.value
-            self._table.meta['REF-DEC'] = self._ref_coord.dec.value
-            self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-            self._table.meta['NAXIS2'] = self._wcs._naxis[1]
-            for key in self._wcs.to_header():
-                self._table.meta[key] = self._wcs.to_header()[key]
-            return
-
-        # if seed locations are not specified, generate a list of
-        # locations based on specified cell shape and seed spacing
-        super().__init__()
-        # extract celestial WCS information from header
-        self._header = header
-        self._wcs = WCS(self._header).celestial
-        if not self._wcs.axis_type_names == ['RA', 'DEC']:
-            raise ValueError(
-                "Input header have unexpected axis type")
-        # find the sky coordinate of the reference point
-        if ref_radec is None:
-            self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
-        else:
-            self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-        # use CDELT if no 'cell_spacing' value is provided
-        if seed_spacing is None:
-            spacing = np.min(np.abs(self._wcs.wcs.cdelt))*u.deg
-        else:
-            spacing = seed_spacing*u.deg
-        # estimate the size of the entire Voronoi diagram
-        footprint_world = self._wcs.calc_footprint()
-        radius = []
-        for coord in footprint_world:
-            corner_coord = SkyCoord(*coord*u.deg)
-            radius += [
-                corner_coord.separation(
-                    self._ref_coord).to('deg').value]
-        if cell_shape == 'square':
-            half_nx = half_ny = int(np.ceil(
-                np.max(radius) / spacing.value))
-        elif cell_shape == 'hexagon':
-            half_nx = int(np.ceil(
-                np.max(radius) / spacing.value))
-            half_ny = int(np.ceil(
-                np.max(radius) / spacing.value / np.sqrt(3)))
-        else:
-            raise ValueError(
-                f"Unknown cell shape: {cell_shape}")
-        # find RA & DEC coordinates for seeds
-        iy, ix = np.mgrid[-half_ny:half_ny+1, -half_nx:half_nx+1]
-        if cell_shape == 'square':
-            ra_arr = (
-                self._ref_coord.ra.value +
-                ix.flatten() * spacing.value /
-                np.cos(self._ref_coord.dec.to('rad').value))
-            dec_arr = (
-                self._ref_coord.dec.value +
-                iy.flatten() * spacing.value)
-        elif cell_shape == 'hexagon':
-            ra_arr = (
-                self._ref_coord.ra.value +
-                np.concatenate([ix, ix+0.5], axis=None) *
-                spacing.value /
-                np.cos(self._ref_coord.dec.to('rad').value))
-            dec_arr = (
-                self._ref_coord.dec.value +
-                np.concatenate([iy, iy+0.5], axis=None) *
-                spacing.value * np.sqrt(3))
-        self._table['RA'] = ra_arr * u.deg
-        self._table['DEC'] = dec_arr * u.deg
-        # discard cells outside the FITS header footprint
-        ix = np.arange(self._wcs._naxis[0])
-        iy = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
-        ramap, decmap = self._wcs.all_pix2world(
-            ix, iy, 0, ra_dec_order=True)
-        indices = self.find_locs_in_cells(ramap, decmap)
-        mask = np.zeros(len(self)).astype('?')
-        for ind in range(len(self)):
-            if (indices == ind).sum() > 0:
-                mask[ind] = True
-        self._table = self[mask]
-        # record metadata
-        self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-        self._table.meta['TESSTYPE'] = (
-            f"AUTO-GENERATED ({cell_shape.upper()} CELLS)")
-        self._table.meta['REF-RA'] = self._ref_coord.ra.value
-        self._table.meta['REF-DEC'] = self._ref_coord.dec.value
-        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
-        for key in self._wcs.to_header():
-            self._table.meta[key] = self._wcs.to_header()[key]
-
-    #-----------------------------------------------------------------
-
-    def find_locs_in_cells(self, ra, dec):
-        """
-        Find out which cells do the input locations belong to.
-
-        Parameters
-        ----------
-        ra : array_like
-            R.A. of the locations in question
-        dec : array_like
-            Declication of the locations in question
-
-        Return
-        ------
-        indices : array_like
-            An array of the indices of cells each location belonds to.
-            If any location is outside the footprint of the Voronoi
-            diagram, the corresponding index is set to -1.
-        """
-        # identify reference coordinate
-        radec_ctr = np.array(
-            [self._ref_coord.ra.value, self._ref_coord.dec.value])
-        scale_arr = np.array(
-            [np.cos(self._ref_coord.dec.to('rad').value), 1])
-
-        # find the angular offset coordinates for the seeds
-        radec_seeds = np.stack(
-            [self['RA'].quantity.value,
-             self['DEC'].quantity.value], axis=-1)
-        offset_seeds = (radec_seeds - radec_ctr) * scale_arr
-
-        # find the angular offset coordinates for input locations
-        radec_loc = np.stack([ra.flatten(), dec.flatten()], axis=-1)
-        offset_loc = (radec_loc - radec_ctr) * scale_arr
-
-        # find locations in cells
-        kdtree = cKDTree(offset_seeds)
-        _, indices = kdtree.query(offset_loc)
-
-        # if any location is outside the footprint of the FITS header
-        # used to generate the diagram, overwrite its cell index to -1
-        nx, ny = self._wcs._naxis
-        ix, iy = self._wcs.all_world2pix(
-            ra.flatten(), dec.flatten(), 0, ra_dec_order=False)
-        indices[(ix < 0) | (ix > nx-1) | (iy < 0) | (iy > ny-1)] = -1
-
-        return indices.reshape(ra.shape)
-
-    #-----------------------------------------------------------------
-
-    def _reduce_input(self, image, ihdu, header):
-        """
-        Reduce any combination of input values to (data, header, wcs).
-
-        Parameters
-        ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
-            The image to be resampled.
-        ihdu : int, optional
-            If 'image' is a str or an HDUList, this keyword should
-            specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
-            If 'image' is an ndarray, this keyword should be a FITS
-            header providing the WCS information.
-
-        Returns
-        -------
-        data : np.ndarray
-        hdr : fits.Header object
-        wcs : astropy.wcs.WCS object
-        """
-        if isinstance(image, np.ndarray):
-            data = image
-            hdr = header
-        elif isinstance(image, tuple([fits.PrimaryHDU, fits.ImageHDU,
-                                      fits.CompImageHDU])):
-            data = image.data
-            hdr = image.header
-        elif isinstance(image, fits.HDUList):
-            data = np.copy(image[ihdu].data)
-            hdr = image[ihdu].header.copy()
-        else:
-            with fits.open(image) as hdul:
-                data = np.copy(hdul[ihdu].data)
-                hdr = hdul[ihdu].header.copy()
-        wcs = WCS(hdr)
-        if not (data.ndim == hdr['NAXIS'] == 2):
-            raise ValueError(
-                "Input image and/or header is not 2-dimensional")
-        if not data.shape == (hdr['NAXIS2'], hdr['NAXIS1']):
-            raise ValueError(
-                "Input image and header have inconsistent shape")
-        if not wcs.axis_type_names == ['RA', 'DEC']:
-            raise ValueError(
-                "Input header have unexpected axis type")
-        return data, hdr, wcs
-
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def resample_image(
-            self, image, ihdu=0, header=None,
-            colname='new_col', unit='',
-            fill_outside='nearest'):
-        """
-        Resample an image at the location of the Voronoi seeds.
+            self, infile, colname='new_col', unit=u.Unit(''),
+            **kwargs):
 
-        Parameters
-        ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
-            The image to be resampled.
-        ihdu : int, optional
-            If 'image' is a str or an HDUList, this keyword should
-            specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
-            If 'image' is an ndarray, this keyword should be a FITS
-            header providing the WCS information.
-        colname : str, optional
-            Name of a column in the table to save the output values.
-            Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
-            Physical unit of the output values (default='').
-            If unit='header', the 'BUNIT' entry in the header is used.
-        fill_outside : {'nearest', float}, optional
-            The behavior outside the footprint of the input image.
-            If fill_outside='nearest', all seeds outside the footprint
-            are assigned the value of the nearest pixel in the image.
-            Otherwise, all seeds outside the image footprint are
-            assigned the value of this keyword.
-        """
-        data, hdr, wcs = self._reduce_input(image, ihdu, header)
+        if not Path(infile).is_file():
+            self[colname] = np.full(len(self), np.nan) * unit
+            return
 
-        # find nearest the nearest pixel for each seed location
-        ix, iy = wcs.all_world2pix(
-            self['RA'].quantity.value,
-            self['DEC'].quantity.value,
-            0, ra_dec_order=True)
-        ix = np.round(ix).astype('int')
-        iy = np.round(iy).astype('int')
-        mask = ((ix < 0) | (ix > wcs._naxis[0]-1) |
-                (iy < 0) | (iy > wcs._naxis[1]-1))
-        ix[ix < 0] = 0
-        ix[ix > wcs._naxis[0]-1] = wcs._naxis[0]-1
-        iy[iy < 0] = 0
-        iy[iy > wcs._naxis[1]-1] = wcs._naxis[1]-1
-
-        # get nearest pixel value
-        sub_data = data[iy, ix]
-
-        # assign values for seed locations outside the image footprint
-        if fill_outside != 'nearest':
-            sub_data[mask] = fill_outside
-
-        # save the resampled values as a new column in the table
-        self._table[colname] = sub_data
-        if unit == 'header':
-            self._table[colname].unit = u.Unit(hdr['BUNIT'])
-        else:
-            self._table[colname].unit = u.Unit(unit)
-
-    #-----------------------------------------------------------------
-
-    def calc_image_stats(
-            self, image, ihdu=0, header=None,
-            stat_func=None, weight=None,
-            colname='new_col', unit='', **kwargs):
-        """
-        Calculate statistics of an image within each cell.
-
-        Parameters
-        ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
-            The image to be resampled.
-        ihdu : int, optional
-            If 'image' is a str or an HDUList, this keyword should
-            specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
-            If 'image' is an ndarray, this keyword should be a FITS
-            header providing the WCS information.
-        stat_func : callable
-            A function that accepts an array of values, and return a
-            scalar value (which is the calculated statistics). If
-            'weight' is not None, this function should also accept a
-            keyword named 'weights', which specifies the statistical
-            weight of each value in the array.
-        weight : np.ndarray, optional
-            If not None, this keyword should be an ndarray specifying
-            the statistical weight of each pixel in the input image.
-            Note that in this case, the broadcasted weight array will
-            be passed to 'stat_func' in a keyword named 'weights'.
-        colname : str, optional
-            Name of a column in the table to save the output values.
-            Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
-            Physical unit of the output values (default='').
-            If unit='header', the 'BUNIT' entry in the header is used.
-        **kwargs
-            Keyword arguments to be passed to 'stat_func'
-        """
-        data, hdr, wcs = self._reduce_input(image, ihdu, header)
-        if weight is not None:
-            weights = np.broadcast_to(weight, data.shape)
-
-        # find pixels in cells
-        ix = np.arange(wcs._naxis[0])
-        iy = np.arange(wcs._naxis[1]).reshape(-1, 1)
-        ramap, decmap = wcs.all_pix2world(
-            ix, iy, 0, ra_dec_order=True)
-        indices = self.find_locs_in_cells(ramap, decmap)
-
-        # calculate weighted statistics within each cell
-        if not callable(stat_func):
-            raise ValueError("Invalid input for 'stat_func'")
-        arr = np.full(len(self), np.nan)
-        for ind in range(len(self)):
-            if weight is None:
-                arr[ind] = stat_func(
-                    data.astype('float')[indices == ind],
-                    **kwargs)
-            else:
-                arr[ind] = stat_func(
-                    data.astype('float')[indices == ind],
-                    weights=weights.astype('float')[indices == ind],
-                    **kwargs)
-
-        # save the summed values as a new column in the table
-        self._table[colname] = arr
-        if unit == 'header':
-            self._table[colname].unit = u.Unit(hdr['BUNIT'])
-        else:
-            self._table[colname].unit = u.Unit(unit)
-
-    #-----------------------------------------------------------------
-
-    def calc_catalog_stats(
-            self, value, ra, dec, stat_func=None, weight=None,
-            colname='new_col', unit='', **kwargs):
-        """
-        Calculate statistics of a catalog entry within each cell.
-
-        Parameters
-        ----------
-        value : np.ndarray
-            Values in the catalog entry.
-        ra : np.ndarray
-            RA coordinates corresponding to each row of the catalog.
-        dec : np.ndarray
-            Dec coordinates corresponding to each row of the catalog.
-        stat_func : callable
-            A function that accepts an array of values, and return a
-            scalar value (which is the calculated statistics). If
-            'weight' is not None, this function should also accept a
-            keyword named 'weights', which specifies the statistical
-            weight of each value in the array.
-        weight : np.ndarray, optional
-            If not None, this keyword should be an ndarray specifying
-            the statistical weight of each row in the catalog.
-            Note that in this case, the broadcasted weight array will
-            be passed to 'stat_func' in a keyword named 'weights'.
-        colname : str, optional
-            Name of a column in the table to save the output values.
-            Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
-            Physical unit of the output values (default='').
-        **kwargs
-            Keyword arguments to be passed to 'stat_func'
-        """
-        if weight is not None:
-            weights = np.broadcast_to(weight, value.shape)
-
-        # find rows in cells
-        indices = self.find_locs_in_cells(ra, dec)
-
-        # calculate weighted statistics within each cell
-        if not callable(stat_func):
-            raise ValueError("Invalid input for 'stat_func'")
-        arr = np.full(len(self), np.nan)
-        for ind in range(len(self)):
-            if weight is None:
-                arr[ind] = stat_func(
-                    value.astype('float')[indices == ind],
-                    **kwargs)
-            else:
-                arr[ind] = stat_func(
-                    value.astype('float')[indices == ind],
-                    weights=weights.astype('float')[indices == ind],
-                    **kwargs)
-
-        # save the summed values as a new column in the table
-        self._table[colname] = arr
-        self._table[colname].unit = u.Unit(unit)
-
-    #-----------------------------------------------------------------
-
-    def write(self, filename, keep_metadata=True, **kwargs):
-        """
-        Write a VoronoiTessTable to a file.
-
-        Parameters
-        ----------
-        filename : string
-            Name of the file to write to.
-        keep_metadata : bool, optional
-            Whether to keep table meta data in the output file.
-            Default is to keep, which allows one to reconstruct
-            the VoronoiTessTable by reading the file with
-            `VoronoiTessTable.read`. Also when keep_metadata=True,
-            output format must be 'ascii.ecsv'.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.write`
-        """
-        if not keep_metadata:
-            t = self._table.copy()
-            t.meta = OrderedDict()
-            t.write(filename, **kwargs)
-        else:
-            if 'format' in kwargs:
-                if kwargs['format'] != 'ascii.ecsv':
-                    warnings.warn(
-                        "Overwrite keyword 'format' to 'ascii.ecsv' "
-                        "when keep_metadata=True")
-            kwargs['format'] = 'ascii.ecsv'
-            self._table.write(filename, **kwargs)
-
-    #-----------------------------------------------------------------
-
-    @classmethod
-    def read(cls, filename, **kwargs):
-        """
-        Read a VoronoiTessTable from a file.
-
-        Parameters
-        ----------
-        filename : str
-            Name of the file to read from.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.read`
-
-        Return
-        ------
-        table : VonoroiTessTable
-        """
-
-        if 'format' in kwargs:
-            if kwargs['format'] != 'ascii.ecsv':
-                warnings.warn(
-                    "Overwrite keyword 'format' to 'ascii.ecsv' "
-                    "when reading VonoroiTessTable from file.")
-        kwargs['format'] = 'ascii.ecsv'
-        t = Table.read(filename, **kwargs)
-        if not 'TBLTYPE' in t.meta:
-            raise ValueError("Input file not recognized")
-        if t.meta['TBLTYPE'] != 'VoronoiTessTable':
-            raise ValueError("Input file not recognized")
-
-        vtt = cls(
-            fits.Header(t.meta), seeds_ra=[], seeds_dec=[],
-            ref_radec=(t.meta['REF-RA'], t.meta['REF-DEC']))
-        vtt._table = t
-
-        return vtt
-
-    #-----------------------------------------------------------------
-
-    def show_seeds_on_sky(
-            self, ax=None, image=None, ffigkw={}, **scatterkw):
-        """
-        Show RA-Dec locations of the seeds on top of an image.
-
-        ax : `~matplotlib.axes.Axes`, optional
-            If 'image' is None, this is the Axes instance in which to
-            make a scatter plot showing the seed locations.
-        image : see below
-            The image on which to overplot the seed locations.
-            This will be passed to `aplpy.FITSFigure`.
-        ffigkw : dict, optional
-            Keyword arguments to be passed to `aplpy.FITSFigure`
-        **scatterkw :
-            Keyword arguments to be passed to `plt.scatter`
-        """
-        if image is not None:
-            # show image using aplpy and overplot seed locations
-            from aplpy import FITSFigure
-            ffig = FITSFigure(image, **ffigkw)
-            ffig.show_markers(
-                self['RA'].quantity.value,
-                self['DEC'].quantity.value,
-                **scatterkw)
-            return ffig
-        else:
-            # make a simple scatter plot
-            if ax is None:
-                import matplotlib.pyplot as plt
-                plt.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
-                return plt.gca()
-            else:
-                ax.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
-                return ax
+        VoronoiTessTable.resample_image(
+            self, infile, colname=colname, unit='', **kwargs)
 
 
 ######################################################################

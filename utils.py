@@ -1,18 +1,18 @@
 import numpy as np
 from astropy import units as u
 from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
 
 # --------------------------------------------------------------------
 
 
 def deproject(
-        center_coord=None, incl=0*u.deg, pa=0*u.deg,
+        center_ra=0*u.deg, center_dec=0*u.deg,
+        incl=0*u.deg, pa=0*u.deg,
         header=None, wcs=None, naxis=None, ra=None, dec=None,
         return_offset=False):
 
     """
-    Calculate deprojected radii and projected angles in a disk.
+    Calculate deprojected radii and projected angles.
 
     This function deals with projected images of astronomical objects
     with an intrinsic disk geometry. Given sky coordinates of the
@@ -28,8 +28,10 @@ def deproject(
 
     Parameters
     ----------
-    center_coord : `~astropy.coordinates.SkyCoord` object or 2-tuple
-        Sky coordinates of the disk center
+    center_ra : `~astropy.units.Quantity` object or number, optional
+        RA coordinate of the disk center. Default is 0 degree.
+    center_dec : `~astropy.units.Quantity` object or number, optional
+        Dec coordinate of the disk center. Default is 0 degree.
     incl : `~astropy.units.Quantity` object or number, optional
         Inclination angle of the disk (0 degree means face-on)
         Default is 0 degree.
@@ -65,14 +67,14 @@ def deproject(
     https://github.com/akleroy/cpropstoo/blob/master/cubes/deproject.pro
     """
 
-    if isinstance(center_coord, SkyCoord):
-        x0_deg = center_coord.ra.degree
-        y0_deg = center_coord.dec.degree
+    if hasattr(center_ra, 'unit'):
+        x0_deg = center_ra.to(u.deg).value
     else:
-        x0_deg, y0_deg = center_coord
-        if hasattr(x0_deg, 'unit'):
-            x0_deg = x0_deg.to(u.deg).value
-            y0_deg = y0_deg.to(u.deg).value
+        x0_deg = center_ra
+    if hasattr(center_dec, 'unit'):
+        y0_deg = center_dec.to(u.deg).value
+    else:
+        y0_deg = center_dec
     if hasattr(incl, 'unit'):
         incl_deg = incl.to(u.deg).value
     else:
@@ -128,6 +130,18 @@ def deproject(
         return radius_deg, projang_deg, dx_deg, dy_deg
     else:
         return radius_deg, projang_deg
+
+
+#---------------------------------------------------------------------
+
+
+def identical_units(u1, u2):
+    if not u.Unit(u1).is_equivalent(u.Unit(u2)):
+        return False
+    elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
+        return False
+    else:
+        return True
 
 
 #---------------------------------------------------------------------

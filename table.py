@@ -471,7 +471,7 @@ class TessellMegaTable(
             return
 
         VoronoiTessTable.resample_image(
-            self, infile, colname=colname, unit='', **kwargs)
+            self, infile, colname=colname, unit=unit, **kwargs)
 
 
 ######################################################################

@@ -368,7 +368,7 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
         self._region_defs = region_defs
         if names is None:
             names = [f"REGION#{i}" for i in range(len(region_defs))]
-        self._table['NAME'] = names
+        self._table['REGION'] = names
 
     def find_coords_in_regions(self, ra, dec):
         """

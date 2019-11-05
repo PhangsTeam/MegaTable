@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+import warnings
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
@@ -15,13 +15,33 @@ from .utils import nanaverage
 class PhangsAlmaMixin(object):
 
     """
-    Mixin class offering tools to deal with PHANGS-ALMA data products.
+    Mixin class offering tools to deal with PHANGS-ALMA data products
     """
 
     # ----------------------------------------------------------------
 
     def calc_CO_stats(
-            self, bm0file, sm0file, sewfile, res, **kwargs):
+            self, bm0file, sm0file, sewfile, res,
+            suppress_error=False, **kwargs):
+        """
+        Calculate cloud-scale CO statistics using PHANGS-ALMA data
+
+        Parameters
+        ----------
+        bm0file : str, path_like
+            PHANGS-ALMA CO(2-1) broad moment-0 map file
+        sm0file : str, path_like
+            PHANGS-ALMA CO(2-1) strict moment-0 map file
+        bm0file : str, path_like
+            PHANGS-ALMA CO(2-1) strict effective width map file
+        res : astropy.units.Quantity object
+            CO data linear resolution (carrying a unit [=] pc)
+        suppress_error : bool, optional
+            Whether to suppress the error message if any of the input
+            files are not found on disk (default=False)
+        **kwargs
+            Keyword arguments to be passed to 'calc_image_stats'
+        """
 
         rstr = f"{res.to('pc').value:.0f}pc"
         cols = [
@@ -47,12 +67,15 @@ class PhangsAlmaMixin(object):
             (f"F<sigv^2/I_CO21_{rstr}>", 'km s-1 K-1'),
         ]
 
-        # if no data file found: add placeholder (empty) columns
-        if not (bm0file.is_file() and sm0file.is_file() and
-                sewfile.is_file()):
-            for col, unit in cols:
-                self[col] = np.full(len(self), np.nan) * u.Unit(unit)
-            return
+        if not (Path(bm0file).is_file() and Path(sm0file).is_file() and
+                Path(sewfile).is_file()):
+            if suppress_error:
+                # add placeholder (empty) columns
+                for col, unit in cols:
+                    self[col] = np.full(len(self), np.nan) * u.Unit(unit)
+                return
+            else:
+                raise ValueError("Input file(s) not found")
 
         # read files
         with fits.open(bm0file) as hdul:
@@ -123,7 +146,23 @@ class PhangsAlmaMixin(object):
     # ----------------------------------------------------------------
 
     def calc_cprops_stats(
-        self, cpropsfile, res, **kwargs):
+        self, cpropsfile, res, suppress_error=False, **kwargs):
+        """
+        Calculate GMC statistics using (PHANGS-ALMA) CPROPS catalogs
+
+        Parameters
+        ----------
+        cpropsfile : str, path_like
+            PHANGS-ALMA CPROPS output file
+        res : astropy.units.Quantity object
+            Linear resolution (carrying a unit [=] pc) of the CO data
+            on which CPROPS was run.
+        suppress_error : bool, optional
+            Whether to suppress the error message if any of the input
+            files are not found on disk (default=False)
+        **kwargs
+            Keyword arguments to be passed to 'calc_image_stats'
+        """
 
         rstr = f"{res.to('pc').value:.0f}pc"
         cols = [
@@ -154,18 +193,17 @@ class PhangsAlmaMixin(object):
             (f"F<R*sigv^2/F_CPROPS_{rstr}>", 'km s-1 K-1 arcsec-1'),
         ]
 
-        # if no CPROPS file found: add placeholder (empty) columns
-        if not cpropsfile.is_file():
-            for col, unit in cols:
-                self[col] = np.full(len(self), np.nan) * u.Unit(unit)
-            return
+        if not Path(cpropsfile).is_file():
+            if suppress_error:
+                # add placeholder (empty) columns
+                for col, unit in cols:
+                    self[col] = np.full(len(self), np.nan) * u.Unit(unit)
+                return
+            else:
+                raise ValueError("Input file not found")
 
         # read CPROPS file
-        try:
-            t_cat = Table.read(cpropsfile)
-        except ValueError as e:
-            print(e)
-            return
+        t_cat = Table.read(cpropsfile)
         ra_cat = t_cat['XCTR_DEG'].quantity.value
         dec_cat = t_cat['YCTR_DEG'].quantity.value
         flux_cat = (
@@ -238,28 +276,61 @@ class PhangsAlmaMixin(object):
 class EnvMaskMixin(object):
 
     """
-    Mixin class offering tools to deal with (S4G) environmental masks.
+    Mixin class offering tools to deal with (S4G) environmental masks
     """
 
     # ----------------------------------------------------------------
 
     def calc_env_frac(
-            self, envfile, wtfile, colname='new_col', **kwargs):
+            self, envfile, wtfile=None, colname='frac_env',
+            suppress_error=False, **kwargs):
+        """
+        Calculate environmental fractions using S4G environ. masks
+
+        Parameters
+        ----------
+        envfile : str or path_like
+            S4G environmental mask file (disk / bulge / bars / etc.)
+        wtfile : str or path_like, optional
+            A 2-D image file that assigns weight to each pixel.
+            For example, one should use the CO moment-0 map to assign
+            weight when estimating the fractional CO flux contribution
+            from each environment.
+            If None, the environmental fraction will be calculated
+            using a uniform-weighting scheme (i.e., area-weighting).
+        colname : str, optional
+            Name of a column in the table to save the output values.
+            Default: 'frac_env'
+        suppress_error : bool, optional
+            Whether to suppress the error message if any of the input
+            files are not found on disk (default=False)
+        **kwargs
+            Keyword arguments to be passed to 'calc_image_stats'
+        """
 
         from reproject import reproject_interp
 
-        if not (envfile.is_file() and wtfile.is_file()):
-            self[colname] = np.full(len(self), np.nan)
-            return
+        if (not Path(envfile).is_file() or
+            wtfile is not None and not Path(wtfile).is_file()):
+            if suppress_error:
+                # add placeholder (empty) columns
+                self[colname] = np.full(len(self), np.nan)
+                return
+            else:
+                raise ValueError("Input file not found")
 
-        with fits.open(wtfile) as hdul:
-            wtmap = hdul[0].data.copy()
-            wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
-            wthdr = hdul[0].header.copy()
-        with fits.open(envfile) as hdul:
-            envmap, footprint = reproject_interp(
-                hdul[0], wthdr, order=0)
-        envmap[~footprint.astype('?')] = 0
+        if wtfile is None:
+            with fits.open(envfile) as hdul:
+                envmap = hdul[0].data.copy()
+        else:
+            with fits.open(wtfile) as hdul:
+                wtmap = hdul[0].data.copy()
+                wtmap[~np.isfinite(wtmap) | (wtmap < 0)] = 0
+                wthdr = hdul[0].header.copy()
+            with fits.open(envfile) as hdul:
+                envmap, footprint = reproject_interp(
+                    hdul[0], wthdr, order=0)
+            envmap[~footprint.astype('?')] = 0
         envbimap = (envmap > 0).astype('float')
         self.calc_image_stats(
             envbimap, header=wthdr, stat_func=nanaverage,
@@ -294,13 +365,13 @@ class RadialMegaTable(
     gal_incl_deg : float, optional
         Inclination angle of the galaxy (in degrees).
         Default is 0 degree.
-    gal_pa_deg : float, optional
+    gal_posang_deg : float, optional
         Position angle of the galaxy (in degrees; North through East).
         Default is 0 degree.
     max_rgal_deg : float, optional
         The (deprojected) maximum galactic radius (in degrees)
         covered by the radial profile.
-        Default is to cover out to 10 times the ring width.
+        Default is to cover out to 20 times the ring width.
     """
 
     __name__ = "RadialMegaTable"
@@ -308,57 +379,97 @@ class RadialMegaTable(
     # ----------------------------------------------------------------
 
     def __init__(
-            self, gal_ra_deg, gal_dec_deg, ring_width_deg,
-            gal_incl_deg=0, gal_pa_deg=0, max_rgal_deg=None):
+            self, gal_ra_deg, gal_dec_deg, ring_width_as,
+            gal_incl_deg=0, gal_posang_deg=0, max_rgal_as=None):
 
         from functools import partial
         from .utils import deproject
 
-        if max_rgal_deg is None:
-            nring = 10
+        if max_rgal_as is None:
+            nring = 20
         else:
-            nring = int(np.ceil((max_rgal_deg / ring_width_deg)))
+            nring = int(np.ceil((max_rgal_as / ring_width_as)))
 
         # function that determines whether a set of coordinates locate
         # inside the ring between rmin and rmax
         def coord2bool(
                 ra, dec, rmin=None, rmax=None,
                 gal_ra=None, gal_dec=None,
-                gal_incl=None, gal_pa=None):
+                gal_incl=None, gal_posang=None):
             projrad, projang = deproject(
                 center_ra=gal_ra, center_dec=gal_dec,
-                incl=gal_incl, pa=gal_pa, ra=ra, dec=dec)
+                incl=gal_incl, pa=gal_posang, ra=ra, dec=dec)
             return ((projrad >= rmin) & (projrad < rmax))
 
         # ring names and definitions
         ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
         ring_defs = []
-        rbounds = np.arange(nring+1) * ring_width_deg
-        for rmin, rmax in zip(rbounds[:-1], rbounds[1:]):
+        rbounds_as = np.arange(nring+1) * ring_width_as/3600
+        for rmin, rmax in zip(rbounds_as[:-1], rbounds_as[1:]):
             ring_defs += [
                 partial(
-                    coord2bool, rmin=rmin, rmax=rmax,
+                    coord2bool, rmin=rmin/3600, rmax=rmax/3600,
                     gal_ra=gal_ra_deg, gal_dec=gal_dec_deg,
-                    gal_incl=gal_incl_deg, gal_pa=gal_pa_deg)]
+                    gal_incl=gal_incl_deg, gal_posang=gal_posang_deg)]
 
+        # initialize object
         GeneralRegionTable.__init__(
             self, ring_defs, names=ring_names)
-        self._table['rang_gal_min'] = rbounds[:-1] * u.deg
-        self._table['rang_gal_max'] = rbounds[1:] * u.deg
+        # save ring inner/outer radii in table
+        self._table['r_gal_angl_min'] = rbounds_as[:-1] * u.arcsec
+        self._table['r_gal_angl_max'] = rbounds_as[1:] * u.arcsec
 
-    # ----------------------------------------------------------------
+        # record meta data in table
+        self._table.meta['RA_DEG'] = gal_ra_deg
+        self._table.meta['DEC_DEG'] = gal_dec_deg
+        self._table.meta['INCL_DEG'] = gal_incl_deg
+        self._table.meta['PA_DEG'] = gal_posang_deg
+        self._table.meta['WIDTH_AS'] = ring_width_as
+        if max_rgal_as is None:
+            self._table.meta['RMAX_AS'] = ring_width_as * 19.99
+        else:
+            self._table.meta['RMAX_AS'] = max_rgal_as
 
-    def calc_image_stats(
-            self, image, colname='new_col', unit=u.Unit(''),
-            **kwargs):
+    #-----------------------------------------------------------------
 
-        if (isinstance(image, (str, bytes, os.PathLike)) and
-            not Path(image).is_file()):
-            self[colname] = np.full(len(self), np.nan) * unit
-            return
+    @classmethod
+    def read(cls, filename, **kwargs):
+        """
+        Read (and reconstruct) a RadialMegaTable from file.
 
-        GeneralRegionTable.calc_image_stats(
-            self, image, colname=colname, unit=unit, **kwargs)
+        Parameters
+        ----------
+        filename : str
+            Name of the file to read from.
+        **kwargs
+            Keyword arguments to be passed to `~astropy.table.read`
+
+        Return
+        ------
+        table : RadialMegaTable
+        """
+        t = Table.read(filename, **kwargs)
+
+        # input file should be a valid RadialMegaTable ouput
+        if not 'TBL_TYPE' in t.meta:
+            raise ValueError("Input file not recognized")
+        if t.meta['TBL_TYPE'] != 'RadialMegaTable':
+            raise ValueError(
+                "Cannot reconstruct RadialMegaTable object from "
+                "input file")
+
+        # initiate RadialMegaTable w/ recorded meta data in file
+        mt = cls(
+            t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['WIDTH_AS'],
+            gal_incl_deg=t.meta['INCL_DEG'],
+            gal_posang_deg=t.meta['PA_DEG'],
+            max_rgal_deg=t.meta['RMAX_AS'])
+
+        # overwrite the underlying data table
+        for key in t.colnames:
+            mt[key] = t[key]
+
+        return mt
 
     # ----------------------------------------------------------------
 
@@ -384,26 +495,49 @@ class RadialMegaTable(
         """
         from itertools import compress
         
+        # remove rows together w/ corresponding region definitions
+        # and keep track of changes in row numbers
+        has_changed = False
         if discard_NaN is not None:
             for col in np.atleast_1d(discard_NaN):
                 flag = np.isnan(self[col])
                 self._table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
+                if flag.sum() > 0:
+                    has_changed = True
         if keep_finite is not None:
             for col in np.atleast_1d(keep_finite):
                 flag = ~np.isfinite(self[col])
                 self._table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
+                if flag.sum() > 0:
+                    has_changed = True
         if discard_negative is not None:
             for col in np.atleast_1d(discard_negative):
                 flag = self[col] < 0
                 self._table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
+                if flag.sum() > 0:
+                    has_changed = True
         if keep_positive is not None:
             for col in np.atleast_1d(keep_positive):
                 flag = ~(self[col] > 0)
                 self._table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
+                if flag.sum() > 0:
+                    has_changed = True
+
+        if has_changed:
+            warnings.warn(
+                "Some rings has been removed during table cleaning. "
+                "Part of the RadialTessTable functionalities are "
+                "thus disabled to avoid introducing bugs in further "
+                "data reduction.")
+            # remove core functionality
+            self.find_coords_in_regions = None
+            # present object reconstruction after writing to file
+            self._table.meta['TBL_TYPE'] = (
+                self._table.meta['TBL_TYPE'] + '_CLEANED')
 
 
 ######################################################################
@@ -460,18 +594,107 @@ class TessellMegaTable(
             cell_shape=cell_shape, seed_spacing=cell_size_deg,
             ref_radec=(gal_ra_deg, gal_dec_deg))
 
+    #-----------------------------------------------------------------
+
+    @classmethod
+    def read(cls, filename, **kwargs):
+        """
+        Read (and reconstruct) a TessellMegaTable from file.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file to read from.
+        **kwargs
+            Keyword arguments to be passed to `~astropy.table.read`
+
+        Return
+        ------
+        table : TessellMegaTable
+        """
+        t = Table.read(filename, **kwargs)
+
+        # input file should be a valid TessellMegaTable ouput
+        if not 'TBL_TYPE' in t.meta:
+            raise ValueError("Input file not recognized")
+        if t.meta['TBL_TYPE'] != 'TessellMegaTable':
+            raise ValueError(
+                "Cannot reconstruct TessellMegaTable object from "
+                "input file")
+
+        # initiate TessellMegaTable w/ recorded meta data in file
+        mt = cls(
+            fits.Header(t.meta),
+            cell_shape=t.meta['CELL_TYP'],
+            cell_size_deg=t.meta['SIZE_DEG'],
+            gal_ra_deg=t.meta['RA_DEG'],
+            gal_dec_deg=t.meta['DEC_DEG'])
+
+        # overwrite the underlying data table
+        for key in t.colnames:
+            mt[key] = t[key]
+
+        return mt
+
     # ----------------------------------------------------------------
 
-    def resample_image(
-            self, infile, colname='new_col', unit=u.Unit(''),
-            **kwargs):
+    def clean(
+            self, discard_NaN=None, keep_finite=None,
+            discard_negative=None, keep_positive=None):
+        """
+        Cleaning table rows that contain 'bad' column values.
 
-        if not Path(infile).is_file():
-            self[colname] = np.full(len(self), np.nan) * unit
-            return
+        Parameters
+        ----------
+        discard_NaN : None or string or array of string, optional
+            To remove rows containing NaNs in these column(s).
+        keep_finite : None or string or array of string, optional
+            To remove NaNs and Infs in these column(s).
+        discard_negative : None or string or array of string, optional
+            To remove negative values in these column(s).
+            (Note that NaNs and +Infs will not be removed)
+        keep_finite : None or string or array of string, optional
+            To only keep positive values in these column(s).
+        """
 
-        VoronoiTessTable.resample_image(
-            self, infile, colname=colname, unit=unit, **kwargs)
+        # keep track of changes in row numbers
+        has_changed = False
+        if discard_NaN is not None:
+            for col in np.atleast_1d(discard_NaN):
+                flag = np.isnan(self[col])
+                self._table = self[~flag]
+                if flag.sum() > 0:
+                    has_changed = True
+        if keep_finite is not None:
+            for col in np.atleast_1d(keep_finite):
+                flag = ~np.isfinite(self[col])
+                self._table = self[~flag]
+                if flag.sum() > 0:
+                    has_changed = True
+        if discard_negative is not None:
+            for col in np.atleast_1d(discard_negative):
+                flag = self[col] < 0
+                self._table = self[~flag]
+                if flag.sum() > 0:
+                    has_changed = True
+        if keep_positive is not None:
+            for col in np.atleast_1d(keep_positive):
+                flag = ~(self[col] > 0)
+                self._table = self[~flag]
+                if flag.sum() > 0:
+                    has_changed = True
+
+        if has_changed:
+            warnings.warn(
+                "Some cells has been removed during table cleaning. "
+                "Part of the VonoroiTessTable functionalities are "
+                "thus disabled to avoid introducing bugs in further "
+                "data reduction.")
+            # remove core functionality
+            self.find_coords_in_regions = None
+            # present object reconstruction after writing to file
+            self._table.meta['TBL_TYPE'] = (
+                self._table.meta['TBL_TYPE'] + '_CLEANED')
 
 
 ######################################################################

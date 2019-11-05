@@ -1,4 +1,6 @@
+import os
 import warnings
+from pathlib import Path
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
@@ -48,37 +50,6 @@ class HiddenTable(object):
         else:
             self._table = Table()
 
-    def clean(
-            self, discard_NaN=None, keep_finite=None,
-            discard_negative=None, keep_positive=None):
-        """
-        Cleaning table rows that contain 'bad' column values.
-
-        Parameters
-        ----------
-        discard_NaN : None or string or array of string, optional
-            To remove rows containing NaNs in these column(s).
-        keep_finite : None or string or array of string, optional
-            To remove NaNs and Infs in these column(s).
-        discard_negative : None or string or array of string, optional
-            To remove negative values in these column(s).
-            (Note that NaNs and +Infs will not be removed)
-        keep_finite : None or string or array of string, optional
-            To only keep positive values in these column(s).
-        """
-        if discard_NaN is not None:
-            for col in np.atleast_1d(discard_NaN):
-                self._table = self[~np.isnan(self[col])]
-        if keep_finite is not None:
-            for col in np.atleast_1d(keep_finite):
-                self._table = self[np.isfinite(self[col])]
-        if discard_negative is not None:
-            for col in np.atleast_1d(discard_negative):
-                self._table = self[~(self[col] < 0)]
-        if keep_positive is not None:
-            for col in np.atleast_1d(keep_positive):
-                self._table = self[self[col] > 0]
-
     def write(self, filename, keep_metadata=True, **kwargs):
         """
         Write the hidden table to a file.
@@ -89,8 +60,7 @@ class HiddenTable(object):
             Name of the file to write to.
         keep_metadata : bool, optional
             Whether to keep table meta data in the output file.
-            Default is to keep. Also when keep_metadata=True,
-            output format must be 'ascii.ecsv'.
+            Default is to keep.
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
@@ -100,27 +70,7 @@ class HiddenTable(object):
                 t.meta.pop(key)
             t.write(filename, **kwargs)
         else:
-            if 'format' in kwargs:
-                if kwargs['format'] != 'ascii.ecsv':
-                    warnings.warn(
-                        "Setting format='ascii.ecsv' "
-                        "when keep_metadata=True")
-            kwargs['format'] = 'ascii.ecsv'
             self._table.write(filename, **kwargs)
-
-    @classmethod
-    def read(cls, filename, **kwargs):
-        """
-        Read table from a file and hide it in the protected attribute.
-
-        Parameters
-        ----------
-        filename : string
-            Name of the file to read.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.read`
-        """
-        return cls(table=Table.read(filename, **kwargs))
 
 
 ######################################################################
@@ -203,7 +153,8 @@ class StatsMixin(object):
 
     #-----------------------------------------------------------------
 
-    def _reduce_image_input(self, image, ihdu, header):
+    def _reduce_image_input(
+            self, image, ihdu, header, suppress_error=False):
         """
         Reduce any combination of input values to (data, header, wcs).
 
@@ -217,6 +168,9 @@ class StatsMixin(object):
         header : astropy.fits.Header, optional
             If 'image' is an ndarray, this keyword should be a FITS
             header providing the WCS information.
+        suppress_error : bool, optional
+            Whether to suppress the error message if 'image' looks
+            like a file but is not found on disk (default=False)
 
         Returns
         -------
@@ -234,6 +188,12 @@ class StatsMixin(object):
             data = np.copy(image[ihdu].data)
             hdr = image[ihdu].header.copy()
         else:
+            if (isinstance(image, (str, bytes, os.PathLike)) and
+                not Path(image).is_file()):
+                if suppress_error:
+                    return None, None, None
+                else:
+                    raise ValueError("Input image not found")
             with fits.open(image) as hdul:
                 data = np.copy(hdul[ihdu].data)
                 hdr = hdul[ihdu].header.copy()
@@ -254,7 +214,8 @@ class StatsMixin(object):
     def calc_image_stats(
             self, image, ihdu=0, header=None,
             stat_func=None, weight=None,
-            colname='new_col', unit='', **kwargs):
+            colname='new_col', unit='', suppress_error=False,
+            **kwargs):
         """
         Calculate statistics of an image within each region.
 
@@ -285,10 +246,19 @@ class StatsMixin(object):
         unit : str or astropy.unit.Unit, optional
             Physical unit of the output values (default='').
             If unit='header', the 'BUNIT' entry in the header is used.
+        suppress_error : bool, optional
+            Whether to suppress the error message if 'image' looks
+            like a file but is not found on disk (default=False)
         **kwargs
             Keyword arguments to be passed to 'stat_func'
         """
-        data, hdr, wcs = self._reduce_image_input(image, ihdu, header)
+
+        data, hdr, wcs = self._reduce_image_input(
+            image, ihdu, header, suppress_error=suppress_error)
+        if data is None:
+            self._table[colname] = (
+                np.full(len(self), np.nan) * u.Unit(unit))
+            return
         
         # find pixels in cells
         iax0 = np.arange(wcs._naxis[0])
@@ -369,6 +339,7 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
         if names is None:
             names = [f"REGION#{i}" for i in range(len(region_defs))]
         self._table['REGION'] = names
+        self._table.meta['TBL_TYPE'] = self.__name__
 
     def find_coords_in_regions(self, ra, dec):
         """
@@ -485,10 +456,11 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             else:
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
             # record metadata
-            self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-            self._table.meta['TESSTYPE'] = 'USER-DEFINED'
-            self._table.meta['REF-RA'] = self._ref_coord.ra.value
-            self._table.meta['REF-DEC'] = self._ref_coord.dec.value
+            self._table.meta['TBL_TYPE'] = self.__name__
+            self._table.meta['CELL_TYP'] = 'user-defined'
+            self._table.meta['SIZE_DEG'] = '-'
+            self._table.meta['RA_DEG'] = self._ref_coord.ra.value
+            self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
             self._table.meta['NAXIS1'] = self._wcs._naxis[0]
             self._table.meta['NAXIS2'] = self._wcs._naxis[1]
             for key in self._wcs.to_header():
@@ -563,11 +535,11 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         flagarr = self.find_coords_in_regions(ramap, decmap)
         self._table = self[flagarr.any(axis=0)]
         # record metadata
-        self._table.meta['TBLTYPE'] = 'VoronoiTessTable'
-        self._table.meta['TESSTYPE'] = (
-            f"AUTO-GENERATED ({cell_shape.upper()} CELLS)")
-        self._table.meta['REF-RA'] = self._ref_coord.ra.value
-        self._table.meta['REF-DEC'] = self._ref_coord.dec.value
+        self._table.meta['TBL_TYPE'] = self.__name__
+        self._table.meta['CELL_TYP'] = cell_shape
+        self._table.meta['SIZE_DEG'] = seed_spacing
+        self._table.meta['RA_DEG'] = self._ref_coord.ra.value
+        self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
         self._table.meta['NAXIS1'] = self._wcs._naxis[0]
         self._table.meta['NAXIS2'] = self._wcs._naxis[1]
         for key in self._wcs.to_header():
@@ -632,10 +604,13 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
     def resample_image(
             self, image, ihdu=0, header=None,
-            colname='new_col', unit='',
+            colname='new_col', unit='', suppress_error=False,
             fill_outside='nearest'):
         """
         Resample an image at the location of the Voronoi seeds.
+
+        The resampling is done by finding the nearest pixel to the
+        location of each seed in the image.
 
         Parameters
         ----------
@@ -659,8 +634,17 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             are assigned the value of the nearest pixel in the image.
             Otherwise, all seeds outside the image footprint are
             assigned the value of this keyword.
+        suppress_error : bool, optional
+            Whether to suppress the error message if 'image' looks
+            like a file but is not found on disk (default=False)
         """
-        data, hdr, wcs = self._reduce_image_input(image, ihdu, header)
+
+        data, hdr, wcs = self._reduce_image_input(
+            image, ihdu, header, suppress_error=suppress_error)
+        if data is None:
+            self._table[colname] = (
+                np.full(len(self), np.nan) * u.Unit(unit))
+            return
 
         # find nearest the nearest pixel for each seed location
         iax0, iax1 = wcs.all_world2pix(
@@ -695,41 +679,6 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                         "Specified unit is not the same as the unit "
                         "recorded in the FITS header")
             self._table[colname].unit = u.Unit(unit)
-
-    #-----------------------------------------------------------------
-
-    @classmethod
-    def read(cls, filename, **kwargs):
-        """
-        Read (and reconstruct) a VoronoiTessTable from a file.
-
-        Parameters
-        ----------
-        filename : str
-            Name of the file to read from.
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.read`
-
-        Return
-        ------
-        table : VonoroiTessTable
-        """
-        if 'format' in kwargs:
-            if kwargs['format'] != 'ascii.ecsv':
-                warnings.warn(
-                    "Overwrite keyword 'format' to 'ascii.ecsv' "
-                    "when reading VonoroiTessTable from file.")
-        kwargs['format'] = 'ascii.ecsv'
-        t = Table.read(filename, **kwargs)
-        if not 'TBLTYPE' in t.meta:
-            raise ValueError("Input file not recognized")
-        if t.meta['TBLTYPE'] != 'VoronoiTessTable':
-            raise ValueError("Input file not recognized")
-        vtt = cls(
-            fits.Header(t.meta), seeds_ra=[], seeds_dec=[],
-            ref_radec=(t.meta['REF-RA'], t.meta['REF-DEC']))
-        vtt._table = t
-        return vtt
 
     #-----------------------------------------------------------------
 

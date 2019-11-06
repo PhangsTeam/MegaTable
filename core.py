@@ -260,7 +260,7 @@ class StatsMixin(object):
                 np.full(len(self), np.nan) * u.Unit(unit))
             return
         
-        # find pixels in cells
+        # find pixels in regions
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = wcs.all_pix2world(
@@ -339,7 +339,7 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
         if names is None:
             names = [f"REGION#{i}" for i in range(len(region_defs))]
         self._table['REGION'] = names
-        self._table.meta['TBL_TYPE'] = self.__name__
+        self._table.meta['TBLTYPE'] = self.__name__
 
     def find_coords_in_regions(self, ra, dec):
         """
@@ -399,9 +399,9 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
     """
     Table built from a Voronoi tessellation of (a part of) the sky.
 
-    Each seed/cell in the Voronoi diagram maps to a row in the table.
+    Each seed/tile in the Voronoi diagram maps to a row in the table.
     Once a table is constructed, additional columns can be added
-    by calculating statistics of images within each Voronoi cell, or
+    by calculating statistics of images within each Voronoi tile, or
     by resampling images at the location of each seed.
 
     Parameters
@@ -414,11 +414,11 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
     seeds_dec : array_like, optional
         If the user would like to specify the seed locations,
         this would be their Declination coordinates (in degrees)
-    cell_shape : {'square', 'hexagon'}, optional
+    tile_shape : {'square', 'hexagon'}, optional
         If the seed locations are to be automatically generated,
-        this keyword specifies the shape of the Voronoi cell.
+        this keyword specifies the shape of the Voronoi tile.
         Default: 'square', in which case the Voronoi diagram comprises
-        regularly spaced square cells.
+        regularly spaced square tiles.
     seed_spacing : float, optional
         If the seed locations are to be automatically generated,
         this keyword specifies the spacing between adjacent seeds.
@@ -437,7 +437,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
     def __init__(
             self, header, seeds_ra=None, seeds_dec=None,
-            cell_shape='square', seed_spacing=None, ref_radec=None):
+            tile_shape='square', seed_spacing=None, ref_radec=None):
 
         # if seed locations are specified, write them into the table
         if seeds_ra is not None and seeds_dec is not None:
@@ -455,20 +455,11 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
             else:
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-            # record metadata
-            self._table.meta['TBL_TYPE'] = self.__name__
-            self._table.meta['CELL_TYP'] = 'user-defined'
-            self._table.meta['SIZE_DEG'] = '-'
-            self._table.meta['RA_DEG'] = self._ref_coord.ra.value
-            self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
-            self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-            self._table.meta['NAXIS2'] = self._wcs._naxis[1]
-            for key in self._wcs.to_header():
-                self._table.meta[key] = self._wcs.to_header()[key]
+            self._table.meta['TBLTYPE'] = self.__name__
             return
 
         # if seed locations are not specified, generate a list of
-        # locations based on specified cell shape and seed spacing
+        # locations based on specified tile shape and seed spacing
         super().__init__()
         # extract celestial WCS information from header
         self._header = header
@@ -481,7 +472,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
         else:
             self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-        # use CDELT if no 'cell_spacing' value is provided
+        # use CDELT if no 'seed_spacing' value is provided
         if seed_spacing is None:
             spacing = np.min(np.abs(self._wcs.wcs.cdelt))*u.deg
         else:
@@ -494,20 +485,20 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             radius += [
                 corner_coord.separation(
                     self._ref_coord).to('deg').value]
-        if cell_shape == 'square':
+        if tile_shape == 'square':
             half_nx = half_ny = int(np.ceil(
                 np.max(radius) / spacing.value))
-        elif cell_shape == 'hexagon':
+        elif tile_shape == 'hexagon':
             half_nx = int(np.ceil(
                 np.max(radius) / spacing.value))
             half_ny = int(np.ceil(
                 np.max(radius) / spacing.value / np.sqrt(3)))
         else:
             raise ValueError(
-                f"Unknown cell shape: {cell_shape}")
+                f"Unknown tile shape: {tile_shape}")
         # find RA & DEC coordinates for seeds
         iy, ix = np.mgrid[-half_ny:half_ny+1, -half_nx:half_nx+1]
-        if cell_shape == 'square':
+        if tile_shape == 'square':
             ra_arr = (
                 self._ref_coord.ra.value +
                 ix.flatten() * spacing.value /
@@ -515,7 +506,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             dec_arr = (
                 self._ref_coord.dec.value +
                 iy.flatten() * spacing.value)
-        elif cell_shape == 'hexagon':
+        elif tile_shape == 'hexagon':
             ra_arr = (
                 self._ref_coord.ra.value +
                 np.concatenate([ix, ix+0.5], axis=None) *
@@ -527,29 +518,20 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 spacing.value * np.sqrt(3))
         self._table['RA'] = ra_arr * u.deg
         self._table['DEC'] = dec_arr * u.deg
-        # discard cells outside the FITS header footprint
+        # discard tiles outside the FITS header footprint
         iax0 = np.arange(self._wcs._naxis[0])
         iax1 = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = self._wcs.all_pix2world(
             iax0, iax1, 0, ra_dec_order=True)
         flagarr = self.find_coords_in_regions(ramap, decmap)
         self._table = self[flagarr.any(axis=0)]
-        # record metadata
-        self._table.meta['TBL_TYPE'] = self.__name__
-        self._table.meta['CELL_TYP'] = cell_shape
-        self._table.meta['SIZE_DEG'] = seed_spacing
-        self._table.meta['RA_DEG'] = self._ref_coord.ra.value
-        self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
-        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
-        for key in self._wcs.to_header():
-            self._table.meta[key] = self._wcs.to_header()[key]
+        self._table.meta['TBLTYPE'] = self.__name__
 
     #-----------------------------------------------------------------
 
     def find_coords_in_regions(self, ra, dec):
         """
-        Find out which regions(cells) contain which input coordinates.
+        Find out which regions(tiles) contain which input coordinates.
 
         Parameters
         ----------
@@ -561,9 +543,9 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         Return
         ------
         flagarr : 2-D boolean array
-            A boolean array indicating whether each cell contains
+            A boolean array indicating whether each tile contains
             each input coordinate. The shape of this array is:
-            [# of coordinates, # of cells]
+            [# of coordinates, # of tiles]
         """
         from scipy.spatial import cKDTree
 
@@ -583,7 +565,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         radec_loc = np.stack([ra.flatten(), dec.flatten()], axis=-1)
         offset_loc = (radec_loc - radec_ctr) * scale_arr
 
-        # find coordinates in cells
+        # find coordinates in tiles
         kdtree = cKDTree(offset_seeds)
         _, indices = kdtree.query(offset_loc)
         flagarr = np.full([len(offset_loc), len(offset_seeds)], False)

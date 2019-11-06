@@ -360,16 +360,16 @@ class RadialMegaTable(
         Right Ascension coordinate of the galaxy center (in degrees).
     gal_dec_deg : float, optional
         Declination coordinate of the galaxy center (in degrees).
-    ring_width_deg : float
-        The (deprojected) width of each ring (in degrees).
+    ring_width_as : float
+        The (deprojected) width of each ring (in arcseconds).
     gal_incl_deg : float, optional
         Inclination angle of the galaxy (in degrees).
         Default is 0 degree.
     gal_posang_deg : float, optional
         Position angle of the galaxy (in degrees; North through East).
         Default is 0 degree.
-    max_rgal_deg : float, optional
-        The (deprojected) maximum galactic radius (in degrees)
+    max_rgal_as : float, optional
+        The (deprojected) maximum galactic radius (in arcseconds)
         covered by the radial profile.
         Default is to cover out to 20 times the ring width.
     """
@@ -404,7 +404,7 @@ class RadialMegaTable(
         # ring names and definitions
         ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
         ring_defs = []
-        rbounds_as = np.arange(nring+1) * ring_width_as/3600
+        rbounds_as = np.arange(nring+1) * ring_width_as
         for rmin, rmax in zip(rbounds_as[:-1], rbounds_as[1:]):
             ring_defs += [
                 partial(
@@ -424,7 +424,7 @@ class RadialMegaTable(
         self._table.meta['DEC_DEG'] = gal_dec_deg
         self._table.meta['INCL_DEG'] = gal_incl_deg
         self._table.meta['PA_DEG'] = gal_posang_deg
-        self._table.meta['WIDTH_AS'] = ring_width_as
+        self._table.meta['RBIN_AS'] = ring_width_as
         if max_rgal_as is None:
             self._table.meta['RMAX_AS'] = ring_width_as * 19.99
         else:
@@ -451,19 +451,19 @@ class RadialMegaTable(
         t = Table.read(filename, **kwargs)
 
         # input file should be a valid RadialMegaTable ouput
-        if not 'TBL_TYPE' in t.meta:
+        if not 'TBLTYPE' in t.meta:
             raise ValueError("Input file not recognized")
-        if t.meta['TBL_TYPE'] != 'RadialMegaTable':
+        if t.meta['TBLTYPE'] != 'RadialMegaTable':
             raise ValueError(
                 "Cannot reconstruct RadialMegaTable object from "
                 "input file")
 
         # initiate RadialMegaTable w/ recorded meta data in file
         mt = cls(
-            t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['WIDTH_AS'],
+            t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['RBIN_AS'],
             gal_incl_deg=t.meta['INCL_DEG'],
             gal_posang_deg=t.meta['PA_DEG'],
-            max_rgal_deg=t.meta['RMAX_AS'])
+            max_rgal_as=t.meta['RMAX_AS'])
 
         # overwrite the underlying data table
         for key in t.colnames:
@@ -536,8 +536,8 @@ class RadialMegaTable(
             # remove core functionality
             self.find_coords_in_regions = None
             # present object reconstruction after writing to file
-            self._table.meta['TBL_TYPE'] = (
-                self._table.meta['TBL_TYPE'] + '_CLEANED')
+            self._table.meta['TBLTYPE'] = (
+                self._table.meta['TBLTYPE'] + '_CLEANED')
 
 
 ######################################################################
@@ -553,21 +553,21 @@ class TessellMegaTable(
     """
     Mega-table built from a tessellation of a galaxy's sky footprint.
 
-    Each cell/aperture in the tessellation maps to a row in the table.
+    Each aperture/tile in the tessellation maps to a row in the table.
     Once a table is constructed, additional columns can be added
-    by calculating statistics of images within each cell/aperture, or
+    by calculating statistics of images within each aperture, or
     by resampling images at the location of each seed.
 
     Parameters
     ----------
     header : astropy.fits.Header
         FITS header that defines the sky footprint of a galaxy.
-    cell_shape : {'hexagon', 'square'}, optional
-        The shape of the cell/aperture that comprise the tessellation.
-        Default: 'hexagon', in which case a hexagonal tiling is used.
-    cell_size_deg : float, optional
-        The angular size of the cells/aperture (defined as the
-        spacing between adjacent cell centers; in degrees).
+    aperture_shape : {'hexagon', 'square'}, optional
+        The shape of the apertures/tiles that form the tessellation.
+        Default: 'hexagon', in which case hexagonal tiles are used.
+    aperture_size_as : float, optional
+        The angular size of the apertures/tiles (defined as the
+        spacing between adjacent aperture centers; in arcseconds).
         If None, the minimum absolute value of the 'CDELT' entry
         in the input header will be used.
     gal_ra_deg : float, optional
@@ -587,12 +587,24 @@ class TessellMegaTable(
     # ----------------------------------------------------------------
 
     def __init__(
-            self, header, cell_shape='hexagon', cell_size_deg=None,
+            self, header,
+            aperture_shape='hexagon', aperture_size_as=None,
             gal_ra_deg=None, gal_dec_deg=None):
         VoronoiTessTable.__init__(
             self, header,
-            cell_shape=cell_shape, seed_spacing=cell_size_deg,
+            tile_shape=aperture_shape,
+            seed_spacing=aperture_size_as/3600,
             ref_radec=(gal_ra_deg, gal_dec_deg))
+
+        # record metadata
+        self._table.meta['APERTYPE'] = aperture_shape
+        self._table.meta['APER_AS'] = aperture_size_as
+        self._table.meta['RA_DEG'] = self._ref_coord.ra.value
+        self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
+        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
+        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
+        for key in self._wcs.to_header():
+            self._table.meta[key] = self._wcs.to_header()[key]
 
     #-----------------------------------------------------------------
 
@@ -615,9 +627,9 @@ class TessellMegaTable(
         t = Table.read(filename, **kwargs)
 
         # input file should be a valid TessellMegaTable ouput
-        if not 'TBL_TYPE' in t.meta:
+        if not 'TBLTYPE' in t.meta:
             raise ValueError("Input file not recognized")
-        if t.meta['TBL_TYPE'] != 'TessellMegaTable':
+        if t.meta['TBLTYPE'] != 'TessellMegaTable':
             raise ValueError(
                 "Cannot reconstruct TessellMegaTable object from "
                 "input file")
@@ -625,8 +637,8 @@ class TessellMegaTable(
         # initiate TessellMegaTable w/ recorded meta data in file
         mt = cls(
             fits.Header(t.meta),
-            cell_shape=t.meta['CELL_TYP'],
-            cell_size_deg=t.meta['SIZE_DEG'],
+            aperture_shape=t.meta['APERTYPE'],
+            aperture_size_as=t.meta['APER_AS'],
             gal_ra_deg=t.meta['RA_DEG'],
             gal_dec_deg=t.meta['DEC_DEG'])
 
@@ -686,15 +698,15 @@ class TessellMegaTable(
 
         if has_changed:
             warnings.warn(
-                "Some cells has been removed during table cleaning. "
+                "Some tiles has been removed during table cleaning. "
                 "Part of the VonoroiTessTable functionalities are "
                 "thus disabled to avoid introducing bugs in further "
                 "data reduction.")
             # remove core functionality
             self.find_coords_in_regions = None
             # present object reconstruction after writing to file
-            self._table.meta['TBL_TYPE'] = (
-                self._table.meta['TBL_TYPE'] + '_CLEANED')
+            self._table.meta['TBLTYPE'] = (
+                self._table.meta['TBLTYPE'] + '_CLEANED')
 
 
 ######################################################################

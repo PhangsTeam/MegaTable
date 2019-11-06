@@ -2,6 +2,7 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from itertools import product
 import numpy as np
 from astropy import units as u, constants as const
 from astropy.table import Table
@@ -26,7 +27,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
     if datatypes[0] == 'sample_table':
         # return PHANGSdir / 'sample_v1p3_sup.ecsv'
         return (PHANGSdir / 'mega-tables' /
-                'sample_table_for_Sun+19.fits')
+                'sample_table_for_Sun+20.fits')
 
     elif datatypes[0] == 'ALMA':
         # PHANGS-ALMA data
@@ -86,7 +87,8 @@ def gen_raw_measurement_table(
         gal_incl_deg=None, gal_posang_deg=None,
         verbose=True, writefile=''):
 
-    cell_size_deg = np.rad2deg(aperture_size_kpc / gal_dist_Mpc / 1e3)
+    aperture_size_as = np.rad2deg(
+        aperture_size_kpc / gal_dist_Mpc / 1e3) * 3600
 
     low_res = aperture_size_kpc * u.kpc
     CO_high_res = np.array(CO_res_pc) * u.pc
@@ -103,8 +105,8 @@ def gen_raw_measurement_table(
     with fits.open(infile) as hdul:
         mt = TessellMegaTable(
             hdul[0].header, 
-            cell_shape=aperture_shape,
-            cell_size_deg=cell_size_deg,
+            aperture_shape=aperture_shape,
+            aperture_size_as=aperture_size_as,
             gal_ra_deg=gal_ra_deg, gal_dec_deg=gal_dec_deg)
 
     # add galactic radii and projected angles in table
@@ -318,16 +320,16 @@ def gen_phys_props_table(
     # initiate new table
     t_phys = Table()
     t_phys.meta['NAME'] = str(gal_name)
-    t_phys.meta['RA_DEG'] = gal_ra_deg
-    t_phys.meta['DEC_DEG'] = gal_dec_deg
-    t_phys.meta['INCL_DEG'] = gal_incl_deg
-    t_phys.meta['PA_DEG'] = gal_posang_deg
-    t_phys.meta['DIST_MPC'] = gal_dist_Mpc
-    t_phys.meta['LOGMSTAR'] = gal_logMstar
-    t_phys.meta['RDISK_AS'] = gal_Rstar_arcsec
-    t_phys.meta['REFF_AS'] = gal_Reff_arcsec
-    t_phys.meta['TBL_NOTE'] = note
-    t_phys.meta['VERSION'] = f"ver{version:.1f}"
+    t_phys.meta['RA_DEG'] = float(f"{gal_ra_deg:.6f}")
+    t_phys.meta['DEC_DEG'] = float(f"{gal_dec_deg:.6f}")
+    t_phys.meta['INCL_DEG'] = float(f"{gal_incl_deg:.1f}")
+    t_phys.meta['PA_DEG'] = float(f"{gal_posang_deg:.1f}")
+    t_phys.meta['DIST_MPC'] = float(f"{gal_dist_Mpc:.3g}")
+    t_phys.meta['LOGMSTAR'] = float(f"{gal_logMstar:.2f}")
+    t_phys.meta['RDISK_AS'] = float(f"{gal_Rstar_arcsec:.1f}")
+    t_phys.meta['REFF_AS'] = float(f"{gal_Reff_arcsec:.1f}")
+    t_phys.meta['TBLNOTE'] = str(note)
+    t_phys.meta['VERSION'] = float(version)
 
     # galaxy global parameters
     gal_cosi = np.cos(np.deg2rad(gal_incl_deg))
@@ -372,7 +374,7 @@ def gen_phys_props_table(
     for key in (
             'I_3p6um_ICA_1kpc_samp',
             'I_3p6um_raw_1kpc_samp'):
-        newkey = 'Sigma_star'+key[-12:-8]
+        newkey = 'Sigma_star'+key[-14:-10]
         t_phys[newkey] = (
             mt[key].quantity * gal_cosi * alpha3p6um
         ).to('Msun/pc^2')
@@ -448,7 +450,7 @@ def gen_phys_props_table(
         t_phys['frac_bulge'][np.nonzero(r_gal == 0)[0]] = 1.
 
     # CO map statistics
-    for res in CO_high_res:
+    for res, wstr in product(CO_high_res, ('A', 'F')):
         R_cloud = res / 2
         rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"fracA_CO21_{rstr}"] = (
@@ -460,86 +462,63 @@ def gen_phys_props_table(
         t_phys[f"clumping_CO21_{rstr}"] = (
             mt[f"F<I_CO21_{rstr}>"].quantity /
             mt[f"A<I_CO21_{rstr}>"].quantity).to('')
-        t_phys[f"A<Sigma_mol_pix_{rstr}>"] = (
-            mt[f"A<I_CO21_{rstr}>"].quantity *
+        t_phys[f"{wstr}<Sigma_mol_pix_{rstr}>"] = (
+            mt[f"{wstr}<I_CO21_{rstr}>"].quantity *
             alphaCO21).to('Msun pc-2')
-        t_phys[f"F<Sigma_mol_pix_{rstr}>"] = (
-            mt[f"F<I_CO21_{rstr}>"].quantity *
-            alphaCO21).to('Msun pc-2')
-        t_phys[f"A<vdisp_mol_pix_{rstr}>"] = (
-            mt[f"A<sigv_CO21_{rstr}>"].quantity).to('km s-1')
-        t_phys[f"F<vdisp_mol_pix_{rstr}>"] = (
-            mt[f"F<sigv_CO21_{rstr}>"].quantity).to('km s-1')
-        t_phys[f"A<P_turb_pix_{rstr}>"] = (  # Sun+20 Eq.4
-            (3/2) * mt[f"A<I*sigv^2_CO21_{rstr}>"].quantity /
+        t_phys[f"{wstr}<vdisp_mol_pix_{rstr}>"] = (
+            mt[f"{wstr}<sigv_CO21_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"{wstr}<P_turb_pix_{rstr}>"] = (
+            # Sun+20 Eq.4
+            3/2 * mt[f"{wstr}<I*sigv^2_CO21_{rstr}>"].quantity /
             (2*R_cloud) * alphaCO21 / const.k_B).to('K cm-3')
-        t_phys[f"F<P_turb_pix_{rstr}>"] = (  # Eq.4 in Sun+20
-            (3/2) * mt[f"F<I*sigv^2_CO21_{rstr}>"].quantity /
-            (2*R_cloud) * alphaCO21 / const.k_B).to('K cm-3')
-        t_phys[f"A<alpha_vir_pix_{rstr}>"] = (  # Eq.13 in Sun+18
+        t_phys[f"{wstr}<alpha_vir_pix_{rstr}>"] = (
+            # Sun+18 Eq.13
             5 * np.log(2) / (10/9 * np.pi * const.G) *
-            mt[f"A<sigv^2/I_CO21_{rstr}>"].quantity / R_cloud /
-            alphaCO21).to('')
-        t_phys[f"F<alpha_vir_pix_{rstr}>"] = (  # Eq.13 in Sun+18
-            5 * np.log(2) / (10/9 * np.pi * const.G) *
-            mt[f"F<sigv^2/I_CO21_{rstr}>"].quantity / R_cloud /
-            alphaCO21).to('')
+            mt[f"{wstr}<sigv^2/I_CO21_{rstr}>"].quantity /
+            R_cloud / alphaCO21).to('')
 
     # CPROPS cloud statistics
     R_factor = np.sqrt(5) / 1.91  # Rosolowsky&Leroy06 Sec.3.1
-    for res in CO_high_res:
+    for res, wstr in product(CO_high_res, ('U', 'F')):
+        los_depth = res
         rstr = f"{res.to('pc').value:.0f}pc"
         t_phys[f"Nobj_CPROPS_{rstr}"] = (
             mt[f"Nobj_CPROPS_{rstr}"].quantity).to('')
         t_phys[f"fracF_CPROPS_{rstr}"] = (
             mt[f"Flux_CPROPS_total_{rstr}"].quantity /
             mt[f"Flux_CO21_broad_{rstr}"].quantity).to('')
-        t_phys[f"U<M_mol_CPROPS_{rstr}>"] = (
+        t_phys[f"{wstr}<M_mol_CPROPS_{rstr}>"] = (
             # Note that F [=] K*km/s arcsec2
-            mt[f"U<F_CPROPS_{rstr}>"].quantity * alphaCO21 *
-            gal_dist**2 / u.sr).to('Msun')
-        t_phys[f"F<M_mol_CPROPS_{rstr}>"] = (
-            # Note that F [=] K*km/s arcsec2
-            mt[f"F<F_CPROPS_{rstr}>"].quantity * alphaCO21 *
-            gal_dist**2 / u.sr).to('Msun')
-        t_phys[f"U<R_CPROPS_{rstr}>"] = (
+            mt[f"{wstr}<F_CPROPS_{rstr}>"].quantity *
+            alphaCO21 * gal_dist**2 / u.sr).to('Msun')
+        t_phys[f"{wstr}<R_CPROPS_{rstr}>"] = (
             # Note that R [=] arcsec
-            mt[f"U<R_CPROPS_{rstr}>"].quantity *
+            mt[f"{wstr}<R_CPROPS_{rstr}>"].quantity *
             gal_dist / u.rad).to('pc')
-        t_phys[f"F<R_CPROPS_{rstr}>"] = (
-            # Note that R [=] arcsec
-            mt[f"F<R_CPROPS_{rstr}>"].quantity *
-            gal_dist / u.rad).to('pc')
-        t_phys[f"U<Sigma_mol_CPROPS_{rstr}>"] = (
-            mt[f"U<F/R^2_CPROPS_{rstr}>"].quantity * alphaCO21 /
-            (np.pi*R_factor**2)).to('Msun pc-2')
-        t_phys[f"F<Sigma_mol_CPROPS_{rstr}>"] = (
-            mt[f"F<F/R^2_CPROPS_{rstr}>"].quantity * alphaCO21 /
-            (np.pi*R_factor**2)).to('Msun pc-2')
-        t_phys[f"U<vdisp_mol_CPROPS_{rstr}>"] = (
-            mt[f"U<sigv_CPROPS_{rstr}>"].quantity).to('km s-1')
-        t_phys[f"F<vdisp_mol_CPROPS_{rstr}>"] = (
-            mt[f"F<sigv_CPROPS_{rstr}>"].quantity).to('km s-1')
-        t_phys[f"U<P_turb_CPROPS_{rstr}>"] = (
-            3 / (4 * np.pi) *
-            mt[f"U<F*sigv^2/R^3_CPROPS_{rstr}>"].quantity *
+        t_phys[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"] = (
+            mt[f"{wstr}<F/R^2_CPROPS_{rstr}>"].quantity *
+            alphaCO21 / (np.pi*R_factor**2)).to('Msun pc-2')
+        t_phys[f"{wstr}<vdisp_mol_CPROPS_{rstr}>"] = (
+            mt[f"{wstr}<sigv_CPROPS_{rstr}>"].quantity).to('km s-1')
+        t_phys[f"{wstr}<P_turb_CPROPS_sphere_{rstr}>"] = (
+            # Sun+20 Eq.28
+            3 / (4*np.pi) *
+            mt[f"{wstr}<F*sigv^2/R^3_CPROPS_{rstr}>"].quantity *
             alphaCO21 / R_factor**3 / (gal_dist / u.rad) /
             const.k_B).to('K cm-3')
-        t_phys[f"F<P_turb_CPROPS_{rstr}>"] = (
-            3 / (4 * np.pi) *
-            mt[f"F<F*sigv^2/R^3_CPROPS_{rstr}>"].quantity *
-            alphaCO21 / R_factor**3 / (gal_dist / u.rad) /
+        t_phys[f"{wstr}<P_turb_CPROPS_fixlos_{rstr}>"] = (
+            # Sun+20 Sec.6.3
+            3 / (2*np.pi) *
+            mt[f'{wstr}<F*sigv^2/R^2_CPROPS_{rstr}>'].quantity *
+            alphaCO21 / R_factor**2 / los_depth /
             const.k_B).to('K cm-3')
-        t_phys[f"U<alpha_vir_CPROPS_{rstr}>"] = (  # Sun+18 Eq.6
+        t_phys[f"{wstr}<alpha_vir_CPROPS_sphere_{rstr}>"] = (
+            # Sun+18 Eq.6
             5 / const.G *
-            mt[f"U<R*sigv^2/F_CPROPS_{rstr}>"].quantity /
-            alphaCO21 * R_factor / (gal_dist / u.rad)).to('')
-        t_phys[f"F<alpha_vir_CPROPS_{rstr}>"] = (  # Sun+18 Eq.6
-            5 / const.G *
-            mt[f"F<R*sigv^2/F_CPROPS_{rstr}>"].quantity /
+            mt[f"{wstr}<R*sigv^2/F_CPROPS_{rstr}>"].quantity /
             alphaCO21 * R_factor / (gal_dist / u.rad)).to('')
 
-    # dynamical equilibrium pressure estimates
+    # dynamical equilibrium pressure (P_DE) estimates
     Sigma_gas = Sigma_mol + Sigma_atom
     res_fid = CO_high_res[-2].to('pc')  # 120 pc
     rstr_fid = f"{res_fid.value:.0f}pc"
@@ -548,110 +527,95 @@ def gen_phys_props_table(
     vdisp_z = (
         (vdisp_mol_z * Sigma_mol + vdisp_atom_z * Sigma_atom) /
         Sigma_gas).to('km s-1')
+    # kpc-scale P_DE estimates
     t_phys["P_DE_classic"] = (
+        # Sun+20 Eq.12
         (np.pi * const.G / 2 * Sigma_gas**2 +
          Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star)) /
         const.k_B).to('K cm-3')
     t_phys["P_DE_classic_flared"] = (
+        # Sun+20 Sec.6.2
         (np.pi * const.G / 2 * Sigma_gas**2 +
-         Sigma_gas * vdisp_z *
-         np.sqrt(2*const.G*rho_star_flared)) /
+         Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star_flared)) /
         const.k_B).to('K cm-3')
     t_phys["P_DE_classic_fixedsiggas"] = (
+        # Sun+20 Sec.6.2
         (np.pi * const.G / 2 * Sigma_gas**2 +
-         Sigma_gas * vdisp_atom_z *
-         np.sqrt(2*const.G*rho_star)) /
+         Sigma_gas * vdisp_atom_z * np.sqrt(2*const.G*rho_star)) /
         const.k_B).to('K cm-3')
     t_phys["W_atom"] = (
+        # Sun+20 Eq.18
         (np.pi * const.G / 2 * Sigma_atom**2 +
          np.pi * const.G * Sigma_atom * Sigma_mol +
          Sigma_atom * vdisp_atom_z *
          np.sqrt(2*const.G*rho_star)) /
         const.k_B).to('K cm-3')
-    t_phys["P_DE_smooth"] = (
-        (np.pi * const.G / 2 * Sigma_mol**2 +
-         np.pi * const.G * Sigma_mol * rho_star * res_fid/2) /
-        const.k_B).to('K cm-3') + t_phys['W_atom'].quantity
-    for res in CO_high_res:
+    # cloud-scale P_DE estimates from pixel statistics
+    for res, wstr in product(CO_high_res, ('A', 'F')):
         R_cloud = res / 2
         rstr = f"{res.to('pc').value:.0f}pc"
-        t_phys[f"A<W_cloud_self_pix_{rstr}>"] = (
+        t_phys[f"{wstr}<W_cloud_self_pix_{rstr}>"] = (
+            # Sun+20 Eq.16
             3/8 * np.pi * const.G *
-            mt[f"A<I^2_CO21_{rstr}>"].quantity * alphaCO21**2 /
-            const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_self_pix_{rstr}>"] = (
-            3/8 * np.pi * const.G *
-            mt[f"F<I^2_CO21_{rstr}>"].quantity * alphaCO21**2 /
-            const.k_B).to('K cm-3')
-        t_phys[f"A<W_cloud_mol_pix_{rstr}>"] = (
+            mt[f"{wstr}<I^2_CO21_{rstr}>"].quantity *
+            alphaCO21**2 / const.k_B).to('K cm-3')
+        t_phys[f"{wstr}<W_cloud_mol_pix_{rstr}>"] = (
+            # Sun+20 Eq.16
             np.pi * const.G / 2 * Sigma_mol *
-            t_phys[f"A<Sigma_mol_pix_{rstr}>"] /
+            t_phys[f"{wstr}<Sigma_mol_pix_{rstr}>"] /
             const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_mol_pix_{rstr}>"] = (
-            np.pi * const.G / 2 * Sigma_mol *
-            t_phys[f"F<Sigma_mol_pix_{rstr}>"] /
-            const.k_B).to('K cm-3')
-        t_phys[f"A<W_cloud_star_pix_{rstr}>"] = (
+        t_phys[f"{wstr}<W_cloud_star_pix_{rstr}>"] = (
+            # Sun+20 Eq.16
             3/2 * np.pi * const.G * rho_star * R_cloud *
-            t_phys[f"A<Sigma_mol_pix_{rstr}>"] /
+            t_phys[f"{wstr}<Sigma_mol_pix_{rstr}>"] /
             const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_star_pix_{rstr}>"] = (
-            3/2 * np.pi * const.G * rho_star * R_cloud *
-            t_phys[f"F<Sigma_mol_pix_{rstr}>"] /
-            const.k_B).to('K cm-3')
-        t_phys[f"A<P_DE_pix_{rstr}>"] = (
-            t_phys[f"A<W_cloud_self_pix_{rstr}>"].quantity +
-            t_phys[f"A<W_cloud_mol_pix_{rstr}>"].quantity +
-            t_phys[f"A<W_cloud_star_pix_{rstr}>"].quantity +
+        t_phys[f"{wstr}<P_DE_pix_{rstr}>"] = (
+            # Sun+20 Eq.15&16
+            t_phys[f"{wstr}<W_cloud_self_pix_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_mol_pix_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_star_pix_{rstr}>"].quantity +
             t_phys["W_atom"].quantity)
-        t_phys[f"F<P_DE_pix_{rstr}>"] = (
-            t_phys[f"F<W_cloud_self_pix_{rstr}>"].quantity +
-            t_phys[f"F<W_cloud_mol_pix_{rstr}>"].quantity +
-            t_phys[f"F<W_cloud_star_pix_{rstr}>"].quantity +
-            t_phys["W_atom"].quantity)
-    for res in CO_high_res:
+    # cloud-scale P_DE estimates from (CPROPS) cloud statistics
+    for res, wstr in product(CO_high_res, ('U', 'F')):
+        los_depth = res
         rstr = f"{res.to('pc').value:.0f}pc"
-        t_phys[f"U<W_cloud_self_CPROPS_{rstr}>"] = (
+        t_phys[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"] = (
+            # Sun+20 Eq.29
             3 * const.G / 8 / np.pi *
-            mt[f"U<F^2/R^4_CPROPS_{rstr}>"].quantity *
+            mt[f"{wstr}<F^2/R^4_CPROPS_{rstr}>"].quantity *
             alphaCO21**2 / R_factor**4 /
             const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_self_CPROPS_{rstr}>"] = (
-            3 * const.G / 8 / np.pi *
-            mt[f"F<F^2/R^4_CPROPS_{rstr}>"].quantity *
-            alphaCO21**2 / R_factor**4 /
-            const.k_B).to('K cm-3')
-        t_phys[f"U<W_cloud_mol_CPROPS_{rstr}>"] = (
+        t_phys[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"] = (
+            # Sun+20 Eq.29
             np.pi * const.G / 2 * Sigma_mol *
-            t_phys[f"U<Sigma_mol_CPROPS_{rstr}>"].quantity /
+            t_phys[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"].quantity /
             const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_mol_CPROPS_{rstr}>"] = (
-            np.pi * const.G / 2 * Sigma_mol *
-            t_phys[f"F<Sigma_mol_CPROPS_{rstr}>"].quantity /
-            const.k_B).to('K cm-3')
-        t_phys[f"U<W_cloud_star_CPROPS_{rstr}>"] = (
+        t_phys[f"{wstr}<W_cloud_star_CPROPS_sphere_{rstr}>"] = (
+            # Sun+20 Eq.29
             3/2 * const.G * rho_star *
-            mt[f"U<F/R_CPROPS_{rstr}>"].quantity *
+            mt[f"{wstr}<F/R_CPROPS_{rstr}>"].quantity *
             alphaCO21 / R_factor * (gal_dist / u.rad) /
             const.k_B).to('K cm-3')
-        t_phys[f"F<W_cloud_star_CPROPS_{rstr}>"] = (
-            3/2 * const.G * rho_star *
-            mt[f"F<F/R_CPROPS_{rstr}>"].quantity *
-            alphaCO21 / R_factor * (gal_dist / u.rad) /
-            const.k_B).to('K cm-3')
-        t_phys[f"U<P_DE_CPROPS_{rstr}>"] = (
-            t_phys[f"U<W_cloud_self_CPROPS_{rstr}>"].quantity +
-            t_phys[f"U<W_cloud_mol_CPROPS_{rstr}>"].quantity +
-            t_phys[f"U<W_cloud_star_CPROPS_{rstr}>"].quantity +
+        t_phys[f"{wstr}<W_cloud_star_CPROPS_fixlos_{rstr}>"] = (
+            # Sun+20 Sec.6.3
+            3/4 * np.pi * const.G * rho_star *
+            t_phys[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"].quantity *
+            los_depth / const.k_B).to('K cm-3')
+        t_phys[f"{wstr}<P_DE_CPROPS_sphere_{rstr}>"] = (
+            # Sun+20 Eq.29
+            t_phys[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_star_CPROPS_sphere_{rstr}>"].quantity +
             t_phys["W_atom"].quantity)
-        t_phys[f"F<P_DE_CPROPS_{rstr}>"] = (
-            t_phys[f"F<W_cloud_self_CPROPS_{rstr}>"].quantity +
-            t_phys[f"F<W_cloud_mol_CPROPS_{rstr}>"].quantity +
-            t_phys[f"F<W_cloud_star_CPROPS_{rstr}>"].quantity +
+        t_phys[f"{wstr}<P_DE_CPROPS_fixlos_{rstr}>"] = (
+            # Sun+20 Sec.6.3
+            t_phys[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"].quantity +
+            t_phys[f"{wstr}<W_cloud_star_CPROPS_fixlos_{rstr}>"].quantity +
             t_phys["W_atom"].quantity)
 
     if append_raw_data:
-        for key in mt.colnames:
+        for key in mt[:].colnames:
             if key not in t_phys.colnames:
                 t_phys[key] = mt[key].quantity
 
@@ -765,8 +729,10 @@ if __name__ == '__main__':
                 gal_dist_Mpc=dist.value, gal_logMstar=logMstar,
                 gal_Rstar_arcsec=Rstar.value,
                 gal_Reff_arcsec=Reff.value,
-                append_raw_data=False,
-                note='PHANGS sample table v1p4 (but distances=v1p3)',
+                # append_raw_data=True,
+                note=(
+                    'PHANGS sample table v1p4 (but distances=v1p3); '
+                    'PHANGS-ALMA internal data release v3p4'),
                 version=0.9, writefile=physfile)
         print("")
 

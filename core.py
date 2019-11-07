@@ -29,6 +29,12 @@ class HiddenTable(object):
 
     __name__ = "HiddenTable"
 
+    def __init__(self, table=None):
+        if table is not None:
+            self._table = table
+        else:
+            self._table = Table()
+
     def __str__(self):
         return self._table.__str__()
 
@@ -44,13 +50,13 @@ class HiddenTable(object):
     def __setitem__(self, key, value):
         self._table[key] = value
 
-    def __init__(self, table=None):
-        if table is not None:
-            self._table = table
-        else:
-            self._table = Table()
+    @property
+    def meta(self):
+        return self._table.meta
 
-    def write(self, filename, keep_metadata=True, **kwargs):
+    def write(
+            self, filename, keep_metadata=True, add_timestamp=True,
+            **kwargs):
         """
         Write the hidden table to a file.
 
@@ -59,18 +65,34 @@ class HiddenTable(object):
         filename : string
             Name of the file to write to.
         keep_metadata : bool, optional
-            Whether to keep table meta data in the output file.
-            Default is to keep.
+            Whether to keep existing metadata (Default: True)
+        add_timestamp : bool, optional
+            Whether to add a time stamp in the metadata
+            (Default: True)
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
+        t = self._table.copy()
         if not keep_metadata:
-            t = self._table.copy()
+            # remove all metadata
             for key in self._table.meta:
                 t.meta.pop(key)
-            t.write(filename, **kwargs)
         else:
-            self._table.write(filename, **kwargs)
+            # remove metadata not allowed in FITS headers
+            hdr = fits.Header()
+            for key in self._table.meta:
+                try:
+                    hdr[key] = t.meta[key]
+                except:
+                    t.meta.pop(key)
+        if 'UTCSTAMP' in t.meta:
+            # remove previous time stamp
+            t.meta.pop('UTCSTAMP')
+        if add_timestamp:
+            # add current time stamp
+            import time
+            t.meta['UTCSTAMP'] = time.strftime('%c', time.gmtime())
+        t.write(filename, **kwargs)
 
 
 ######################################################################
@@ -259,7 +281,7 @@ class StatsMixin(object):
             self._table[colname] = (
                 np.full(len(self), np.nan) * u.Unit(unit))
             return
-        
+
         # find pixels in regions
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)

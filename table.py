@@ -360,7 +360,7 @@ class RadialMegaTable(
         Right Ascension coordinate of the galaxy center (in degrees).
     gal_dec_deg : float, optional
         Declination coordinate of the galaxy center (in degrees).
-    ring_width_as : float
+    rgal_bin_arcsec : float
         The (deprojected) width of each ring (in arcseconds).
     gal_incl_deg : float, optional
         Inclination angle of the galaxy (in degrees).
@@ -368,7 +368,7 @@ class RadialMegaTable(
     gal_posang_deg : float, optional
         Position angle of the galaxy (in degrees; North through East).
         Default is 0 degree.
-    max_rgal_as : float, optional
+    rgal_max_arcsec : float, optional
         The (deprojected) maximum galactic radius (in arcseconds)
         covered by the radial profile.
         Default is to cover out to 20 times the ring width.
@@ -379,16 +379,16 @@ class RadialMegaTable(
     # ----------------------------------------------------------------
 
     def __init__(
-            self, gal_ra_deg, gal_dec_deg, ring_width_as,
-            gal_incl_deg=0, gal_posang_deg=0, max_rgal_as=None):
+            self, gal_ra_deg, gal_dec_deg, rgal_bin_arcsec,
+            gal_incl_deg=0, gal_posang_deg=0, rgal_max_arcsec=None):
 
         from functools import partial
         from .utils import deproject
 
-        if max_rgal_as is None:
+        if rgal_max_arcsec is None:
             nring = 20
         else:
-            nring = int(np.ceil((max_rgal_as / ring_width_as)))
+            nring = int(np.ceil((rgal_max_arcsec / rgal_bin_arcsec)))
 
         # function that determines whether a set of coordinates locate
         # inside the ring between rmin and rmax
@@ -404,8 +404,8 @@ class RadialMegaTable(
         # ring names and definitions
         ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
         ring_defs = []
-        rbounds_as = np.arange(nring+1) * ring_width_as
-        for rmin, rmax in zip(rbounds_as[:-1], rbounds_as[1:]):
+        rbounds_arcsec = np.arange(nring+1) * rgal_bin_arcsec
+        for rmin, rmax in zip(rbounds_arcsec[:-1], rbounds_arcsec[1:]):
             ring_defs += [
                 partial(
                     coord2bool, rmin=rmin/3600, rmax=rmax/3600,
@@ -416,19 +416,19 @@ class RadialMegaTable(
         GeneralRegionTable.__init__(
             self, ring_defs, names=ring_names)
         # save ring inner/outer radii in table
-        self._table['r_gal_angl_min'] = rbounds_as[:-1] * u.arcsec
-        self._table['r_gal_angl_max'] = rbounds_as[1:] * u.arcsec
+        self['r_gal_angl_min'] = rbounds_arcsec[:-1] * u.arcsec
+        self['r_gal_angl_max'] = rbounds_arcsec[1:] * u.arcsec
 
         # record meta data in table
-        self._table.meta['RA_DEG'] = gal_ra_deg
-        self._table.meta['DEC_DEG'] = gal_dec_deg
-        self._table.meta['INCL_DEG'] = gal_incl_deg
-        self._table.meta['PA_DEG'] = gal_posang_deg
-        self._table.meta['RBIN_AS'] = ring_width_as
-        if max_rgal_as is None:
-            self._table.meta['RMAX_AS'] = ring_width_as * 19.99
+        self.meta['RA_DEG'] = gal_ra_deg
+        self.meta['DEC_DEG'] = gal_dec_deg
+        self.meta['INCL_DEG'] = gal_incl_deg
+        self.meta['PA_DEG'] = gal_posang_deg
+        self.meta['RBIN_AS'] = rgal_bin_arcsec
+        if rgal_max_arcsec is None:
+            self.meta['RMAX_AS'] = rgal_bin_arcsec * 19.99
         else:
-            self._table.meta['RMAX_AS'] = max_rgal_as
+            self.meta['RMAX_AS'] = rgal_max_arcsec
 
     #-----------------------------------------------------------------
 
@@ -463,11 +463,13 @@ class RadialMegaTable(
             t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['RBIN_AS'],
             gal_incl_deg=t.meta['INCL_DEG'],
             gal_posang_deg=t.meta['PA_DEG'],
-            max_rgal_as=t.meta['RMAX_AS'])
+            rgal_max_arcsec=t.meta['RMAX_AS'])
 
         # overwrite the underlying data table
         for key in t.colnames:
             mt[key] = t[key]
+        for key in t.meta:
+            mt.meta[key] = t.meta[key]
 
         return mt
 
@@ -494,7 +496,7 @@ class RadialMegaTable(
             column(s).
         """
         from itertools import compress
-        
+
         # remove rows together w/ corresponding region definitions
         # and keep track of changes in row numbers
         has_changed = False
@@ -536,8 +538,8 @@ class RadialMegaTable(
             # remove core functionality
             self.find_coords_in_regions = None
             # present object reconstruction after writing to file
-            self._table.meta['TBLTYPE'] = (
-                self._table.meta['TBLTYPE'] + '_CLEANED')
+            self.meta['TBLTYPE'] = (
+                self.meta['TBLTYPE'] + ' (CLEANED)')
 
 
 ######################################################################
@@ -565,7 +567,7 @@ class TessellMegaTable(
     aperture_shape : {'hexagon', 'square'}, optional
         The shape of the apertures/tiles that form the tessellation.
         Default: 'hexagon', in which case hexagonal tiles are used.
-    aperture_size_as : float, optional
+    aperture_size_arcsec : float, optional
         The angular size of the apertures/tiles (defined as the
         spacing between adjacent aperture centers; in arcseconds).
         If None, the minimum absolute value of the 'CDELT' entry
@@ -588,23 +590,23 @@ class TessellMegaTable(
 
     def __init__(
             self, header,
-            aperture_shape='hexagon', aperture_size_as=None,
+            aperture_shape='hexagon', aperture_size_arcsec=None,
             gal_ra_deg=None, gal_dec_deg=None):
         VoronoiTessTable.__init__(
             self, header,
             tile_shape=aperture_shape,
-            seed_spacing=aperture_size_as/3600,
+            seed_spacing=aperture_size_arcsec/3600,
             ref_radec=(gal_ra_deg, gal_dec_deg))
 
         # record metadata
-        self._table.meta['APERTYPE'] = aperture_shape
-        self._table.meta['APER_AS'] = aperture_size_as
-        self._table.meta['RA_DEG'] = self._ref_coord.ra.value
-        self._table.meta['DEC_DEG'] = self._ref_coord.dec.value
-        self._table.meta['NAXIS1'] = self._wcs._naxis[0]
-        self._table.meta['NAXIS2'] = self._wcs._naxis[1]
+        self.meta['APERTYPE'] = aperture_shape
+        self.meta['APER_AS'] = aperture_size_arcsec
+        self.meta['RA_DEG'] = self._ref_coord.ra.value
+        self.meta['DEC_DEG'] = self._ref_coord.dec.value
+        self.meta['NAXIS1'] = self._wcs._naxis[0]
+        self.meta['NAXIS2'] = self._wcs._naxis[1]
         for key in self._wcs.to_header():
-            self._table.meta[key] = self._wcs.to_header()[key]
+            self.meta[key] = self._wcs.to_header()[key]
 
     #-----------------------------------------------------------------
 
@@ -638,13 +640,15 @@ class TessellMegaTable(
         mt = cls(
             fits.Header(t.meta),
             aperture_shape=t.meta['APERTYPE'],
-            aperture_size_as=t.meta['APER_AS'],
+            aperture_size_arcsec=t.meta['APER_AS'],
             gal_ra_deg=t.meta['RA_DEG'],
             gal_dec_deg=t.meta['DEC_DEG'])
 
         # overwrite the underlying data table
         for key in t.colnames:
             mt[key] = t[key]
+        for key in t.meta:
+            mt.meta[key] = t.meta[key]
 
         return mt
 
@@ -705,8 +709,8 @@ class TessellMegaTable(
             # remove core functionality
             self.find_coords_in_regions = None
             # present object reconstruction after writing to file
-            self._table.meta['TBLTYPE'] = (
-                self._table.meta['TBLTYPE'] + '_CLEANED')
+            self.meta['TBLTYPE'] = (
+                self.meta['TBLTYPE'] + ' (CLEANED)')
 
 
 ######################################################################

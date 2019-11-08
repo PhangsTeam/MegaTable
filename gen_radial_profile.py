@@ -87,12 +87,12 @@ def gen_raw_measurement_table(
         verbose=True, writefile=''):
 
     rgal_bin_arcsec = np.rad2deg(
-        rgal_bin_kpc / gal_dist_Mpc / 1e3) / 3600
+        rgal_bin_kpc / gal_dist_Mpc / 1e3) * 3600
     if rgal_max_kpc is None:
         rgal_max_arcsec = None
     else:
         rgal_max_arcsec = np.rad2deg(
-            rgal_max_kpc / gal_dist_Mpc / 1e3) / 3600
+            rgal_max_kpc / gal_dist_Mpc / 1e3) * 3600
 
     CO_high_res = np.array(CO_res_pc) * u.pc
 

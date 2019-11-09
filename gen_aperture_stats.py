@@ -24,7 +24,6 @@ def get_data_path(datatype, galname=None, lin_res=None):
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
     if datatypes[0] == 'sample_table':
-        # return PHANGSdir / 'sample_v1p3_sup.ecsv'
         return (PHANGSdir / 'mega-tables' /
                 'sample_table_for_Sun+20.fits')
 
@@ -33,7 +32,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
         basedir = PHANGSdir / 'ALMA'
         if datatypes[1] == 'CO':
             # PHANGS-ALMA CO map (v4)
-            basedir /= 'v4-processed'
+            basedir /= 'v3p4-processed'
             fname_seq = [galname, 'CO21'] + datatypes[2:]
             if lin_res is not None:
                 fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]

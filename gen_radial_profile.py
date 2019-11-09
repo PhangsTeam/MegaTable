@@ -23,7 +23,6 @@ def get_data_path(datatype, galname=None, lin_res=None):
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
     if datatypes[0] == 'sample_table':
-        # return PHANGSdir / 'sample_v1p4.ecsv'
         return (PHANGSdir / 'mega-tables' /
                 'sample_table_for_Sun+20.fits')
 

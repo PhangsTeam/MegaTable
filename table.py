@@ -558,7 +558,7 @@ class TessellMegaTable(
     Each aperture/tile in the tessellation maps to a row in the table.
     Once a table is constructed, additional columns can be added
     by calculating statistics of images within each aperture, or
-    by resampling images at the location of each seed.
+    by resampling images at the center of each aperture.
 
     Parameters
     ----------
@@ -711,6 +711,49 @@ class TessellMegaTable(
             # present object reconstruction after writing to file
             self.meta['TBLTYPE'] = (
                 self.meta['TBLTYPE'] + ' (CLEANED)')
+
+    #-----------------------------------------------------------------
+
+    def show_apertures_on_sky(
+            self, ax=None, image=None, ffigkw={}, **scatterkw):
+        """
+        Show RA-Dec locations of the tile centers on top of an image.
+
+        ax : `~matplotlib.axes.Axes`, optional
+            If 'image' is None, this is the Axes instance in which to
+            make a scatter plot showing the tile centers.
+        image : see below
+            The image on which to overplot the tile centers.
+            This will be passed to `aplpy.FITSFigure`.
+        ffigkw : dict, optional
+            Keyword arguments to be passed to `aplpy.FITSFigure`
+        **scatterkw :
+            Keyword arguments to be passed to `plt.scatter`
+        """
+        if image is not None:
+            # show image using aplpy and overplot tile centers
+            from aplpy import FITSFigure
+            ffig = FITSFigure(image, **ffigkw)
+            ffig.show_markers(
+                self['RA'].quantity.value,
+                self['DEC'].quantity.value,
+                **scatterkw)
+            return ffig
+        else:
+            # make a simple scatter plot
+            if ax is None:
+                import matplotlib.pyplot as plt
+                plt.scatter(
+                    self['RA'].quantity.value,
+                    self['DEC'].quantity.value,
+                    **scatterkw)
+                return plt.gca()
+            else:
+                ax.scatter(
+                    self['RA'].quantity.value,
+                    self['DEC'].quantity.value,
+                    **scatterkw)
+                return ax
 
 
 ######################################################################

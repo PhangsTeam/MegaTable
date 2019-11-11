@@ -684,49 +684,6 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                         "recorded in the FITS header")
             self._table[colname].unit = u.Unit(unit)
 
-    #-----------------------------------------------------------------
-
-    def show_seeds_on_sky(
-            self, ax=None, image=None, ffigkw={}, **scatterkw):
-        """
-        Show RA-Dec locations of the seeds on top of an image.
-
-        ax : `~matplotlib.axes.Axes`, optional
-            If 'image' is None, this is the Axes instance in which to
-            make a scatter plot showing the seed locations.
-        image : see below
-            The image on which to overplot the seed locations.
-            This will be passed to `aplpy.FITSFigure`.
-        ffigkw : dict, optional
-            Keyword arguments to be passed to `aplpy.FITSFigure`
-        **scatterkw :
-            Keyword arguments to be passed to `plt.scatter`
-        """
-        if image is not None:
-            # show image using aplpy and overplot seed locations
-            from aplpy import FITSFigure
-            ffig = FITSFigure(image, **ffigkw)
-            ffig.show_markers(
-                self['RA'].quantity.value,
-                self['DEC'].quantity.value,
-                **scatterkw)
-            return ffig
-        else:
-            # make a simple scatter plot
-            if ax is None:
-                import matplotlib.pyplot as plt
-                plt.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
-                return plt.gca()
-            else:
-                ax.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
-                return ax
-
 
 ######################################################################
 ######################################################################

@@ -85,13 +85,13 @@ class HiddenTable(object):
                     hdr[key] = t.meta[key]
                 except:
                     t.meta.pop(key)
-        if 'UTCSTAMP' in t.meta:
+        if 'TIMESTMP' in t.meta:
             # remove previous time stamp
-            t.meta.pop('UTCSTAMP')
+            t.meta.pop('TIMESTMP')
         if add_timestamp:
             # add current time stamp
             import time
-            t.meta['UTCSTAMP'] = time.strftime('%c', time.gmtime())
+            t.meta['TIMESTMP'] = time.strftime('%c', time.gmtime())
         t.write(filename, **kwargs)
 
 

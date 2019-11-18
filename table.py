@@ -531,8 +531,8 @@ class RadialMegaTable(
 
         if has_changed:
             warnings.warn(
-                "Some rings has been removed during table cleaning. "
-                "Part of the RadialTessTable functionalities are "
+                "Some rings has been removed during table cleaning."
+                " Part of the RadialTessTable functionalities are "
                 "thus disabled to avoid introducing bugs in further "
                 "data reduction.")
             # remove core functionality
@@ -611,7 +611,7 @@ class TessellMegaTable(
     #-----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, **kwargs):
+    def read(cls, filename, ignore_inconsistency=False, **kwargs):
         """
         Read (and reconstruct) a TessellMegaTable from file.
 
@@ -619,6 +619,9 @@ class TessellMegaTable(
         ----------
         filename : str
             Name of the file to read from.
+        ignore_inconsistency : bool, optional
+            Whether to suppress the error message if metadata seems
+            inconsistent with table content (default: False)
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
@@ -645,6 +648,12 @@ class TessellMegaTable(
             gal_dec_deg=t.meta['DEC_DEG'])
 
         # overwrite the underlying data table
+        if len(mt) != len(t):
+            if ignore_inconsistency:
+                mt._table = Table()
+            else:
+                raise ValueError(
+                    "Table content and metadata are inconsistent")
         for key in t.colnames:
             mt[key] = t[key]
         for key in t.meta:
@@ -702,8 +711,8 @@ class TessellMegaTable(
 
         if has_changed:
             warnings.warn(
-                "Some tiles has been removed during table cleaning. "
-                "Part of the VonoroiTessTable functionalities are "
+                "Some tiles has been removed during table cleaning."
+                " Part of the VonoroiTessTable functionalities are "
                 "thus disabled to avoid introducing bugs in further "
                 "data reduction.")
             # remove core functionality

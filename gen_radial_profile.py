@@ -106,7 +106,7 @@ def gen_raw_measurement_table(
 
     # add z0MGS data in table
     if verbose:
-        print("  Resampling z0MGS data")
+        print("  Incorporating z0MGS data")
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:NUVW3', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -140,7 +140,7 @@ def gen_raw_measurement_table(
 
     # add S4G data in table
     if verbose:
-        print("  Resampling S4G data")
+        print("  Incorporating S4G data")
     rt.calc_image_stats(
         get_data_path('S4G:ICA3p6um', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -152,7 +152,7 @@ def gen_raw_measurement_table(
 
     # add HI data in table
     if verbose:
-        print("  Resampling HI data")
+        print("  Incorporating HI data")
     rt.calc_image_stats(
         get_data_path('HI:mom0', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -261,7 +261,7 @@ def get_h_star(Rstar, diskshape='flat', Rgal=None):
 
 def gen_phys_props_table(
         rtfile, gal_name=None, gal_logMstar=None,
-        gal_Rstar_arcsec=None, gal_Reff_arcsec=None,
+        gal_Reff_arcsec=None, gal_Rstar_arcsec=None,
         CO_res_pc=[], append_raw_data=False, note='', version=0,
         writefile=''):
 
@@ -272,25 +272,21 @@ def gen_phys_props_table(
     # read mega-table
     rt = RadialMegaTable.read(rtfile)
     assert rt.meta['GALAXY'] == str(gal_name)
-    gal_dist_Mpc = rt.meta['DIST_MPC']
-    gal_ra_deg = rt.meta['RA_DEG']
-    gal_dec_deg = rt.meta['DEC_DEG']
-    gal_incl_deg = rt.meta['INCL_DEG']
-    gal_posang_deg = rt.meta['PA_DEG']
 
     # galaxy global parameters
-    gal_cosi = np.cos(np.deg2rad(gal_incl_deg))
-    gal_dist = gal_dist_Mpc * u.Mpc
+    gal_cosi = np.cos(np.deg2rad(rt.meta['INCL_DEG']))
+    gal_dist = rt.meta['DIST_MPC'] * u.Mpc
     gal_Mstar = 10**gal_logMstar * u.Msun
-    gal_Rstar = (np.deg2rad(gal_Rstar_arcsec/3600)*gal_dist).to('kpc')
     gal_Reff = (np.deg2rad(gal_Reff_arcsec/3600)*gal_dist).to('kpc')
+    gal_Rstar = (np.deg2rad(gal_Rstar_arcsec/3600)*gal_dist).to('kpc')
 
     # initiate new table
     pt = RadialMegaTable(
-        gal_ra_deg, gal_dec_deg, rt.meta['RBIN_AS'],
+        rt.meta['RA_DEG'], rt.meta['DEC_DEG'],
+        rt.meta['RBIN_AS'],
         rgal_max_arcsec=rt.meta['RMAX_AS'],
-        gal_incl_deg=gal_incl_deg,
-        gal_posang_deg=gal_posang_deg)
+        gal_incl_deg=rt.meta['INCL_DEG'],
+        gal_posang_deg=rt.meta['PA_DEG'])
     for key in rt.meta:
         pt.meta[key] = rt.meta[key]
 
@@ -302,8 +298,7 @@ def gen_phys_props_table(
     pt['r_gal_max'] = r_gal_max = (
         rt['r_gal_angl_max'].quantity.to('rad').value *
         gal_dist).to('kpc')
-    r_gal = (pt['r_gal_min'].quantity +
-             pt['r_gal_max'].quantity) / 2
+    r_gal = (r_gal_min + r_gal_max) / 2
 
     # CO contribution by environments
     for reg in regions:
@@ -316,46 +311,34 @@ def gen_phys_props_table(
         pt['frac_bulge'][np.nonzero(r_gal_min == 0)[0]] = 1.
 
     # metallicity
-    pt['log(O/H)_PP04'] = predict_metallicity(
+    pt['log(O/H)_O3N2_PP04_predicted'] = predict_metallicity(
         gal_Mstar, calibrator='O3N2(PP04)', MZR='Sanchez+19',
         Rgal=r_gal, Re=gal_Reff, gradient='Sanchez+14')
     pt['Zprime'] = Zprime = 10**(
-        pt['log(O/H)_PP04'] - 8.69)
+        pt['log(O/H)_O3N2_PP04_predicted'] - 8.69)
 
     # SFR surface density
+    pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
     for key in ('Sigma_SFR_FUVW4', 'Sigma_SFR_W4ONLY',
                 'Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY',
                 'Sigma_SFR_FUVONLY', 'Sigma_SFR_NUVONLY'):
         pt[key] = rt[key].quantity.to('Msun kpc-2 yr-1')
         if (np.isfinite(pt[key]).sum() != 0 and
-            'Sigma_SFR' not in pt[:].colnames):
+            np.isfinite(pt['Sigma_SFR']).sum() == 0):
             pt['Sigma_SFR'] = pt[key].quantity
-    if 'Sigma_SFR' not in pt[:].colnames:
-        pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
 
     # stellar mass surface densities
     alpha3p6um = get_alpha3p6um(ref='MS14')
+    pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     for key in ('I_3p6um_ICA', 'I_3p6um_raw'):
         newkey = 'Sigma_star'+key[-4:]
         pt[newkey] = (
             rt[key].quantity * gal_cosi * alpha3p6um
         ).to('Msun/pc^2')
         if (np.isfinite(pt[newkey]).sum() != 0 and
-            'Sigma_star' not in pt[:].colnames):
+            np.isfinite(pt['Sigma_star']).sum() == 0):
             pt['Sigma_star'] = pt[newkey].quantity
-    if 'Sigma_star' not in pt[:].colnames:
-        pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     Sigma_star = pt['Sigma_star'].quantity
-
-    # stellar mass volume density near disk mid-plane
-    pt['rho_star'] = rho_star = (
-        pt['Sigma_star'] / 4 /
-        get_h_star(gal_Rstar, diskshape='flat')
-    ).to('Msun pc-3')
-    pt['rho_star_flared'] = rho_star_flared = (
-        pt['Sigma_star'] / 4 /
-        get_h_star(gal_Rstar, diskshape='flared', Rgal=r_gal)
-    ).to('Msun pc-3')
 
     # HI mass surface density
     alpha21cm = get_alpha21cm(include_He=True)
@@ -460,99 +443,21 @@ def gen_phys_props_table(
 
     # dynamical equilibrium pressure estimates
     Sigma_gas = Sigma_mol + Sigma_atom
-    res_fid = CO_high_res[-2].to('pc')  # 120 pc
-    rstr_fid = f"{res_fid.value:.0f}pc"
+    rstr_fid = f"{CO_high_res[-1].to('pc').value:.0f}pc"  # 150 pc
     vdisp_mol_z = pt[f"F<vdisp_mol_pix_{rstr_fid}>"].quantity
     vdisp_atom_z = 10 * u.Unit('km s-1')
     vdisp_z = (
         (vdisp_mol_z * Sigma_mol + vdisp_atom_z * Sigma_atom) /
         Sigma_gas).to('km s-1')
-    # kpc-scale P_DE estimates
+    rho_star = (
+        pt['Sigma_star'] / 4 /
+        get_h_star(gal_Rstar, diskshape='flat')
+    ).to('Msun pc-3')
     pt["P_DE_classic"] = (
         # Sun+20 Eq.12
         (np.pi * const.G / 2 * Sigma_gas**2 +
          Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star)) /
         const.k_B).to('K cm-3')
-    pt["P_DE_classic_flared"] = (
-        # Sun+20 Sec.6.2
-        (np.pi * const.G / 2 * Sigma_gas**2 +
-         Sigma_gas * vdisp_z * np.sqrt(2*const.G*rho_star_flared)) /
-        const.k_B).to('K cm-3')
-    pt["P_DE_classic_fixedsiggas"] = (
-        # Sun+20 Sec.6.2
-        (np.pi * const.G / 2 * Sigma_gas**2 +
-         Sigma_gas * vdisp_atom_z * np.sqrt(2*const.G*rho_star)) /
-        const.k_B).to('K cm-3')
-    # pt["W_atom"] = (
-    #     # Sun+20 Eq.18
-    #     (np.pi * const.G / 2 * Sigma_atom**2 +
-    #      np.pi * const.G * Sigma_atom * Sigma_mol +
-    #      Sigma_atom * vdisp_atom_z *
-    #      np.sqrt(2*const.G*rho_star)) /
-    #     const.k_B).to('K cm-3')
-    # # cloud-scale P_DE estimates from pixel statistics
-    # for res, wstr in product(CO_high_res, ('A', 'F')):
-    #     R_cloud = res / 2
-    #     rstr = f"{res.to('pc').value:.0f}pc"
-    #     pt[f"{wstr}<W_cloud_self_pix_{rstr}>"] = (
-    #         # Sun+20 Eq.16
-    #         3/8 * np.pi * const.G *
-    #         rt[f"{wstr}<I^2_CO21_{rstr}>"].quantity *
-    #         alphaCO21**2 / const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<W_cloud_mol_pix_{rstr}>"] = (
-    #         # Sun+20 Eq.16
-    #         np.pi * const.G / 2 * Sigma_mol *
-    #         pt[f"{wstr}<Sigma_mol_pix_{rstr}>"] /
-    #         const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<W_cloud_star_pix_{rstr}>"] = (
-    #         # Sun+20 Eq.16
-    #         3/2 * np.pi * const.G * rho_star * R_cloud *
-    #         pt[f"{wstr}<Sigma_mol_pix_{rstr}>"] /
-    #         const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<P_DE_pix_{rstr}>"] = (
-    #         # Sun+20 Eq.15&16
-    #         pt[f"{wstr}<W_cloud_self_pix_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_mol_pix_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_star_pix_{rstr}>"].quantity +
-    #         pt["W_atom"].quantity)
-    # # cloud-scale P_DE estimates from (CPROPS) cloud statistics
-    # for res, wstr in product(CO_high_res, ('U', 'F')):
-    #     los_depth = res
-    #     rstr = f"{res.to('pc').value:.0f}pc"
-    #     pt[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"] = (
-    #         # Sun+20 Eq.29
-    #         3 * const.G / 8 / np.pi *
-    #         rt[f"{wstr}<F^2/R^4_CPROPS_{rstr}>"].quantity *
-    #         alphaCO21**2 / R_factor**4 /
-    #         const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"] = (
-    #         # Sun+20 Eq.29
-    #         np.pi * const.G / 2 * Sigma_mol *
-    #         pt[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"].quantity /
-    #         const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<W_cloud_star_CPROPS_sphere_{rstr}>"] = (
-    #         # Sun+20 Eq.29
-    #         3/2 * const.G * rho_star *
-    #         rt[f"{wstr}<F/R_CPROPS_{rstr}>"].quantity *
-    #         alphaCO21 / R_factor * (gal_dist / u.rad) /
-    #         const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<W_cloud_star_CPROPS_fixlos_{rstr}>"] = (
-    #         # Sun+20 Sec.6.3
-    #         3/4 * np.pi * const.G * rho_star *
-    #         pt[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"].quantity *
-    #         los_depth / const.k_B).to('K cm-3')
-    #     pt[f"{wstr}<P_DE_CPROPS_sphere_{rstr}>"] = (
-    #         # Sun+20 Eq.29
-    #         pt[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_star_CPROPS_sphere_{rstr}>"].quantity+
-    #         pt["W_atom"].quantity)
-    #     pt[f"{wstr}<P_DE_CPROPS_fixlos_{rstr}>"] = (
-    #         # Sun+20 Sec.6.3
-    #         pt[f"{wstr}<W_cloud_self_CPROPS_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_mol_CPROPS_{rstr}>"].quantity +
-    #         pt[f"{wstr}<W_cloud_star_CPROPS_fixlos_{rstr}>"].quantity+
-    #         pt["W_atom"].quantity)
 
     if append_raw_data:
         for key in rt[:].colnames:
@@ -561,8 +466,8 @@ def gen_phys_props_table(
 
     # record metadata
     pt.meta['LOGMSTAR'] = gal_logMstar
-    pt.meta['RDISK_AS'] = gal_Rstar_arcsec
     pt.meta['REFF_AS'] = gal_Reff_arcsec
+    pt.meta['RDISK_AS'] = gal_Rstar_arcsec
     pt.meta['TBLNOTE'] = str(note)
     pt.meta['VERSION'] = float(version)
 
@@ -626,8 +531,8 @@ if __name__ == '__main__':
         incl = row['ORIENT_INCL'] * u.deg
         posang = row['ORIENT_POSANG'] * u.deg
         logMstar = row['MSTAR_LOGMSTAR']
-        Rstar = row['SIZE_S4G_RSTAR'] * u.arcsec
         Reff = row['SIZE_W1_R50'] * u.arcsec
+        Rstar = row['SIZE_S4G_RSTAR'] * u.arcsec
 
         # skip targets with bad geometrical information
         if not ((incl >= 0*u.deg) and (incl < 90*u.deg) and
@@ -672,8 +577,8 @@ if __name__ == '__main__':
             gen_phys_props_table(
                 rtfile, gal_name=name,
                 gal_logMstar=logMstar,
-                gal_Rstar_arcsec=Rstar.value,
                 gal_Reff_arcsec=Reff.value,
+                gal_Rstar_arcsec=Rstar.value,
                 CO_res_pc=CO_high_res.to('pc').value,
                 append_raw_data=False,
                 note=(

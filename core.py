@@ -51,6 +51,10 @@ class HiddenTable(object):
         self._table[key] = value
 
     @property
+    def colnames(self):
+        return self._table.colnames
+
+    @property
     def meta(self):
         return self._table.meta
 

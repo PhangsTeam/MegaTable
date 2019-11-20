@@ -106,7 +106,7 @@ def gen_raw_measurement_table(
 
     # add z0MGS data in table
     if verbose:
-        print("  Resampling z0MGS data")
+        print("  Incorporating z0MGS data")
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:NUVW3', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -140,7 +140,7 @@ def gen_raw_measurement_table(
 
     # add S4G data in table
     if verbose:
-        print("  Resampling S4G data")
+        print("  Incorporating S4G data")
     rt.calc_image_stats(
         get_data_path('S4G:ICA3p6um', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -152,7 +152,7 @@ def gen_raw_measurement_table(
 
     # add HI data in table
     if verbose:
-        print("  Resampling HI data")
+        print("  Incorporating HI data")
     rt.calc_image_stats(
         get_data_path('HI:mom0', gal_name),
         suppress_error=True, stat_func=nanaverage,
@@ -311,35 +311,33 @@ def gen_phys_props_table(
         pt['frac_bulge'][np.nonzero(r_gal_min == 0)[0]] = 1.
 
     # metallicity
-    pt['log(O/H)_PP04'] = predict_metallicity(
+    pt['log(O/H)_O3N2_PP04_predicted'] = predict_metallicity(
         gal_Mstar, calibrator='O3N2(PP04)', MZR='Sanchez+19',
         Rgal=r_gal, Re=gal_Reff, gradient='Sanchez+14')
     pt['Zprime'] = Zprime = 10**(
-        pt['log(O/H)_PP04'] - 8.69)
+        pt['log(O/H)_O3N2_PP04_predicted'] - 8.69)
 
     # SFR surface density
+    pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
     for key in ('Sigma_SFR_FUVW4', 'Sigma_SFR_W4ONLY',
                 'Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY',
                 'Sigma_SFR_FUVONLY', 'Sigma_SFR_NUVONLY'):
         pt[key] = rt[key].quantity.to('Msun kpc-2 yr-1')
         if (np.isfinite(pt[key]).sum() != 0 and
-            'Sigma_SFR' not in pt[:].colnames):
+            np.isfinite(pt['Sigma_SFR']).sum() == 0):
             pt['Sigma_SFR'] = pt[key].quantity
-    if 'Sigma_SFR' not in pt[:].colnames:
-        pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
 
     # stellar mass surface densities
     alpha3p6um = get_alpha3p6um(ref='MS14')
+    pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     for key in ('I_3p6um_ICA', 'I_3p6um_raw'):
         newkey = 'Sigma_star'+key[-4:]
         pt[newkey] = (
             rt[key].quantity * gal_cosi * alpha3p6um
         ).to('Msun/pc^2')
         if (np.isfinite(pt[newkey]).sum() != 0 and
-            'Sigma_star' not in pt[:].colnames):
+            np.isfinite(pt['Sigma_star']).sum() == 0):
             pt['Sigma_star'] = pt[newkey].quantity
-    if 'Sigma_star' not in pt[:].colnames:
-        pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     Sigma_star = pt['Sigma_star'].quantity
 
     # HI mass surface density

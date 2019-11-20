@@ -31,7 +31,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
         # PHANGS-ALMA data
         basedir = PHANGSdir / 'ALMA'
         if datatypes[1] == 'CO':
-            # PHANGS-ALMA CO map (v4)
+            # PHANGS-ALMA CO map
             basedir /= 'v3p4-processed'
             fname_seq = [galname, 'CO21'] + datatypes[2:]
             if lin_res is not None:
@@ -123,97 +123,95 @@ def gen_raw_measurement_table(
 
     # add z0MGS data in table
     if verbose:
-        print("  Resampling z0MGS data")
-    rt.resample_image(
-        get_data_path('z0MGS:SFR:NUVW3', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='Sigma_SFR_NUVW3_1kpc_samp',
-        unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.resample_image(
-        get_data_path('z0MGS:SFR:W3ONLY', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='Sigma_SFR_W3ONLY_1kpc_samp',
-        unit=u.Unit('Msun kpc-2 yr-1'))
+        print("  Incorporating z0MGS data")
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:NUVW3', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_NUVW3_nat_avg',
+        colname='Sigma_SFR_NUVW3',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:FUVW4', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_FUVW4_nat_avg',
+        colname='Sigma_SFR_FUVW4',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:NUVONLY', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_NUVONLY_nat_avg',
+        colname='Sigma_SFR_NUVONLY',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:FUVONLY', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_FUVONLY_nat_avg',
+        colname='Sigma_SFR_FUVONLY',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:W3ONLY', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_W3ONLY_nat_avg',
+        colname='Sigma_SFR_W3ONLY',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:W4ONLY', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_W4ONLY_nat_avg',
+        colname='Sigma_SFR_W4ONLY',
+        unit=u.Unit('Msun kpc-2 yr-1'))
+    rt.resample_image(
+        get_data_path('z0MGS:SFR:NUVW3', gal_name, low_res),
+        suppress_error=True, fill_outside=np.nan,
+        colname='Sigma_SFR_NUVW3_resampled',
+        unit=u.Unit('Msun kpc-2 yr-1'))
+    rt.resample_image(
+        get_data_path('z0MGS:SFR:W3ONLY', gal_name, low_res),
+        suppress_error=True, fill_outside=np.nan,
+        colname='Sigma_SFR_W3ONLY_resampled',
         unit=u.Unit('Msun kpc-2 yr-1'))
 
     # add S4G data in table
     if verbose:
-        print("  Resampling S4G data")
-    rt.resample_image(
-        get_data_path('S4G:ICA3p6um', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_3p6um_ICA_1kpc_samp', unit=u.Unit('MJy sr-1'))
-    rt.resample_image(
-        get_data_path('S4G:3p6um', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_3p6um_raw_1kpc_samp', unit=u.Unit('MJy sr-1'))
+        print("  Incorporating S4G data")
     rt.calc_image_stats(
         get_data_path('S4G:ICA3p6um', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='I_3p6um_ICA_nat_avg', unit=u.Unit('MJy sr-1'))
+        colname='I_3p6um_ICA', unit=u.Unit('MJy sr-1'))
     rt.calc_image_stats(
         get_data_path('S4G:3p6um', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='I_3p6um_raw_nat_avg', unit=u.Unit('MJy sr-1'))
+        colname='I_3p6um_raw', unit=u.Unit('MJy sr-1'))
+    rt.resample_image(
+        get_data_path('S4G:ICA3p6um', gal_name, low_res),
+        suppress_error=True, fill_outside=np.nan,
+        colname='I_3p6um_ICA_resampled', unit=u.Unit('MJy sr-1'))
+    rt.resample_image(
+        get_data_path('S4G:3p6um', gal_name, low_res),
+        suppress_error=True, fill_outside=np.nan,
+        colname='I_3p6um_raw_resampled', unit=u.Unit('MJy sr-1'))
 
     # add HI data in table
     if verbose:
-        print("  Resampling HI data")
-    rt.resample_image(
-        get_data_path('HI:mom0', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_21cm_1kpc_samp', unit=u.Unit('K km s-1'))
-    rt.resample_image(
-        get_data_path('HI:mom0', gal_name),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_21cm_nat_samp', unit=u.Unit('K km s-1'))
+        print("  Incorporating HI data")
     rt.calc_image_stats(
         get_data_path('HI:mom0', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='I_21cm_nat_avg', unit=u.Unit('K km s-1'))
+        colname='I_21cm', unit=u.Unit('K km s-1'))
+    rt.resample_image(
+        get_data_path('HI:mom0', gal_name, low_res),
+        suppress_error=True, fill_outside=np.nan,
+        colname='I_21cm_resampled', unit=u.Unit('K km s-1'))
+    rt.resample_image(
+        get_data_path('HI:mom0', gal_name),
+        suppress_error=True, fill_outside=np.nan,
+        colname='I_21cm_nat_resampled', unit=u.Unit('K km s-1'))
     # mask all values below 20 K km s-1 (for now)
     thres = 20 * u.Unit('K km s-1')
-    for key in ('I_21cm_1kpc_samp', 'I_21cm_nat_samp',
-                'I_21cm_nat_avg'):
+    for key in ('I_21cm', 'I_21cm_resampled', 'I_21cm_nat_resampled'):
         rt._table[key][rt[key].quantity < thres] = 0
 
     # add low resolution CO data in table
-    # note: resampling 1kpc resolution maps as they are more complete
     if verbose:
         print("  Resampling low resolution CO data")
     rt.resample_image(
         get_data_path('ALMA:CO:mom0:strict', gal_name, low_res),
         suppress_error=True, fill_outside=np.nan,
-        colname='I_CO21_1kpc_samp', unit=u.Unit('K km s-1'))
+        colname='I_CO21_resampled', unit=u.Unit('K km s-1'))
 
     # add environmental fraction (CO flux-weighted) in table
     if verbose:
@@ -363,66 +361,49 @@ def gen_phys_props_table(
         pt['frac_bulge'][np.nonzero(r_gal == 0)[0]] = 1.
 
     # metallicity
-    pt['log(O/H)_PP04'] = predict_metallicity(
+    pt['log(O/H)_O3N2_PP04_predicted'] = predict_metallicity(
         gal_Mstar, calibrator='O3N2(PP04)', MZR='Sanchez+19',
         Rgal=r_gal, Re=gal_Reff, gradient='Sanchez+14')
     pt['Zprime'] = Zprime = 10**(
-        pt['log(O/H)_PP04'] - 8.69)
+        pt['log(O/H)_O3N2_PP04_predicted'] - 8.69)
 
     # SFR surface density
-    for key in ('Sigma_SFR_NUVW3_1kpc_samp',
-                'Sigma_SFR_W3ONLY_1kpc_samp'):
-        newkey = key[:-10]
-        pt[newkey] = rt[key].quantity.to('Msun kpc-2 yr-1')
-        if (np.isfinite(pt[newkey]).sum() != 0 and
-            'Sigma_SFR' not in pt[:].colnames):
-            pt['Sigma_SFR'] = pt[newkey].quantity
-    if 'Sigma_SFR' not in pt[:].colnames:
-        pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
-    # for key in (
-    #         'Sigma_SFR_NUVW3_nat_avg', 'Sigma_SFR_W3ONLY_nat_avg',
-    #         'Sigma_SFR_FUVW4_nat_avg', 'Sigma_SFR_W4ONLY_nat_avg'):
-    #     pt[key] = rt[key].quantity.to('Msun kpc-2 yr-1')
+    pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
+    for key in ('Sigma_SFR_FUVW4', 'Sigma_SFR_W4ONLY',
+                'Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY',
+                'Sigma_SFR_FUVONLY', 'Sigma_SFR_NUVONLY'):
+        pt[key] = rt[key].quantity.to('Msun kpc-2 yr-1')
+        if (np.isfinite(pt[key]).sum() != 0 and
+            np.isfinite(pt['Sigma_SFR']).sum() == 0):
+            pt['Sigma_SFR'] = pt[key].quantity
 
     # stellar mass surface densities
     alpha3p6um = get_alpha3p6um(ref='MS14')
-    for key in ('I_3p6um_ICA_1kpc_samp',
-                'I_3p6um_raw_1kpc_samp'):
-        newkey = 'Sigma_star'+key[-14:-10]
+    pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
+    for key in ('I_3p6um_ICA', 'I_3p6um_raw'):
+        newkey = 'Sigma_star'+key[-4:]
         pt[newkey] = (
             rt[key].quantity * gal_cosi * alpha3p6um
         ).to('Msun/pc^2')
         if (np.isfinite(pt[newkey]).sum() != 0 and
-            'Sigma_star' not in pt[:].colnames):
+            np.isfinite(pt['Sigma_star']).sum() == 0):
             pt['Sigma_star'] = pt[newkey].quantity
-    if 'Sigma_star' not in pt[:].colnames:
-        pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
-    # for key in ('I_3p6um_ICA_nat_avg', 'I_3p6um_raw_nat_avg'):
-    #     newkey = 'Sigma_star'+key[-12:]
-    #     pt[newkey] = (
-    #         rt[key].quantity * gal_cosi * alpha3p6um
-    #     ).to('Msun/pc^2')
     Sigma_star = pt['Sigma_star'].quantity
 
     # HI mass surface density
     alpha21cm = get_alpha21cm(include_He=True)
     pt['Sigma_atom'] = (
-        rt['I_21cm_1kpc_samp'].quantity * gal_cosi * alpha21cm
+        rt['I_21cm'].quantity * gal_cosi * alpha21cm
     ).to('Msun pc-2')
-    if np.isfinite(pt['Sigma_atom']).sum() == 0:
-        pt['Sigma_atom'] = (
-            rt['I_21cm_nat_samp'].quantity * gal_cosi * alpha21cm
-        ).to('Msun pc-2')
-    Sigma_atom = pt['Sigma_atom'].quantity
-    # pt['Sigma_atom'] = (
-    #     rt['I_21cm_nat_avg'].quantity * gal_cosi * alpha21cm
-    # ).to('Msun pc-2')
     Sigma_atom = pt['Sigma_atom'].quantity
 
     # H2 surface density (low resolution)
     R21 = get_R21()
     rstr_fid = f"{CO_high_res[-1].to('pc').value:.0f}pc"  # 150 pc
-    ICO10kpc = rt['I_CO21_1kpc_samp'].quantity * gal_cosi / R21
+    pt['I_CO21'] = I_CO21 = (
+        rt[f"Flux_CO21_broad_{rstr_fid}"].quantity /
+        rt[f"Area_CO21_total_{rstr_fid}"].quantity).to('K km s-1')
+    ICO10kpc = I_CO21 * gal_cosi / R21
     ICO10GMC = rt[f"F<I_CO21_{rstr_fid}>"].quantity / R21
     pt['alphaCO10_MW'] = predict_alphaCO10(
         prescription='constant')
@@ -438,8 +419,7 @@ def gen_phys_props_table(
         B13_WCO10kpc=ICO10kpc, B13_WCO10GMC=ICO10GMC)
     alphaCO21 = pt['alphaCO10_PHANGS'].quantity / R21
     pt['Sigma_mol'] = (
-        rt['I_CO21_1kpc_samp'].quantity * gal_cosi *
-        alphaCO21).to('Msun pc-2')
+        I_CO21 * alphaCO21 * gal_cosi).to('Msun pc-2')
     Sigma_mol = pt['Sigma_mol'].quantity
 
     # CO map statistics

@@ -4,6 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.table import Table
 from astropy.io import fits
+from astropy.wcs import WCS
 from .core import GeneralRegionTable, VoronoiTessTable
 from .utils import nanaverage
 
@@ -640,8 +641,14 @@ class TessellMegaTable(
                 "input file")
 
         # initiate TessellMegaTable w/ recorded meta data in file
+        hdr = fits.Header()
+        for key in t.meta:
+            if key[0] == '_':
+                hdr[key[1:]] = t.meta[key]
+            else:
+                hdr[key] = t.meta[key]
         mt = cls(
-            fits.Header(t.meta),
+            hdr,
             aperture_shape=t.meta['APERTYPE'],
             aperture_size_arcsec=t.meta['APER_AS'],
             gal_ra_deg=t.meta['RA_DEG'],
@@ -656,10 +663,61 @@ class TessellMegaTable(
                     "Table content and metadata are inconsistent")
         for key in t.colnames:
             mt[key] = t[key]
-        for key in t.meta:
-            mt.meta[key] = t.meta[key]
+
+        # read metadata
+        for key in hdr:
+            mt.meta[key] = hdr[key]
 
         return mt
+
+    # ----------------------------------------------------------------
+
+    def write(
+            self, filename, keep_metadata=True, add_timestamp=True,
+            **kwargs):
+        """
+        Write the TessellMegaTable object to a file.
+
+        Parameters
+        ----------
+        filename : string
+            Name of the file to write to.
+        keep_metadata : bool, optional
+            Whether to keep existing metadata (Default: True)
+        add_timestamp : bool, optional
+            Whether to add a time stamp in the metadata
+            (Default: True)
+        **kwargs
+            Keyword arguments to be passed to `~astropy.table.write`
+        """
+        t = self._table.copy()
+        if not keep_metadata:
+            # remove all metadata
+            for key in self._table.meta:
+                t.meta.pop(key)
+        else:
+            # special treatment for WCS keywords
+            for key in ('NAXIS1', 'NAXIS2'):
+                t.meta['_'+key] = t.meta[key]
+                t.meta.pop(key)
+            for key in WCS(t.meta).to_header():
+                t.meta['_'+key] = t.meta[key]
+                t.meta.pop(key)
+            # remove metadata not allowed in FITS headers
+            hdr = fits.Header()
+            for key in t.meta.copy():
+                try:
+                    hdr[key] = t.meta[key]
+                except:
+                    t.meta.pop(key)
+        if 'TIMESTMP' in t.meta:
+            # remove previous time stamp
+            t.meta.pop('TIMESTMP')
+        if add_timestamp:
+            # add current time stamp
+            import time
+            t.meta['TIMESTMP'] = time.strftime('%c', time.gmtime())
+        t.write(filename, **kwargs)
 
     # ----------------------------------------------------------------
 

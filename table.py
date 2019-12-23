@@ -696,13 +696,6 @@ class TessellMegaTable(
             for key in self._table.meta:
                 t.meta.pop(key)
         else:
-            # special treatment for WCS keywords
-            for key in ('NAXIS1', 'NAXIS2'):
-                t.meta['_'+key] = t.meta[key]
-                t.meta.pop(key)
-            for key in WCS(t.meta).to_header():
-                t.meta['_'+key] = t.meta[key]
-                t.meta.pop(key)
             # remove metadata not allowed in FITS headers
             hdr = fits.Header()
             for key in t.meta.copy():
@@ -710,6 +703,13 @@ class TessellMegaTable(
                     hdr[key] = t.meta[key]
                 except:
                     t.meta.pop(key)
+            # special treatment for WCS keywords
+            for key in ('NAXIS1', 'NAXIS2'):
+                t.meta['_'+key] = t.meta[key]
+                t.meta.pop(key)
+            for key in WCS(t.meta).to_header():
+                t.meta['_'+key] = t.meta[key]
+                t.meta.pop(key)
         if 'TIMESTMP' in t.meta:
             # remove previous time stamp
             t.meta.pop('TIMESTMP')

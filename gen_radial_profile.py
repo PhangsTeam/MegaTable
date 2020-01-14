@@ -537,9 +537,13 @@ if __name__ == '__main__':
         # skip targets with bad geometrical information
         if not ((incl >= 0*u.deg) and (incl < 90*u.deg) and
                 np.isfinite(posang)):
+            print(f"Bad orientation measurement - skipping {name}")
+            print("")
             continue
         # skip targets with bad distance
         if not (dist > 0):
+            print(f"Bad distance measurement - skipping {name}")
+            print("")
             continue
 
         print(f"Processing data for {name}")
@@ -552,8 +556,12 @@ if __name__ == '__main__':
             workdir /
             f"{name}_radial_profile_"
             f"{rgal_bin.to('pc').value:.0f}pc.ecsv")
-        if not rtfile.is_file():
+        if rtfile.is_file():
             print(f"Table file already on disk - skipping {name}")
+            print("")
+            continue
+        else:
+            print(f"Constructing raw measurement table for {name}")
             gen_raw_measurement_table(
                 name, gal_dist_Mpc=dist.value,
                 gal_ra_deg=ra.value, gal_dec_deg=dec.value,
@@ -582,11 +590,11 @@ if __name__ == '__main__':
                 CO_res_pc=CO_high_res.to('pc').value,
                 append_raw_data=False,
                 note=(
-                    'PHANGS sample table v1p4 (but distances=v1p3); '
-                    'PHANGS-ALMA internal DR:v3p4; '
-                    'PHANGS-ALMA CPROPS DR:v3'),
-                version=0.9, writefile=ptfile)
-        print("")
+                    'PHANGS sample table v1p4 (except dist=v1p3); '
+                    'PHANGS-ALMA v3p4; '
+                    'CPROPS catalog v3; '
+                    'PHANGS-VLA v1p0'),
+                version=1.0, writefile=ptfile)
 
         # ------------------------------------------------------------
 

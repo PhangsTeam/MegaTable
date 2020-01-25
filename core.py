@@ -549,13 +549,13 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         iax1 = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = self._wcs.all_pix2world(
             iax0, iax1, 0, ra_dec_order=True)
-        flagarr = self.find_coords_in_regions(ramap, decmap)
-        self._table = self[flagarr.any(axis=0)]
+        indices = self.find_coords_in_regions(ramap, decmap)
+        self._table = self[np.isin(np.arange(len(ra_arr)), indices)]
         self._table.meta['TBLTYPE'] = self.__name__
 
     #-----------------------------------------------------------------
 
-    def find_coords_in_regions(self, ra, dec):
+    def find_coords_in_regions(self, ra, dec, fill_value=-1):
         """
         Find out which regions(tiles) contain which input coordinates.
 
@@ -565,13 +565,16 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             R.A. of the coordinates in question
         dec : array_like
             Declication of the coordinates in question
+        fill_value : float, optional
+            The index value to return for input coordinates that have
+            no matched regions (default: -1).
 
         Return
         ------
-        flagarr : 2-D boolean array
-            A boolean array indicating whether each tile contains
-            each input coordinate. The shape of this array is:
-            [# of coordinates, # of tiles]
+        indices : 1-D index array
+            An index array indicating which tile each input coordinate
+            belongs to. The length of this array equals the number of
+            input coordinates.
         """
         from scipy.spatial import cKDTree
 
@@ -594,19 +597,17 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         # find coordinates in tiles
         kdtree = cKDTree(offset_seeds)
         _, indices = kdtree.query(offset_loc)
-        flagarr = np.full([len(offset_loc), len(offset_seeds)], False)
-        flagarr[np.arange(len(offset_loc)), indices] = True
 
-        # "Unfind" all coordinates that are outside the footprint
-        # of the FITS header used to generate the Voronoi diagram
+        # for all coordinates outside the WCS footprint, overwrite
+        # their matched indices with "fill_value"
         nax0, nax1 = self._wcs._naxis
         iax0, iax1 = self._wcs.all_world2pix(
             ra.flatten(), dec.flatten(), 0, ra_dec_order=False)
         mask = ((iax0 < 0) | (iax0 > nax0-1) |
                 (iax1 < 0) | (iax1 > nax1-1))
-        flagarr[mask, :] = False
+        indices[mask] = fill_value
 
-        return flagarr
+        return indices
 
     #-----------------------------------------------------------------
 

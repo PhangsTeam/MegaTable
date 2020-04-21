@@ -156,21 +156,25 @@ class StatsMixin(object):
             weights = np.broadcast_to(weight, entry.shape)
 
         # find object coordinates in regions
-        flagarr = self.find_coords_in_regions(ra, dec)
+        findarr = self.find_coords_in_regions(ra, dec)
 
         # calculate (weighted) statistics within each region
         if not callable(stat_func):
             raise ValueError("Invalid input for 'stat_func'")
         arr = np.full(len(self), np.nan)
         for ind in range(len(self)):
+            if findarr.ndim == 2:  # 2D boolean flag
+                flagarr = findarr[:, ind]
+            elif findarr.ndim == 1:  # 1D index array
+                flagarr = (findarr == ind)
             if weight is None:
                 arr[ind] = stat_func(
-                    entry.astype('float')[flagarr[:, ind]],
+                    entry.astype('float')[flagarr],
                     **kwargs)
             else:
                 arr[ind] = stat_func(
-                    entry.astype('float')[flagarr[:, ind]],
-                    weights=weights.astype('float')[flagarr[:, ind]],
+                    entry.astype('float')[flagarr],
+                    weights=weights.astype('float')[flagarr],
                     **kwargs)
 
         # save the output values as a new column in the table

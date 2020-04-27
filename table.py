@@ -708,6 +708,8 @@ class TessellMegaTable(
                 t.meta['_'+key] = t.meta[key]
                 t.meta.pop(key)
             for key in WCS(t.meta).to_header():
+                if key not in t.meta:
+                    continue
                 t.meta['_'+key] = t.meta[key]
                 t.meta.pop(key)
         if 'TIMESTMP' in t.meta:

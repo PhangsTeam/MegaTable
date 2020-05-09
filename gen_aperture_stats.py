@@ -125,44 +125,34 @@ def gen_raw_measurement_table(
     if verbose:
         print("  Incorporating z0MGS data")
     rt.calc_image_stats(
-        get_data_path('z0MGS:SFR:NUVW3', gal_name),
-        suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_NUVW3',
-        unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.calc_image_stats(
         get_data_path('z0MGS:SFR:FUVW4', gal_name),
         suppress_error=True, stat_func=nanaverage,
         colname='Sigma_SFR_FUVW4',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
-        get_data_path('z0MGS:SFR:NUVONLY', gal_name),
+        get_data_path('z0MGS:SFR:NUVW4', gal_name),
         suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_NUVONLY',
-        unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.calc_image_stats(
-        get_data_path('z0MGS:SFR:FUVONLY', gal_name),
-        suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_FUVONLY',
-        unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.calc_image_stats(
-        get_data_path('z0MGS:SFR:W3ONLY', gal_name),
-        suppress_error=True, stat_func=nanaverage,
-        colname='Sigma_SFR_W3ONLY',
+        colname='Sigma_SFR_NUVW4',
         unit=u.Unit('Msun kpc-2 yr-1'))
     rt.calc_image_stats(
         get_data_path('z0MGS:SFR:W4ONLY', gal_name),
         suppress_error=True, stat_func=nanaverage,
         colname='Sigma_SFR_W4ONLY',
         unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.resample_image(
-        get_data_path('z0MGS:SFR:NUVW3', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='Sigma_SFR_NUVW3_resampled',
+    rt.calc_image_stats(
+        get_data_path('z0MGS:SFR:FUVW3', gal_name),
+        suppress_error=True, stat_func=nanaverage,
+        colname='Sigma_SFR_FUVW3',
         unit=u.Unit('Msun kpc-2 yr-1'))
-    rt.resample_image(
-        get_data_path('z0MGS:SFR:W3ONLY', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='Sigma_SFR_W3ONLY_resampled',
+    rt.calc_image_stats(
+        get_data_path('z0MGS:SFR:NUVW3', gal_name),
+        suppress_error=True, stat_func=nanaverage,
+        colname='Sigma_SFR_NUVW3',
+        unit=u.Unit('Msun kpc-2 yr-1'))
+    rt.calc_image_stats(
+        get_data_path('z0MGS:SFR:W3ONLY', gal_name),
+        suppress_error=True, stat_func=nanaverage,
+        colname='Sigma_SFR_W3ONLY',
         unit=u.Unit('Msun kpc-2 yr-1'))
 
     # add S4G data in table
@@ -176,14 +166,6 @@ def gen_raw_measurement_table(
         get_data_path('S4G:3p6um', gal_name),
         suppress_error=True, stat_func=nanaverage,
         colname='I_3p6um_raw', unit=u.Unit('MJy sr-1'))
-    rt.resample_image(
-        get_data_path('S4G:ICA3p6um', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_3p6um_ICA_resampled', unit=u.Unit('MJy sr-1'))
-    rt.resample_image(
-        get_data_path('S4G:3p6um', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_3p6um_raw_resampled', unit=u.Unit('MJy sr-1'))
 
     # add HI data in table
     if verbose:
@@ -192,18 +174,9 @@ def gen_raw_measurement_table(
         get_data_path('HI:mom0', gal_name),
         suppress_error=True, stat_func=nanaverage,
         colname='I_21cm', unit=u.Unit('K km s-1'))
-    rt.resample_image(
-        get_data_path('HI:mom0', gal_name, low_res),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_21cm_resampled', unit=u.Unit('K km s-1'))
-    rt.resample_image(
-        get_data_path('HI:mom0', gal_name),
-        suppress_error=True, fill_outside=np.nan,
-        colname='I_21cm_nat_resampled', unit=u.Unit('K km s-1'))
     # mask all values below 20 K km s-1 (for now)
     thres = 20 * u.Unit('K km s-1')
-    for key in ('I_21cm', 'I_21cm_resampled', 'I_21cm_nat_resampled'):
-        rt._table[key][rt[key].quantity < thres] = 0
+    rt._table['I_21cm'][rt['I_21cm'].quantity < thres] = 0
 
     # add low resolution CO data in table
     if verbose:
@@ -369,9 +342,10 @@ def gen_phys_props_table(
 
     # SFR surface density
     pt['Sigma_SFR'] = np.nan * u.Unit('Msun kpc-2 yr-1')
-    for key in ('Sigma_SFR_FUVW4', 'Sigma_SFR_W4ONLY',
-                'Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY',
-                'Sigma_SFR_FUVONLY', 'Sigma_SFR_NUVONLY'):
+    for key in (
+            'Sigma_SFR_FUVW4', 'Sigma_SFR_NUVW4', 'Sigma_SFR_W4ONLY',
+            'Sigma_SFR_FUVW3', 'Sigma_SFR_NUVW3', 'Sigma_SFR_W3ONLY',
+            ):
         pt[key] = rt[key].quantity.to('Msun kpc-2 yr-1')
         if (np.isfinite(pt[key]).sum() != 0 and
             np.isfinite(pt['Sigma_SFR']).sum() == 0):

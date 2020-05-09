@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 import numpy as np
 from astropy import units as u, constants as const
-from astropy.table import Table
+from astropy.table import QTable
 from astropy.io import fits
 from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import TessellMegaTable
@@ -176,7 +176,7 @@ def gen_raw_measurement_table(
         colname='I_21cm', unit=u.Unit('K km s-1'))
     # mask all values below 20 K km s-1 (for now)
     thres = 20 * u.Unit('K km s-1')
-    rt._table['I_21cm'][rt['I_21cm'].quantity < thres] = 0
+    rt.table['I_21cm'][rt['I_21cm'].quantity < thres] = 0
 
     # add low resolution CO data in table
     if verbose:
@@ -541,7 +541,7 @@ if __name__ == '__main__':
         sys.stdout = log
 
     # read PHANGS sample table
-    catalog = Table.read(get_data_path('sample_table'))
+    catalog = QTable.read(get_data_path('sample_table'))
     # only keep targets with the 'HAS_ALMA' tag
     catalog = catalog[catalog['HAS_ALMA'] == 1]
     # loop through sample table

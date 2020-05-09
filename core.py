@@ -3,7 +3,7 @@ import warnings
 from pathlib import Path
 import numpy as np
 from astropy import units as u
-from astropy.table import Table
+from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
@@ -16,53 +16,53 @@ HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
 ######################################################################
 
 
-class HiddenTable(object):
+class BaseTable(object):
 
     """
-    Use protected attribute to hide an astropy table.
+    A simple wrapper around `~astropy.tabel.QTable`.
 
     Parameters
     ----------
-    table : astropy.table.Table
-        The table to hide
+    table : `~astropy.table.QTable`
+        Core table
     """
 
-    __name__ = "HiddenTable"
+    __name__ = "BaseTable"
 
     def __init__(self, table=None):
         if table is not None:
-            self._table = table
+            self.table = QTable(table)
         else:
-            self._table = Table()
+            self.table = QTable()
 
     def __str__(self):
-        return self._table.__str__()
+        return self.table.__str__()
 
     def __repr__(self):
-        return self._table.__repr__()
+        return self.table.__repr__()
 
     def __len__(self):
-        return len(self._table)
+        return len(self.table)
 
     def __getitem__(self, key):
-        return self._table[key]
+        return self.table[key]
 
     def __setitem__(self, key, value):
-        self._table[key] = value
+        self.table[key] = value
 
     @property
     def colnames(self):
-        return self._table.colnames
+        return self.table.colnames
 
     @property
     def meta(self):
-        return self._table.meta
+        return self.table.meta
 
     def write(
             self, filename, keep_metadata=True, add_timestamp=True,
             **kwargs):
         """
-        Write the hidden table to a file.
+        Write table to file.
 
         Parameters
         ----------
@@ -76,15 +76,15 @@ class HiddenTable(object):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
-        t = self._table.copy()
+        t = self.table.copy()
         if not keep_metadata:
             # remove all metadata
-            for key in self._table.meta:
+            for key in self.meta:
                 t.meta.pop(key)
         else:
             # remove metadata not allowed in FITS headers
             hdr = fits.Header()
-            for key in self._table.meta:
+            for key in self.meta:
                 try:
                     hdr[key] = t.meta[key]
                 except:
@@ -178,8 +178,8 @@ class StatsMixin(object):
                     **kwargs)
 
         # save the output values as a new column in the table
-        self._table[colname] = arr
-        self._table[colname].unit = u.Unit(unit)
+        self[colname] = arr
+        self[colname].unit = u.Unit(unit)
 
     #-----------------------------------------------------------------
 
@@ -286,7 +286,7 @@ class StatsMixin(object):
         data, hdr, wcs = self._reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self._table[colname] = (
+            self[colname] = (
                 np.full(len(self), np.nan) * u.Unit(unit))
             return
 
@@ -322,7 +322,7 @@ class StatsMixin(object):
 ######################################################################
 
 
-class GeneralRegionTable(StatsMixin, HiddenTable):
+class GeneralRegionTable(StatsMixin, BaseTable):
 
     """
     Table build from a set of user-defined regions on the sky.
@@ -368,8 +368,8 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
         self._region_defs = region_defs
         if names is None:
             names = [f"REGION#{i}" for i in range(len(region_defs))]
-        self._table['REGION'] = names
-        self._table.meta['TBLTYPE'] = self.__name__
+        self['REGION'] = names
+        self.meta['TBLTYPE'] = self.__name__
 
     def find_coords_in_regions(self, ra, dec):
         """
@@ -424,7 +424,7 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
 ######################################################################
 
 
-class VoronoiTessTable(StatsMixin, HiddenTable):
+class VoronoiTessTable(StatsMixin, BaseTable):
 
     """
     Table built from a Voronoi tessellation of (a part of) the sky.
@@ -471,7 +471,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
         # if seed locations are specified, write them into the table
         if seeds_ra is not None and seeds_dec is not None:
-            t = Table()
+            t = QTable()
             t['RA'] = np.atleast_1d(seeds_ra)*u.deg
             t['DEC'] = np.atleast_1d(seeds_dec)*u.deg
             super().__init__(t)
@@ -485,7 +485,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
             else:
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-            self._table.meta['TBLTYPE'] = self.__name__
+            self.meta['TBLTYPE'] = self.__name__
             return
 
         # if seed locations are not specified, generate a list of
@@ -546,16 +546,16 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 self._ref_coord.dec.value +
                 np.concatenate([iy, iy+0.5], axis=None) *
                 spacing.value * np.sqrt(3))
-        self._table['RA'] = ra_arr * u.deg
-        self._table['DEC'] = dec_arr * u.deg
+        self['RA'] = ra_arr * u.deg
+        self['DEC'] = dec_arr * u.deg
         # discard tiles outside the FITS header footprint
         iax0 = np.arange(self._wcs._naxis[0])
         iax1 = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = self._wcs.all_pix2world(
             iax0, iax1, 0, ra_dec_order=True)
         indices = self.find_coords_in_regions(ramap, decmap)
-        self._table = self[np.isin(np.arange(len(ra_arr)), indices)]
-        self._table.meta['TBLTYPE'] = self.__name__
+        self.table = self[np.isin(np.arange(len(ra_arr)), indices)]
+        self.meta['TBLTYPE'] = self.__name__
 
     #-----------------------------------------------------------------
 
@@ -655,7 +655,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         data, hdr, wcs = self._reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self._table[colname] = (
+            self[colname] = (
                 np.full(len(self), np.nan) * u.Unit(unit))
             return
 
@@ -681,9 +681,9 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             sub_data[mask] = fill_outside
 
         # save the resampled values as a new column in the table
-        self._table[colname] = sub_data
+        self[colname] = sub_data
         if unit == 'header':
-            self._table[colname].unit = u.Unit(hdr['BUNIT'])
+            self[colname].unit = u.Unit(hdr['BUNIT'])
         else:
             if 'BUNIT' in hdr:
                 if not identical_units(
@@ -691,7 +691,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                     warnings.warn(
                         "Specified unit is not the same as the unit "
                         "recorded in the FITS header")
-            self._table[colname].unit = u.Unit(unit)
+            self[colname].unit = u.Unit(unit)
 
 
 ######################################################################

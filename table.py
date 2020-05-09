@@ -2,7 +2,7 @@ from pathlib import Path
 import warnings
 import numpy as np
 from astropy import units as u
-from astropy.table import Table
+from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from .core import GeneralRegionTable, VoronoiTessTable
@@ -204,13 +204,13 @@ class PhangsAlmaMixin(object):
                 raise ValueError("Input file not found")
 
         # read CPROPS file
-        t_cat = Table.read(cpropsfile)
-        ra_cat = t_cat['XCTR_DEG'].quantity.value
-        dec_cat = t_cat['YCTR_DEG'].quantity.value
+        t_cat = QTable.read(cpropsfile)
+        ra_cat = t_cat['XCTR_DEG'].value
+        dec_cat = t_cat['YCTR_DEG'].value
         flux_cat = (
             t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
             u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
-        sigv_cat = t_cat['SIGV_KMS'].quantity.value
+        sigv_cat = t_cat['SIGV_KMS'].value
         rad_cat = (  # expressed in Solomon+87 convention
             t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
             u.rad).to('arcsec').value
@@ -449,7 +449,7 @@ class RadialMegaTable(
         ------
         table : RadialMegaTable
         """
-        t = Table.read(filename, **kwargs)
+        t = QTable.read(filename, **kwargs)
 
         # input file should be a valid RadialMegaTable ouput
         if not 'TBLTYPE' in t.meta:
@@ -504,28 +504,28 @@ class RadialMegaTable(
         if discard_NaN is not None:
             for col in np.atleast_1d(discard_NaN):
                 flag = np.isnan(self[col])
-                self._table = self[~flag]
+                self.table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
                 if flag.sum() > 0:
                     has_changed = True
         if keep_finite is not None:
             for col in np.atleast_1d(keep_finite):
                 flag = ~np.isfinite(self[col])
-                self._table = self[~flag]
+                self.table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
                 if flag.sum() > 0:
                     has_changed = True
         if discard_negative is not None:
             for col in np.atleast_1d(discard_negative):
                 flag = self[col] < 0
-                self._table = self[~flag]
+                self.table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
                 if flag.sum() > 0:
                     has_changed = True
         if keep_positive is not None:
             for col in np.atleast_1d(keep_positive):
                 flag = ~(self[col] > 0)
-                self._table = self[~flag]
+                self.table = self[~flag]
                 self._region_defs = compress(self._region_defs, ~flag)
                 if flag.sum() > 0:
                     has_changed = True
@@ -630,7 +630,7 @@ class TessellMegaTable(
         ------
         table : TessellMegaTable
         """
-        t = Table.read(filename, **kwargs)
+        t = QTable.read(filename, **kwargs)
 
         # input file should be a valid TessellMegaTable ouput
         if not 'TBLTYPE' in t.meta:
@@ -657,7 +657,7 @@ class TessellMegaTable(
         # overwrite the underlying data table
         if len(mt) != len(t):
             if ignore_inconsistency:
-                mt._table = Table()
+                mt.table = QTable()
             else:
                 raise ValueError(
                     "Table content and metadata are inconsistent")
@@ -690,10 +690,10 @@ class TessellMegaTable(
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
-        t = self._table.copy()
+        t = self.table.copy()
         if not keep_metadata:
             # remove all metadata
-            for key in self._table.meta:
+            for key in self.meta:
                 t.meta.pop(key)
         else:
             # remove metadata not allowed in FITS headers
@@ -747,25 +747,25 @@ class TessellMegaTable(
         if discard_NaN is not None:
             for col in np.atleast_1d(discard_NaN):
                 flag = np.isnan(self[col])
-                self._table = self[~flag]
+                self.table = self[~flag]
                 if flag.sum() > 0:
                     has_changed = True
         if keep_finite is not None:
             for col in np.atleast_1d(keep_finite):
                 flag = ~np.isfinite(self[col])
-                self._table = self[~flag]
+                self.table = self[~flag]
                 if flag.sum() > 0:
                     has_changed = True
         if discard_negative is not None:
             for col in np.atleast_1d(discard_negative):
                 flag = self[col] < 0
-                self._table = self[~flag]
+                self.table = self[~flag]
                 if flag.sum() > 0:
                     has_changed = True
         if keep_positive is not None:
             for col in np.atleast_1d(keep_positive):
                 flag = ~(self[col] > 0)
-                self._table = self[~flag]
+                self.table = self[~flag]
                 if flag.sum() > 0:
                     has_changed = True
 
@@ -804,24 +804,18 @@ class TessellMegaTable(
             from aplpy import FITSFigure
             ffig = FITSFigure(image, **ffigkw)
             ffig.show_markers(
-                self['RA'].quantity.value,
-                self['DEC'].quantity.value,
-                **scatterkw)
+                self['RA'].value, self['DEC'].value, **scatterkw)
             return ffig
         else:
             # make a simple scatter plot
             if ax is None:
                 import matplotlib.pyplot as plt
                 plt.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
+                    self['RA'].value, self['DEC'].value, **scatterkw)
                 return plt.gca()
             else:
                 ax.scatter(
-                    self['RA'].quantity.value,
-                    self['DEC'].quantity.value,
-                    **scatterkw)
+                    self['RA'].value, self['DEC'].value, **scatterkw)
                 return ax
 
 

@@ -7,7 +7,19 @@ from astropy import units as u, constants as const
 from astropy.table import QTable
 from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import RadialMegaTable
+from mega_table.mixin import PhangsAlmaMixin, EnvMaskMixin
 from mega_table.utils import nanaverage
+
+
+# --------------------------------------------------------------------
+
+
+class MyRadialMegaTable(
+    PhangsAlmaMixin, EnvMaskMixin, RadialMegaTable):
+
+    """
+    Enhanced RadialMegaTable.
+    """
 
 
 # --------------------------------------------------------------------
@@ -98,7 +110,7 @@ def gen_raw_measurement_table(
     # initialize table
     if verbose:
         print("  Initializing data table")
-    rt = RadialMegaTable(
+    rt = MyRadialMegaTable(
         gal_ra_deg, gal_dec_deg, rgal_bin_arcsec,
         rgal_max_arcsec=rgal_max_arcsec,
         gal_incl_deg=gal_incl_deg,

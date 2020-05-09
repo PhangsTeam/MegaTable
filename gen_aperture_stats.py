@@ -8,7 +8,19 @@ from astropy.table import QTable
 from astropy.io import fits
 from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import TessellMegaTable
+from mega_table.mixin import PhangsAlmaMixin, EnvMaskMixin
 from mega_table.utils import deproject, nanaverage
+
+
+# --------------------------------------------------------------------
+
+
+class MyTessellMegaTable(
+    PhangsAlmaMixin, EnvMaskMixin, TessellMegaTable):
+
+    """
+    Enhanced TessellMegaTable.
+    """
 
 
 # --------------------------------------------------------------------
@@ -102,7 +114,7 @@ def gen_raw_measurement_table(
             print("")
         return
     with fits.open(infile) as hdul:
-        rt = TessellMegaTable(
+        rt = MyTessellMegaTable(
             hdul[0].header,
             aperture_shape=aperture_shape,
             aperture_size_arcsec=aperture_size_arcsec,

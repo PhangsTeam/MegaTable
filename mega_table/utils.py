@@ -173,7 +173,7 @@ def deproject(
 
 def get_R21():
     # CO(2-1)/CO(1-0) ratio
-    return 0.7
+    return 0.65  # 0.7
 
 
 def get_alpha21cm(include_He=True):

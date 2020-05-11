@@ -22,6 +22,8 @@ SFR,1000,Sigma_SFR_W4ONLY,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density
 SFR,1000,Sigma_SFR_FUVW3,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (GALEX FUV + WISE 12um)"
 SFR,1000,Sigma_SFR_NUVW3,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (GALEX NUV + WISE 12um)"
 SFR,1000,Sigma_SFR_W3ONLY,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (WISE 12um)"
+SFR,1000,Sigma_SFR_HaW4,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (duPont/WFI Halpha + WISE 22um)"
+SFR,1000,Sigma_SFR_HaONLY,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (duPont/WFI Halpha)"
 
 star,1000,Sigma_star,"Msun pc-2",".3e","Kpc-scale stellar mass surface density (best estimate)"
 star,1000,Sigma_star_3p6um_ICA,"Msun pc-2",".3e","Kpc-scale stellar mass surface density (S4G 3.6um ICA)"

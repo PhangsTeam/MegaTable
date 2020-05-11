@@ -86,6 +86,13 @@ def get_data_path(datatype, galname=None, lin_res=None):
             if lin_res is not None:
                 fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
 
+    elif datatype[0] == 'Halpha':
+        # narrow band Halpha data
+        basedir = PHANGSdir / 'Halpha'
+        fname_seq = [galname] + datatypes[1:]
+        if lin_res is not None:
+            fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
+
     return basedir / ('_'.join(fname_seq) + '.fits')
 
 
@@ -588,11 +595,12 @@ if __name__ == '__main__':
                 gal_Rstar_arcsec=Rstar.value,
                 config=config_phys,
                 note=(
-                    'PHANGS-ALMA v3p4; '
-                    'CPROPS catalog v3; '
-                    'PHANGS-VLA v1p0; '
-                    'sample table v1p4 (dist=v1p2)'),
-                version=1.0, writefile=ptfile)
+                    'PHANGS-ALMA v3.4; '
+                    'PHANGS-CPROPS v3; '
+                    'PHANGS-VLA v1.0; '
+                    'PHANGS-Halpha v0.1&0.3; '
+                    'sample table v1.4 (dist=v1.2)'),
+                version=1.1, writefile=ptfile)
 
         # ------------------------------------------------------------
 

@@ -590,8 +590,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
 
         # find the angular offset coordinates for the seeds
         radec_seeds = np.stack(
-            [self['RA'].quantity.value,
-             self['DEC'].quantity.value], axis=-1)
+            [self['RA'].value, self['DEC'].value], axis=-1)
         offset_seeds = (radec_seeds - radec_ctr) * scale_arr
 
         # find the angular offset coordinates for input locations
@@ -661,9 +660,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
 
         # find nearest the nearest pixel for each seed location
         iax0, iax1 = wcs.all_world2pix(
-            self['RA'].quantity.value,
-            self['DEC'].quantity.value,
-            0, ra_dec_order=True)
+            self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
         iax0 = np.round(iax0).astype('int')
         iax1 = np.round(iax1).astype('int')
         mask = ((iax0 < 0) | (iax0 > wcs._naxis[0]-1) |

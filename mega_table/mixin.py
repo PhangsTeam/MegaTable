@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 from astropy import units as u
-from astropy.table import QTable
+from astropy.table import Table
 from astropy.io import fits
 from .utils import nanaverage
 
@@ -204,13 +204,13 @@ class PhangsAlmaMixin(object):
                 raise ValueError("Input file not found")
 
         # read CPROPS file
-        t_cat = QTable.read(cpropsfile)
-        ra_cat = t_cat['XCTR_DEG'].value
-        dec_cat = t_cat['YCTR_DEG'].value
+        t_cat = Table.read(cpropsfile)
+        ra_cat = np.array(t_cat['XCTR_DEG'])
+        dec_cat = np.array(t_cat['YCTR_DEG'])
         flux_cat = (
             t_cat['FLUX_KKMS_PC2'] / t_cat['DISTANCE_PC']**2 *
             u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
-        sigv_cat = t_cat['SIGV_KMS'].value
+        sigv_cat = np.array(t_cat['SIGV_KMS'])
         rad_cat = (  # expressed in Solomon+87 convention
             t_cat['RAD_PC'] / t_cat['DISTANCE_PC'] *
             u.rad).to('arcsec').value

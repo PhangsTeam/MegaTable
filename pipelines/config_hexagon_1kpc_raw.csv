@@ -39,12 +39,12 @@ frac_CO21_rings,S4G:env_mask:rings&ALMA:CO:mom0:strict,150,,env_frac
 frac_CO21_lenses,S4G:env_mask:lenses&ALMA:CO:mom0:strict,150,,env_frac
 frac_CO21_sp_arms,S4G:env_mask:sp_arms&ALMA:CO:mom0:strict,150,,env_frac
 
-,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,60,,CO_stats
-,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,90,,CO_stats
-,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,120,,CO_stats
-,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,150,,CO_stats
+CO_stats_60pc,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,60,,CO_stats
+CO_stats_90pc,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,90,,CO_stats
+CO_stats_120pc,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,120,,CO_stats
+CO_stats_150pc,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,150,,CO_stats
 
-,ALMA:CPROPS,60,,CPROPS_stats
-,ALMA:CPROPS,90,,CPROPS_stats
-,ALMA:CPROPS,120,,CPROPS_stats
-,ALMA:CPROPS,150,,CPROPS_stats
+CPROPS_stats_60pc,ALMA:CPROPS,60,,CPROPS_stats
+CPROPS_stats_90pc,ALMA:CPROPS,90,,CPROPS_stats
+CPROPS_stats_120pc,ALMA:CPROPS,120,,CPROPS_stats
+CPROPS_stats_150pc,ALMA:CPROPS,150,,CPROPS_stats

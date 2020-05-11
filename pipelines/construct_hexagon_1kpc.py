@@ -252,12 +252,11 @@ def gen_phys_props_table(
 
     if 'metal' in config['group']:
         # metallicity
-        pt['log(O/H)_PP04_predicted'] = predict_metallicity(
-            gal_Mstar, calibrator='O3N2(PP04)',
+        pt['log(O/H)_PP04_prd'] = predict_metallicity(
+            gal_Mstar, calibration='O3N2(PP04)',
             MZR='Sanchez+19', gradient='Sanchez+14',
             Rgal=pt['r_gal'], Re=gal_Reff)
-        pt['Zprime'] = 10**(
-            pt['log(O/H)_O3N2_PP04_predicted'] - 8.69)
+        pt['Zprime'] = 10**(pt['log(O/H)_PP04_prd'] - 8.69)
     else:
         pt['Zprime'] = np.nan
 
@@ -267,10 +266,10 @@ def gen_phys_props_table(
         for key in config[config['group'] == 'SFR']['colname']:
             if key == 'Sigma_SFR':
                 continue
-            if np.isfinite(rt[key+'kpc']).sum() != 0:
-                pt[key] = rt[key+'kpc']
+            if np.isfinite(rt[key+'_kpc']).sum() != 0:
+                pt[key] = rt[key+'_kpc']
             else:
-                pt[key] = rt[key+'nat']
+                pt[key] = rt[key+'_nat']
                 pt[key].description = '[coarser resolution]'
             if (np.isfinite(pt[key]).sum() != 0 and
                 np.isfinite(pt['Sigma_SFR']).sum() == 0):
@@ -285,7 +284,7 @@ def gen_phys_props_table(
             if key == 'Sigma_star':
                 continue
             pt[key] = (
-                rt[key.replace('Sigma_star', 'I')] *
+                rt[key.replace('Sigma_star', 'I')+'_kpc'] *
                 gal_cosi * get_alpha3p6um(ref='MS14'))
             if (np.isfinite(pt[key]).sum() != 0 and
                 np.isfinite(pt['Sigma_star']).sum() == 0):
@@ -314,7 +313,7 @@ def gen_phys_props_table(
             prescription='PHANGS',
             PHANGS_Zprime=pt['Zprime'])
         pt['alphaCO10_MW'] = predict_alphaCO10(
-            prescription='constant')
+            prescription='Galactic')
         if 'CO_stats' in config['group']:
             res_fid = np.max(
                 config[config['group'] == 'CO_stats']['res_pc'])
@@ -340,7 +339,7 @@ def gen_phys_props_table(
                 B13_Sigmakpc=pt['Sigma_star']+pt['Sigma_atom'],
                 B13_WCO10kpc=ICO10kpc,
                 B13_WCO10GMC=ICO10GMC)
-            del res_fig, ICO10GMC, ICO10kpc
+            del res_fid, ICO10GMC, ICO10kpc
         else:
             pt['alphaCO10_B13'] = (
                 np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
@@ -460,15 +459,17 @@ def gen_phys_props_table(
              np.sqrt(2 * const.G * rho_star)) / const.k_B)
 
     # clean and format table
-    pt = pt[list(config['colname'])]
+    new_table = Table(pt[list(config['colname'])])
     for row in config:
-        if pt[row['colname']].description is not None:
-            postfix = ' ' + pt[row['colname']].description
-        else:
-            postfix = ''
-        pt[row['colname']] = pt[row['colname']].to(row['unit'])
-        pt[row['colname']].format = row['format']
-        pt[row['colname']].description = row['description'] + postfix
+        postfix = ''
+        if hasattr(pt[row['colname']], 'description'):
+            if pt[row['colname']].description is not None:
+                postfix = ' ' + pt[row['colname']].description
+        new_table[row['colname']] = pt[row['colname']].to(row['unit'])
+        new_table[row['colname']].info.format = str(row['format'])
+        new_table[row['colname']].info.description = (
+            str(row['description']) + postfix)
+    pt.table = new_table
 
     # record metadata
     pt.meta['LOGMSTAR'] = gal_logMstar
@@ -560,11 +561,7 @@ if __name__ == '__main__':
             workdir /
             f"{name}_{aperture_shape}_stats_"
             f"{aperture_size.to('kpc').value:.0f}kpc_raw.ecsv")
-        if rtfile.is_file():
-            print(f"Table file already on disk - skipping {name}")
-            print("")
-            continue
-        else:
+        if not rtfile.is_file():
             print(f"Constructing raw measurement table for {name}")
             gen_raw_measurement_table(
                 name, gal_dist_Mpc=dist.value,

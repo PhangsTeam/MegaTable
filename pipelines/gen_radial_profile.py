@@ -4,18 +4,19 @@ import warnings
 from pathlib import Path
 import numpy as np
 from astropy import units as u, constants as const
-from astropy.table import QTable
+from astropy.table import Table
 from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import RadialMegaTable
 from mega_table.mixin import PhangsAlmaMixin, EnvMaskMixin
-from mega_table.utils import nanaverage
+from mega_table.utils import (
+    get_R21, get_alpha21cm, get_alpha3p6um, get_h_star, nanaverage)
 
 
 # --------------------------------------------------------------------
 
 
 class MyRadialMegaTable(
-    PhangsAlmaMixin, EnvMaskMixin, RadialMegaTable):
+        PhangsAlmaMixin, EnvMaskMixin, RadialMegaTable):
 
     """
     Enhanced RadialMegaTable.
@@ -231,41 +232,6 @@ def gen_raw_measurement_table(
         return writefile
     else:
         return rt
-
-
-# --------------------------------------------------------------------
-
-
-def get_R21():
-    return 0.7  # CO(2-1)/CO(1-0) ratio
-
-def get_alpha21cm(include_He=True):
-    if include_He:  # include the extra 35% mass of Helium
-        alpha21cm = 1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
-    else:
-        alpha21cm = 1.46e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
-    return alpha21cm
-
-def get_alpha3p6um(ref='MS14'):
-    if ref == 'MS14':  # Y3.6 = 0.47 Msun/Lsun
-        alpha3p6um = 330 * u.Msun/u.pc**2/(u.MJy/u.sr)
-    elif ref == 'Q15':  # Y3.6 = 0.6 Msun/Lsun
-        alpha3p6um = 420 * u.Msun/u.pc**2/(u.MJy/u.sr)
-    else:
-        raise ValueError("")
-    return alpha3p6um
-
-def get_h_star(Rstar, diskshape='flat', Rgal=None):
-    # see Leroy+08 and Ostriker+10
-    flat_ratio = 7.3  # Kregel+02
-    if diskshape == 'flat':
-        hstar = Rstar / flat_ratio
-    elif diskshape == 'flared':
-        hstar = Rstar / flat_ratio * np.exp(
-            (Rgal/Rstar).to('').value - 1)
-    else:
-        raise ValueError("`diskshape` must be 'flat' or 'flared'")
-    return hstar
 
 
 # --------------------------------------------------------------------
@@ -530,7 +496,7 @@ if __name__ == '__main__':
         sys.stdout = log
 
     # read PHANGS sample table
-    catalog = QTable.read(get_data_path('sample_table'))
+    catalog = Table.read(get_data_path('sample_table'))
     # only keep targets with the 'HAS_ALMA' tag
     catalog = catalog[catalog['HAS_ALMA'] == 1]
     # loop through sample table

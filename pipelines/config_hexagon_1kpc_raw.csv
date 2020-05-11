@@ -1,0 +1,50 @@
+colname,source,res_pc,unit,method
+
+r_gal_angl&phi_gal,,0,arcsec&deg,deproject
+
+Sigma_SFR_FUVW4_kpc,z0MGS:SFR:FUVW4,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_FUVW4_nat,z0MGS:SFR:FUVW4,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_FUVW4>,z0MGS:SFR:FUVW4,0,Msun kpc-2 yr-1,area_mean
+Sigma_SFR_NUVW4_kpc,z0MGS:SFR:NUVW4,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_NUVW4_nat,z0MGS:SFR:NUVW4,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_NUVW4>,z0MGS:SFR:NUVW4,0,Msun kpc-2 yr-1,area_mean
+Sigma_SFR_W4ONLY_kpc,z0MGS:SFR:W4ONLY,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_W4ONLY_nat,z0MGS:SFR:W4ONLY,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_W4ONLY>,z0MGS:SFR:W4ONLY,0,Msun kpc-2 yr-1,area_mean
+Sigma_SFR_FUVW3_kpc,z0MGS:SFR:FUVW3,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_FUVW3_nat,z0MGS:SFR:FUVW3,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_FUVW3>,z0MGS:SFR:FUVW3,0,Msun kpc-2 yr-1,area_mean
+Sigma_SFR_NUVW3_kpc,z0MGS:SFR:NUVW3,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_NUVW3_nat,z0MGS:SFR:NUVW3,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_NUVW3>,z0MGS:SFR:NUVW3,0,Msun kpc-2 yr-1,area_mean
+Sigma_SFR_W3ONLY_kpc,z0MGS:SFR:W3ONLY,1000,Msun kpc-2 yr-1,resample
+Sigma_SFR_W3ONLY_nat,z0MGS:SFR:W3ONLY,0,Msun kpc-2 yr-1,resample
+A<Sigma_SFR_W3ONLY>,z0MGS:SFR:W3ONLY,0,Msun kpc-2 yr-1,area_mean
+
+I_3p6um_ICA_kpc,S4G:ICA3p6um,1000,MJy sr-1,resample
+A<I_3p6um_ICA>,S4G:ICA3p6um,0,MJy sr-1,area_mean
+I_3p6um_raw_kpc,S4G:3p6um,1000,MJy sr-1,resample
+A<I_3p6um_raw>,S4G:3p6um,0,MJy sr-1,area_mean
+
+I_21cm_kpc,HI:mom0,1000,K km s-1,resample
+I_21cm_nat,HI:mom0,0,K km s-1,resample
+A<I_21cm>,HI:mom0,0,K km s-1,area_mean
+
+I_CO21_kpc,ALMA:CO:mom0:strict,1000,K km s-1,resample
+
+frac_CO21_bulge,S4G:env_mask:bulge&ALMA:CO:mom0:strict,150,,env_frac
+frac_CO21_disk,S4G:env_mask:disk&ALMA:CO:mom0:strict,150,,env_frac
+frac_CO21_bars,S4G:env_mask:bars&ALMA:CO:mom0:strict,150,,env_frac
+frac_CO21_rings,S4G:env_mask:rings&ALMA:CO:mom0:strict,150,,env_frac
+frac_CO21_lenses,S4G:env_mask:lenses&ALMA:CO:mom0:strict,150,,env_frac
+frac_CO21_sp_arms,S4G:env_mask:sp_arms&ALMA:CO:mom0:strict,150,,env_frac
+
+,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,60,,CO_stats
+,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,90,,CO_stats
+,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,120,,CO_stats
+,ALMA:CO:mom0:broad&ALMA:CO:mom0:strict&ALMA:CO:ew:strict,150,,CO_stats
+
+,ALMA:CPROPS,60,,CPROPS_stats
+,ALMA:CPROPS,90,,CPROPS_stats
+,ALMA:CPROPS,120,,CPROPS_stats
+,ALMA:CPROPS,150,,CPROPS_stats

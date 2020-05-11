@@ -5,6 +5,42 @@ from astropy.wcs import WCS
 # --------------------------------------------------------------------
 
 
+def identical_units(u1, u2):
+    if not u.Unit(u1).is_equivalent(u.Unit(u2)):
+        return False
+    elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
+        return False
+    else:
+        return True
+
+
+# --------------------------------------------------------------------
+
+
+def nanaverage(a, **kwargs):
+    """
+    Compute weighted average along a specified axis, ignoring NaNs.
+
+    Parameters
+    ----------
+    a : array_like
+        Array containing data to be averaged.
+    **kwargs
+        Keyword arguments to be passed to `~numpy.ma.average`
+
+    Return
+    ------
+    avg : ndarray or scalar
+        Return the average along the specified axis.
+    """
+    avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
+    avg = np.ma.filled(avg, np.nan)
+    return avg if avg.size > 1 else avg.item()
+
+
+# --------------------------------------------------------------------
+
+
 def deproject(
         center_ra=0*u.deg, center_dec=0*u.deg,
         incl=0*u.deg, pa=0*u.deg,
@@ -132,37 +168,42 @@ def deproject(
         return radius_deg, projang_deg
 
 
-#---------------------------------------------------------------------
+# --------------------------------------------------------------------
 
 
-def identical_units(u1, u2):
-    if not u.Unit(u1).is_equivalent(u.Unit(u2)):
-        return False
-    elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
-        return False
+def get_R21():
+    # CO(2-1)/CO(1-0) ratio
+    return 0.7
+
+
+def get_alpha21cm(include_He=True):
+    # I_21cm -> Sigma_HI
+    if include_He:  # include the extra 35% mass of Helium
+        alpha21cm = 1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
     else:
-        return True
+        alpha21cm = 1.46e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
+    return alpha21cm
 
 
-#---------------------------------------------------------------------
+def get_alpha3p6um(ref='MS14'):
+    # I_3.6um -> Sigma_star
+    if ref == 'MS14':  # Y3.6 = 0.47 Msun/Lsun
+        alpha3p6um = 330 * u.Msun/u.pc**2/(u.MJy/u.sr)
+    elif ref == 'Q15':  # Y3.6 = 0.6 Msun/Lsun
+        alpha3p6um = 420 * u.Msun/u.pc**2/(u.MJy/u.sr)
+    else:
+        raise ValueError("")
+    return alpha3p6um
 
 
-def nanaverage(a, **kwargs):
-    """
-    Compute the weighted average along the specified axis, ignoring NaNs.
-
-    Parameters
-    ----------
-    a : array_like
-        Array containing data to be averaged.
-    **kwargs
-        Keyword arguments to be passed to `~numpy.ma.average`
-
-    Return
-    ------
-    avg : ndarray or scalar
-        Return the average along the specified axis.
-    """
-    avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
-    avg = np.ma.filled(avg, np.nan)
-    return avg if avg.size > 1 else avg.item()
+def get_h_star(Rstar, diskshape='flat', Rgal=None):
+    # stellar disk scale height (see Leroy+08 and Ostriker+10)
+    flat_ratio = 7.3  # Kregel+02
+    if diskshape == 'flat':
+        hstar = Rstar / flat_ratio
+    elif diskshape == 'flared':
+        hstar = Rstar / flat_ratio * np.exp(
+            (Rgal/Rstar).to('').value - 1)
+    else:
+        raise ValueError("`diskshape` must be 'flat' or 'flared'")
+    return hstar

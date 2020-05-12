@@ -13,6 +13,9 @@ from mega_table.utils import (
     get_R21, get_alpha21cm, get_alpha3p6um, get_h_star, nanaverage,
     deproject)
 
+warnings.filterwarnings('ignore')
+
+logging = True
 
 # --------------------------------------------------------------------
 
@@ -86,7 +89,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
             if lin_res is not None:
                 fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
 
-    elif datatype[0] == 'Halpha':
+    elif datatypes[0] == 'Halpha':
         # narrow band Halpha data
         basedir = PHANGSdir / 'Halpha'
         fname_seq = [galname] + datatypes[1:]
@@ -264,6 +267,7 @@ def gen_phys_props_table(
             MZR='Sanchez+19', gradient='Sanchez+14',
             Rgal=pt['r_gal'], Re=gal_Reff)
         pt['Zprime'] = 10**(pt['log(O/H)_PP04_prd'] - 8.69)
+        pt['Zprime'].description = "(PP04_prd)"
     else:
         pt['Zprime'] = np.nan
 
@@ -275,12 +279,16 @@ def gen_phys_props_table(
                 continue
             if np.isfinite(rt[key+'_kpc']).sum() != 0:
                 pt[key] = rt[key+'_kpc']
-            else:
+            elif key+'_nat' in rt.colnames:
                 pt[key] = rt[key+'_nat']
                 pt[key].description = '[coarser resolution]'
+            else:
+                pt[key] = np.nan * u.Unit('Msun yr-1 kpc-2')
             if (np.isfinite(pt[key]).sum() != 0 and
                 np.isfinite(pt['Sigma_SFR']).sum() == 0):
                 pt['Sigma_SFR'] = pt[key]
+                pt['Sigma_SFR'].description = (
+                    f"({key.replace('Sigma_SFR_', '')})")
     else:
         pt['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
 
@@ -296,6 +304,8 @@ def gen_phys_props_table(
             if (np.isfinite(pt[key]).sum() != 0 and
                 np.isfinite(pt['Sigma_star']).sum() == 0):
                 pt['Sigma_star'] = pt[key]
+                pt['Sigma_star'].description = (
+                    f"({key.replace('Sigma_star_', '')})")
     else:
         pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
 
@@ -352,9 +362,12 @@ def gen_phys_props_table(
                 np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
         if np.isfinite(pt['alphaCO10_PHANGS']).sum() != 0:
             pt['alphaCO10'] = pt['alphaCO10_PHANGS']
+            pt['alphaCO10'].description = "(PHANGS)"
         else:
             pt['alphaCO10'] = pt['alphaCO10_MW']
+            pt['alphaCO10'].description = "(MW)"
         pt['alphaCO21'] = pt['alphaCO10'] / get_R21()
+        pt['alphaCO21'].description = pt['alphaCO10'].description
     else:
         pt['alphaCO10'] = pt['alphaCO21'] = (
             np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
@@ -510,8 +523,6 @@ if __name__ == '__main__':
     workdir = Path(__file__).parent
 
     # warnings & logging settings
-    warnings.filterwarnings('ignore')
-    logging = True
     if logging:
         # output log to a file
         orig_stdout = sys.stdout

@@ -99,7 +99,7 @@ class RadialMegaTable(GeneralRegionTable):
         else:
             self.meta['RMAX_AS'] = rgal_max_arcsec
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     @classmethod
     def read(cls, filename, **kwargs):
@@ -120,7 +120,7 @@ class RadialMegaTable(GeneralRegionTable):
         t = QTable.read(filename, **kwargs)
 
         # input file should be a valid RadialMegaTable ouput
-        if not 'TBLTYPE' in t.meta:
+        if 'TBLTYPE' not in t.meta:
             raise ValueError("Input file not recognized")
         if t.meta['TBLTYPE'] != 'RadialMegaTable':
             raise ValueError(
@@ -276,7 +276,7 @@ class TessellMegaTable(VoronoiTessTable):
         for key in self._wcs.to_header():
             self.meta[key] = self._wcs.to_header()[key]
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     @classmethod
     def read(cls, filename, ignore_inconsistency=False, **kwargs):
@@ -300,7 +300,7 @@ class TessellMegaTable(VoronoiTessTable):
         t = QTable.read(filename, **kwargs)
 
         # input file should be a valid TessellMegaTable ouput
-        if not 'TBLTYPE' in t.meta:
+        if 'TBLTYPE' not in t.meta:
             raise ValueError("Input file not recognized")
         if t.meta['TBLTYPE'] != 'TessellMegaTable':
             raise ValueError(
@@ -368,7 +368,7 @@ class TessellMegaTable(VoronoiTessTable):
             for key in t.meta.copy():
                 try:
                     hdr[key] = t.meta[key]
-                except:
+                except ValueError:
                     t.meta.pop(key)
             # special treatment for WCS keywords
             for key in ('NAXIS1', 'NAXIS2'):
@@ -448,7 +448,7 @@ class TessellMegaTable(VoronoiTessTable):
             self.meta['TBLTYPE'] = (
                 self.meta['TBLTYPE'] + ' (CLEANED)')
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def show_apertures_on_sky(
             self, ax=None, image=None, ffigkw={}, **scatterkw):

@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 import numpy as np
 from astropy import units as u, constants as const
-from astropy.table import Table
+from astropy.table import Table, QTable
 from astropy.io import fits
 from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
 from mega_table.table import TessellMegaTable
@@ -226,7 +226,7 @@ def gen_phys_props_table(
         config=None, note='', version=0, writefile=''):
 
     # read raw measurement table
-    rt = TessellMegaTable.read(rtfile)
+    rt = TessellMegaTable.read(rtfile, ignore_inconsistency=True)
     assert rt.meta['GALAXY'] == str(gal_name)
 
     # galaxy global parameters
@@ -243,6 +243,7 @@ def gen_phys_props_table(
         aperture_size_arcsec=rt.meta['APER_AS'],
         gal_ra_deg=rt.meta['RA_DEG'],
         gal_dec_deg=rt.meta['DEC_DEG'])
+    pt.table = QTable()
     for key in rt.meta:
         pt.meta[key] = rt.meta[key]
 

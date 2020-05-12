@@ -87,7 +87,7 @@ class BaseTable(object):
             for key in self.meta:
                 try:
                     hdr[key] = t.meta[key]
-                except:
+                except ValueError:
                     t.meta.pop(key)
         if 'TIMESTMP' in t.meta:
             # remove previous time stamp
@@ -109,7 +109,7 @@ class StatsMixin(object):
     Mixin class offering tools for calculating catalog/image stats.
     """
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def calc_catalog_stats(
             self, entry, ra, dec, stat_func=None, weight=None,
@@ -181,7 +181,7 @@ class StatsMixin(object):
         self[colname] = arr
         self[colname].unit = u.Unit(unit)
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def _reduce_image_input(
             self, image, ihdu, header, suppress_error=False):
@@ -239,7 +239,7 @@ class StatsMixin(object):
                 "Input header have unexpected axis type")
         return data, hdr, wcs
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def calc_image_stats(
             self, image, ihdu=0, header=None,
@@ -351,10 +351,9 @@ class GeneralRegionTable(StatsMixin, BaseTable):
 
     __name__ = "GeneralRegionTable"
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
-    def __init__(
-        self, region_defs, names=None):
+    def __init__(self, region_defs, names=None):
 
         # verify the region definitions
         for ireg, reg_def in enumerate(region_defs):
@@ -463,7 +462,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
 
     __name__ = "VoronoiTessTable"
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def __init__(
             self, header, seeds_ra=None, seeds_dec=None,
@@ -557,7 +556,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
         self.table = self[np.isin(np.arange(len(ra_arr)), indices)]
         self.meta['TBLTYPE'] = self.__name__
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def find_coords_in_regions(self, ra, dec, fill_value=-1):
         """
@@ -612,7 +611,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
 
         return indices
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def resample_image(
             self, image, ihdu=0, header=None,

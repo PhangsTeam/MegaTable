@@ -451,9 +451,7 @@ def gen_phys_props_table(
     pt.meta['VERSION'] = float(version)
 
     if writefile:
-        pt.write(
-            writefile, add_timestamp=True,
-            delimiter=',', overwrite=True)
+        pt.write(writefile, add_timestamp=True, overwrite=True)
         return writefile
     else:
         return pt
@@ -536,7 +534,7 @@ if __name__ == '__main__':
         rtfile = (
             workdir /
             f"{name}_radial_profile_"
-            f"{rgal_bin.to('pc').value:.0f}pc.ecsv")
+            f"{rgal_bin.to('pc').value:.0f}pc.fits")
         if rtfile.is_file():
             print(f"Table file already on disk - skipping {name}")
             print("")
@@ -560,7 +558,7 @@ if __name__ == '__main__':
         ptfile = (
             workdir /
             f"{name}_radial_profile_"
-            f"{rgal_bin.to('pc').value:.0f}pc_phys.ecsv")
+            f"{rgal_bin.to('pc').value:.0f}pc_phys.fits")
         if (rtfile.is_file() and not ptfile.is_file()):
             print(f"Constructing physical property table for {name}")
             gen_phys_props_table(

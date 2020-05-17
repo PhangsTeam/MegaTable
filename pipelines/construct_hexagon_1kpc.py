@@ -500,9 +500,7 @@ def gen_phys_props_table(
     pt.meta['VERSION'] = float(version)
 
     if writefile:
-        pt.write(
-            writefile, add_timestamp=True,
-            delimiter=',', overwrite=True)
+        pt.write(writefile, add_timestamp=True, overwrite=True)
         return writefile
     else:
         return pt
@@ -581,7 +579,7 @@ if __name__ == '__main__':
         rtfile = (
             workdir /
             f"{name}_{aperture_shape}_stats_"
-            f"{aperture_size.to('kpc').value:.0f}kpc_raw.ecsv")
+            f"{aperture_size.to('kpc').value:.0f}kpc_raw.fits")
         if not rtfile.is_file():
             print(f"Constructing raw measurement table for {name}")
             gen_raw_measurement_table(
@@ -599,7 +597,7 @@ if __name__ == '__main__':
         ptfile = (
             workdir /
             f"{name}_{aperture_shape}_stats_"
-            f"{aperture_size.to('kpc').value:.0f}kpc_phys.ecsv")
+            f"{aperture_size.to('kpc').value:.0f}kpc_phys.fits")
         if (rtfile.is_file() and not ptfile.is_file()):
             print(f"Constructing physical property table for {name}")
             gen_phys_props_table(

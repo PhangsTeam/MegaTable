@@ -500,7 +500,9 @@ def gen_phys_props_table(
     pt.meta['VERSION'] = float(version)
 
     if writefile:
-        pt.write(writefile, add_timestamp=True, overwrite=True)
+        pt.write(
+            writefile, add_timestamp=True,
+            delimiter=',', overwrite=True)
         return writefile
     else:
         return pt

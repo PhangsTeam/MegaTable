@@ -286,8 +286,11 @@ class StatsMixin(object):
         data, hdr, wcs = self._reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self[colname] = (
-                np.full(len(self), np.nan) * u.Unit(unit))
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
             return
 
         # find pixels in regions
@@ -653,8 +656,11 @@ class VoronoiTessTable(StatsMixin, BaseTable):
         data, hdr, wcs = self._reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self[colname] = (
-                np.full(len(self), np.nan) * u.Unit(unit))
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
             return
 
         # find nearest the nearest pixel for each seed location

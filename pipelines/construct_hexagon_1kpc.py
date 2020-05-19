@@ -616,6 +616,17 @@ if __name__ == '__main__':
 
         # ------------------------------------------------------------
 
+        ptfile_new = (
+            workdir /
+            f"{name}_{aperture_shape}_stats_"
+            f"{aperture_size.to('kpc').value:.0f}kpc_phys.ecsv")
+        if ptfile.is_file() and not ptfile_new.is_file():
+            print("Converting FITS table to ECSV format")
+            pt = Table.read(ptfile)
+            pt.write(ptfile_new, delimiter=',', overwrite=True)
+
+        # ------------------------------------------------------------
+
         print(f"Finished processing data for {name}!")
         print("")
 

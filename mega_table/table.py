@@ -450,7 +450,7 @@ class TessellMegaTable(VoronoiTessTable):
 
     # ----------------------------------------------------------------
 
-    def create_maps_from_columns(self, colnames, header):
+    def create_maps_from_columns(self, colnames, header=None):
         """
         Create 2D maps from data in columns based on a FITS header.
 
@@ -458,14 +458,19 @@ class TessellMegaTable(VoronoiTessTable):
         ----------
         colnames : iterable
             Name of the columns to create 2D maps for.
-        header : `~astropy.fits.Header` object
+        header : `~astropy.fits.Header`, optional
             FITS header defining the WCS of the output 2D maps.
+            If None (default), use the header based on which the
+            TessellMegaTable object was initialized.
 
         Return
         ------
         arrays : list of ~numpy.ndarray
         """
-        wcs = WCS(header).celestial
+        if header is None:
+            wcs = WCS(fits.Header(self.meta)).celestial
+        else:
+            wcs = WCS(header).celestial
 
         # find pixels in apertures/tiles
         iax0 = np.arange(wcs._naxis[0])

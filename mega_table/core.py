@@ -7,7 +7,7 @@ from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-from .utils import identical_units
+from .utils import identical_units, reduce_image_input
 
 HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
 
@@ -154,6 +154,8 @@ class StatsMixin(object):
         """
         if weight is not None:
             weights = np.broadcast_to(weight, entry.shape)
+        else:
+            weights = None
 
         # find object coordinates in regions
         findarr = self.find_coords_in_regions(ra, dec)
@@ -165,7 +167,7 @@ class StatsMixin(object):
         for ind in range(len(self)):
             if findarr.ndim == 2:  # 2D boolean flag
                 flagarr = findarr[:, ind]
-            elif findarr.ndim == 1:  # 1D index array
+            else:  # 1D index array
                 flagarr = (findarr == ind)
             if weight is None:
                 arr[ind] = stat_func(
@@ -180,64 +182,6 @@ class StatsMixin(object):
         # save the output values as a new column in the table
         self[colname] = arr
         self[colname].unit = u.Unit(unit)
-
-    # ----------------------------------------------------------------
-
-    def _reduce_image_input(
-            self, image, ihdu, header, suppress_error=False):
-        """
-        Reduce any combination of input values to (data, header, wcs).
-
-        Parameters
-        ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
-            The input image.
-        ihdu : int, optional
-            If 'image' is a str or an HDUList, this keyword should
-            specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
-            If 'image' is an ndarray, this keyword should be a FITS
-            header providing the WCS information.
-        suppress_error : bool, optional
-            Whether to suppress the error message if 'image' looks
-            like a file but is not found on disk (default=False)
-
-        Returns
-        -------
-        data : np.ndarray
-        hdr : fits.Header object
-        wcs : astropy.wcs.WCS object
-        """
-        if isinstance(image, np.ndarray):
-            data = image
-            hdr = header
-        elif isinstance(image, HDU_types):
-            data = image.data
-            hdr = image.header
-        elif isinstance(image, fits.HDUList):
-            data = np.copy(image[ihdu].data)
-            hdr = image[ihdu].header.copy()
-        else:
-            if (isinstance(image, (str, bytes, os.PathLike)) and
-                not Path(image).is_file()):
-                if suppress_error:
-                    return None, None, None
-                else:
-                    raise ValueError("Input image not found")
-            with fits.open(image) as hdul:
-                data = np.copy(hdul[ihdu].data)
-                hdr = hdul[ihdu].header.copy()
-        wcs = WCS(hdr)
-        if not (data.ndim == hdr['NAXIS'] == 2):
-            raise ValueError(
-                "Input image and/or header is not 2-dimensional")
-        if not data.shape == (hdr['NAXIS2'], hdr['NAXIS1']):
-            raise ValueError(
-                "Input image and header have inconsistent shape")
-        if not wcs.axis_type_names == ['RA', 'DEC']:
-            raise ValueError(
-                "Input header have unexpected axis type")
-        return data, hdr, wcs
 
     # ----------------------------------------------------------------
 
@@ -283,7 +227,7 @@ class StatsMixin(object):
             Keyword arguments to be passed to 'stat_func'
         """
 
-        data, hdr, wcs = self._reduce_image_input(
+        data, hdr, wcs = reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
             if unit != 'header':
@@ -293,7 +237,7 @@ class StatsMixin(object):
                 self[colname] = np.full(len(self), np.nan)
             return
 
-        # find pixels in regions
+        # generate RA & Dec arrays
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = wcs.all_pix2world(
@@ -361,7 +305,7 @@ class GeneralRegionTable(StatsMixin, BaseTable):
         # verify the region definitions
         for ireg, reg_def in enumerate(region_defs):
             if (not isinstance(reg_def, HDU_types) and
-                not callable(reg_def)):
+                    not callable(reg_def)):
                 raise ValueError(
                     f"Invalid region definition: #{ireg}")
 
@@ -538,7 +482,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
             dec_arr = (
                 self._ref_coord.dec.value +
                 iy.flatten() * spacing.value)
-        elif tile_shape == 'hexagon':
+        else:
             ra_arr = (
                 self._ref_coord.ra.value +
                 np.concatenate([ix, ix+0.5], axis=None) *
@@ -653,7 +597,7 @@ class VoronoiTessTable(StatsMixin, BaseTable):
             like a file but is not found on disk (default=False)
         """
 
-        data, hdr, wcs = self._reduce_image_input(
+        data, hdr, wcs = reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
             if unit != 'header':

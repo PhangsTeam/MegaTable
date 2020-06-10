@@ -68,7 +68,7 @@ class RadialMegaTable(GeneralRegionTable):
             projrad, projang = deproject(
                 center_ra=gal_ra, center_dec=gal_dec,
                 incl=gal_incl, pa=gal_posang, ra=ra, dec=dec)
-            return ((projrad >= rmin) & (projrad < rmax))
+            return (projrad >= rmin) & (projrad < rmax)
 
         # ring names and definitions
         ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
@@ -160,7 +160,7 @@ class RadialMegaTable(GeneralRegionTable):
         discard_negative : None or string or array of string, optional
             To remove regions showing negative values in these
             column(s). (Note that NaNs and +Infs will not be removed)
-        keep_finite : None or string or array of string, optional
+        keep_positive : None or string or array of string, optional
             To only keep regions showing positive values in these
             column(s).
         """
@@ -405,7 +405,7 @@ class TessellMegaTable(VoronoiTessTable):
         discard_negative : None or string or array of string, optional
             To remove negative values in these column(s).
             (Note that NaNs and +Infs will not be removed)
-        keep_finite : None or string or array of string, optional
+        keep_positive : None or string or array of string, optional
             To only keep positive values in these column(s).
         """
 
@@ -447,6 +447,42 @@ class TessellMegaTable(VoronoiTessTable):
             # present object reconstruction after writing to file
             self.meta['TBLTYPE'] = (
                 self.meta['TBLTYPE'] + ' (CLEANED)')
+
+    # ----------------------------------------------------------------
+
+    def create_maps_from_columns(self, colnames, header):
+        """
+        Create 2D maps from data in columns based on a FITS header.
+
+        Parameters
+        ----------
+        colnames : iterable
+            Name of the columns to create 2D maps for.
+        header : `~astropy.fits.Header` object
+            FITS header defining the WCS of the output 2D maps.
+
+        Return
+        ------
+        arrays : list of ~numpy.ndarray
+        """
+        wcs = WCS(header).celestial
+
+        # find pixels in apertures/tiles
+        iax0 = np.arange(wcs._naxis[0])
+        iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
+        ramap, decmap = wcs.all_pix2world(
+            iax0, iax1, 0, ra_dec_order=True)
+        indmap = self.find_coords_in_regions(
+            ramap, decmap).reshape(ramap.shape)
+
+        # create 2D maps
+        arrays = []
+        for colname in colnames:
+            array = self[colname][indmap]
+            array[indmap == -1] = np.nan
+            arrays += [array]
+
+        return arrays
 
     # ----------------------------------------------------------------
 

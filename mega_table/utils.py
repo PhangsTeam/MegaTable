@@ -1,6 +1,11 @@
+import os
 import numpy as np
+from pathlib import Path
 from astropy import units as u
 from astropy.wcs import WCS
+from astropy.io import fits
+
+HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
 
 # --------------------------------------------------------------------
 

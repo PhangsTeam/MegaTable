@@ -1,5 +1,3 @@
-from pathlib import Path
-import os
 import warnings
 import numpy as np
 from astropy import units as u
@@ -8,8 +6,6 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from .utils import identical_units, reduce_image_input
-
-HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
 
 
 ######################################################################

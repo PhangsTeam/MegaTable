@@ -6,7 +6,7 @@ coord,0,r_gal,kpc,".2f","Deprojected galactocentric radius"
 coord,0,phi_gal,deg,".2f","Deprojected angle (0 = major axis receding side)"
 
 metal,0,Zprime,"1",".3e","Gas-phase metallicity relative to solar value"
-metal,0,log(O/H)_PP04_prd,"1",".3f","Oxygen abundance predicted by scaling relations (O3N2-PP04)"
+metal,0,log(O/H)_MZR+GRD,"1",".3f","Oxygen abundance predicted by scaling relations (Sanchez+14; Sanchez+19)"
 
 alphaCO,0,alphaCO10,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(1-0) line"
 alphaCO,0,alphaCO10_MW,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (MW value)"

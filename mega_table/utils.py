@@ -236,20 +236,6 @@ def deproject(
 # --------------------------------------------------------------------
 
 
-def get_R21():
-    # CO(2-1)/CO(1-0) ratio
-    return 0.65  # 0.7
-
-
-def get_alpha21cm(include_He=True):
-    # I_21cm -> Sigma_HI
-    if include_He:  # include the extra 35% mass of Helium
-        alpha21cm = 1.97e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
-    else:
-        alpha21cm = 1.46e-2 * u.Msun/u.pc**2/(u.K*u.km/u.s)
-    return alpha21cm
-
-
 def get_alpha3p6um(ref='MS14'):
     # I_3.6um -> Sigma_star
     if ref == 'MS14':  # Y3.6 = 0.47 Msun/Lsun

@@ -36,6 +36,10 @@ A<I_21cm>,HI:mom0,0,K km s-1,area_mean
 
 I_CO21_kpc,ALMA:CO:mom0:strict,1000,K km s-1,resample
 
+log(O/H)_MZR+GRD,ALMA:alphaCO:logOH:predicted,0,1,resample
+Zprime,ALMA:alphaCO:Zprime,0,1,resample
+alphaCO10_PHANGS,ALMA:alphaCO:alphaCO10:Sun+20,0,Msun pc-2 K-1 km-1 s,resample
+
 frac_CO21_bulge,S4G:env_mask:bulge&ALMA:CO:mom0:strict,150,,env_frac
 frac_CO21_disk,S4G:env_mask:disk&ALMA:CO:mom0:strict,150,,env_frac
 frac_CO21_bars,S4G:env_mask:bars&ALMA:CO:mom0:strict,150,,env_frac

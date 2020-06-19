@@ -1,0 +1,6 @@
+{
+    "alpha21cm": 0.0197,
+    "alpha21cm_unit": "Msun pc-2 K-1 km-1 s",
+    "alpha21cm_comment": "Heavy elements included",
+    "CO_R21": 0.65
+}

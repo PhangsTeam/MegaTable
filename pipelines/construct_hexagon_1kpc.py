@@ -1,21 +1,21 @@
 import os
 import sys
+import json
 import warnings
 from pathlib import Path
 import numpy as np
 from astropy import units as u, constants as const
 from astropy.table import Table, QTable
 from astropy.io import fits
-from AlmaTools.XCO import predict_metallicity, predict_alphaCO10
+from AlmaTools.XCO import predict_alphaCO10
 from mega_table.table import TessellMegaTable
 from mega_table.mixin import PhangsAlmaMixin, EnvMaskMixin
 from mega_table.utils import (
-    get_R21, get_alpha21cm, get_alpha3p6um, get_h_star, nanaverage,
-    deproject)
+    get_alpha3p6um, get_h_star, nanaverage, deproject)
 
 warnings.filterwarnings('ignore')
 
-logging = True
+logging = False
 
 # --------------------------------------------------------------------
 
@@ -41,8 +41,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
     if datatypes[0] == 'sample_table':
-        return (PHANGSdir / 'mega-tables' /
-                'sample_table_for_Sun+20.fits')
+        return PHANGSdir / 'sample' / 'sample_Sun+20b.ecsv'
 
     elif datatypes[0] == 'ALMA':
         # PHANGS-ALMA data
@@ -60,6 +59,10 @@ def get_data_path(datatype, galname=None, lin_res=None):
             if lin_res is not None:
                 basedir /= f"fixed_{lin_res.to('pc').value:.0f}pc"
                 fname_seq[2] = f"{lin_res.to('pc').value:.0f}pc"
+        elif datatypes[1] == 'alphaCO':
+            # PHANGS alphaCO map
+            basedir = basedir / 'alphaCO'  # / 'v0p1'
+            fname_seq = [galname] + datatypes[2:]
 
     elif datatypes[0] == 'HI':
         # HI data
@@ -95,6 +98,9 @@ def get_data_path(datatype, galname=None, lin_res=None):
         fname_seq = [galname] + datatypes[1:]
         if lin_res is not None:
             fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
+
+    else:
+        raise ValueError("Unrecognized dataset")
 
     return basedir / ('_'.join(fname_seq) + '.fits')
 
@@ -221,9 +227,11 @@ def gen_raw_measurement_table(
 
 
 def gen_phys_props_table(
-        rtfile, gal_name=None, gal_logMstar=None,
-        gal_Reff_arcsec=None, gal_Rstar_arcsec=None,
-        config=None, note='', version=0, writefile=''):
+        rtfile, gal_name=None,
+        # gal_logMstar=None, gal_Reff_arcsec=None,
+        gal_Rstar_arcsec=None,
+        config=None, note='', version=0, writefile='',
+        **params):
 
     # read raw measurement table
     rt = TessellMegaTable.read(rtfile, ignore_inconsistency=True)
@@ -232,8 +240,8 @@ def gen_phys_props_table(
     # galaxy global parameters
     gal_cosi = np.cos(np.deg2rad(rt.meta['INCL_DEG']))
     gal_dist = rt.meta['DIST_MPC'] * u.Mpc
-    gal_Mstar = 10**gal_logMstar * u.Msun
-    gal_Reff = (np.deg2rad(gal_Reff_arcsec/3600)*gal_dist).to('kpc')
+    # gal_Mstar = 10**gal_logMstar * u.Msun
+    # gal_Reff = (np.deg2rad(gal_Reff_arcsec/3600)*gal_dist).to('kpc')
     gal_Rstar = (np.deg2rad(gal_Rstar_arcsec/3600)*gal_dist).to('kpc')
 
     # initiate new table
@@ -263,12 +271,12 @@ def gen_phys_props_table(
 
     if 'metal' in config['group']:
         # metallicity
-        pt['log(O/H)_PP04_prd'] = predict_metallicity(
-            gal_Mstar, calibration='O3N2(PP04)',
-            MZR='Sanchez+19', gradient='Sanchez+14',
-            Rgal=pt['r_gal'], Re=gal_Reff)
-        pt['Zprime'] = 10**(pt['log(O/H)_PP04_prd'] - 8.69)
-        pt['Zprime'].description = "(PP04_prd)"
+        pt['log(O/H)_MZR+GRD'] = rt['log(O/H)_MZR+GRD']
+        pt['Zprime'] = rt['Zprime']
+        with fits.open(get_data_path(
+                'ALMA:alphaCO:Zprime', gal_name)) as hdul:
+            pt['Zprime'].description = (
+                f"({hdul[0].header['METALREF']})")
     else:
         pt['Zprime'] = np.nan
 
@@ -286,7 +294,7 @@ def gen_phys_props_table(
             else:
                 pt[key] = np.nan * u.Unit('Msun yr-1 kpc-2')
             if (np.isfinite(pt[key]).sum() != 0 and
-                np.isfinite(pt['Sigma_SFR']).sum() == 0):
+                    np.isfinite(pt['Sigma_SFR']).sum() == 0):
                 pt['Sigma_SFR'] = pt[key]
                 pt['Sigma_SFR'].description = (
                     f"({key.replace('Sigma_SFR_', '')})")
@@ -315,11 +323,13 @@ def gen_phys_props_table(
         if np.isfinite(rt['I_21cm_kpc']).sum() != 0:
             pt['Sigma_atom'] = (
                 rt['I_21cm_kpc'] * gal_cosi *
-                get_alpha21cm(include_He=True))
+                params['alpha21cm'] *
+                u.Unit(params['alpha21cm_unit']))
         else:
             pt['Sigma_atom'] = (
                 rt['I_21cm_nat'] * gal_cosi *
-                get_alpha21cm(include_He=True))
+                params['alpha21cm'] *
+                u.Unit(params['alpha21cm_unit']))
             pt['Sigma_atom'].description = '[coarser resolution]'
     else:
         pt['Sigma_atom'] = np.nan * u.Unit('Msun pc-2')
@@ -327,15 +337,13 @@ def gen_phys_props_table(
     if 'alphaCO' in config['group']:
         # CO-to-H2 conversion factor
         pt['alphaCO10'] = np.nan * u.Unit('Msun pc-2 K-1 km-1 s')
-        pt['alphaCO10_PHANGS'] = predict_alphaCO10(
-            prescription='PHANGS',
-            PHANGS_Zprime=pt['Zprime'])
+        pt['alphaCO10_PHANGS'] = rt['alphaCO10_PHANGS']
         pt['alphaCO10_MW'] = predict_alphaCO10(
             prescription='Galactic')
         if 'CO_stats' in config['group']:
             res_fid = np.max(
                 config[config['group'] == 'CO_stats']['res_pc'])
-            ICO10GMC = rt[f"F<I_CO21_{res_fid}pc>"] / get_R21()
+            ICO10GMC = rt[f"F<I_CO21_{res_fid}pc>"] / params['CO_R21']
             pt['alphaCO10_N12'] = predict_alphaCO10(
                 prescription='Narayanan+12',
                 N12_Zprime=pt['Zprime'],
@@ -344,12 +352,11 @@ def gen_phys_props_table(
         else:
             pt['alphaCO10_N12'] = (
                 np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
-        if ('CO_stats' in config['group'] and
-            'H2' in config['group']):
+        if 'CO_stats' in config['group'] and 'H2' in config['group']:
             res_fid = np.max(
                 config[config['group'] == 'CO_stats']['res_pc'])
-            ICO10GMC = rt[f"F<I_CO21_{res_fid}pc>"] / get_R21()
-            ICO10kpc = rt['I_CO21_kpc'] * gal_cosi / get_R21()
+            ICO10GMC = rt[f"F<I_CO21_{res_fid}pc>"] / params['CO_R21']
+            ICO10kpc = rt['I_CO21_kpc'] * gal_cosi / params['CO_R21']
             pt['alphaCO10_B13'] = predict_alphaCO10(
                 prescription='Bolatto+13',
                 iterative=True, suppress_error=True,
@@ -367,7 +374,7 @@ def gen_phys_props_table(
         else:
             pt['alphaCO10'] = pt['alphaCO10_MW']
             pt['alphaCO10'].description = "(MW)"
-        pt['alphaCO21'] = pt['alphaCO10'] / get_R21()
+        pt['alphaCO21'] = pt['alphaCO10'] / params['CO_R21']
         pt['alphaCO21'].description = pt['alphaCO10'].description
     else:
         pt['alphaCO10'] = pt['alphaCO21'] = (
@@ -493,8 +500,6 @@ def gen_phys_props_table(
     pt.table = new_table
 
     # record metadata
-    pt.meta['LOGMSTAR'] = gal_logMstar
-    pt.meta['REFF_AS'] = gal_Reff_arcsec
     pt.meta['RDISK_AS'] = gal_Rstar_arcsec
     pt.meta['TBLNOTE'] = str(note)
     pt.meta['VERSION'] = float(version)
@@ -539,6 +544,8 @@ if __name__ == '__main__':
         workdir /
         f"config_{aperture_shape}_"
         f"{aperture_size.to('kpc').value:.0f}kpc_phys.csv")
+    with open(workdir / "config_params.json") as f:
+        config_params = json.load(f)
 
     # read PHANGS sample table
     catalog = Table.read(get_data_path('sample_table'))
@@ -554,9 +561,14 @@ if __name__ == '__main__':
         dec = row['ORIENT_DEC'] * u.deg
         incl = row['ORIENT_INCL'] * u.deg
         posang = row['ORIENT_POSANG'] * u.deg
-        logMstar = row['MSTAR_LOGMSTAR']
-        Rstar = row['SIZE_S4G_RSTAR'] * u.arcsec
-        Reff = row['SIZE_W1_R50'] * u.arcsec
+        # logMstar = row['MSTAR_LOGMSTAR']
+        # Rstar = row['SIZE_S4G_RSTAR'] * u.arcsec
+        # Reff = row['SIZE_W1_R50'] * u.arcsec
+        # ==> changed to below to better replicate
+        # the methods used in Sanchez+19 and Sanchez+14
+        logMstar = np.log10(row['MSTAR_MAP']) + 0.21
+        Rstar = row['SIZE_LSTAR_MASS'] * u.arcsec
+        Reff = Rstar * 1.67
 
         # skip targets with bad geometrical information
         if not ((incl >= 0*u.deg) and (incl < 90*u.deg) and
@@ -602,17 +614,18 @@ if __name__ == '__main__':
             print(f"Constructing physical property table for {name}")
             gen_phys_props_table(
                 rtfile, gal_name=name,
-                gal_logMstar=logMstar,
-                gal_Reff_arcsec=Reff.value,
+                # gal_logMstar=logMstar,
+                # gal_Reff_arcsec=Reff.value,
                 gal_Rstar_arcsec=Rstar.value,
                 config=config_phys,
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'PHANGS-CPROPS v3; '
+                    'PHANGS-alphaCO v0.1; '
                     'PHANGS-VLA v1.0; '
                     'PHANGS-Halpha v0.1&0.3; '
                     'sample table v1.4 (dist=v1.2)'),
-                version=1.1, writefile=ptfile)
+                version=1.1, writefile=ptfile, **config_params)
 
         # ------------------------------------------------------------
 

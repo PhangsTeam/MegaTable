@@ -93,11 +93,11 @@ class RadialMegaTable(GeneralRegionTable):
         self.meta['DEC_DEG'] = gal_dec_deg
         self.meta['INCL_DEG'] = gal_incl_deg
         self.meta['PA_DEG'] = gal_posang_deg
-        self.meta['RBIN_AS'] = rgal_bin_arcsec
+        self.meta['RBIN_DEG'] = rgal_bin_arcsec / 3600
         if rgal_max_arcsec is None:
-            self.meta['RMAX_AS'] = rgal_bin_arcsec * 19.99
+            self.meta['RMAX_DEG'] = rgal_bin_arcsec / 3600 * 19.99
         else:
-            self.meta['RMAX_AS'] = rgal_max_arcsec
+            self.meta['RMAX_DEG'] = rgal_max_arcsec / 3600
 
     # ----------------------------------------------------------------
 
@@ -129,10 +129,11 @@ class RadialMegaTable(GeneralRegionTable):
 
         # initiate RadialMegaTable w/ recorded meta data in file
         mt = cls(
-            t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['RBIN_AS'],
+            t.meta['RA_DEG'], t.meta['DEC_DEG'],
+            t.meta['RBIN_DEG']*3600,
             gal_incl_deg=t.meta['INCL_DEG'],
             gal_posang_deg=t.meta['PA_DEG'],
-            rgal_max_arcsec=t.meta['RMAX_AS'])
+            rgal_max_arcsec=t.meta['RMAX_DEG']*3600)
 
         # overwrite the underlying data table
         for key in t.colnames:
@@ -267,8 +268,8 @@ class TessellMegaTable(VoronoiTessTable):
             ref_radec=(gal_ra_deg, gal_dec_deg))
 
         # record metadata
-        self.meta['APERTYPE'] = aperture_shape
-        self.meta['APER_AS'] = aperture_size_arcsec
+        self.meta['APER_DEF'] = aperture_shape
+        self.meta['APER_DEG'] = aperture_size_arcsec / 3600
         self.meta['RA_DEG'] = self._ref_coord.ra.value
         self.meta['DEC_DEG'] = self._ref_coord.dec.value
         self.meta['NAXIS1'] = self._wcs._naxis[0]
@@ -316,8 +317,8 @@ class TessellMegaTable(VoronoiTessTable):
                 hdr[key] = t.meta[key]
         mt = cls(
             hdr,
-            aperture_shape=t.meta['APERTYPE'],
-            aperture_size_arcsec=t.meta['APER_AS'],
+            aperture_shape=t.meta['APER_DEF'],
+            aperture_size_arcsec=t.meta['APER_DEG']*3600,
             gal_ra_deg=t.meta['RA_DEG'],
             gal_dec_deg=t.meta['DEC_DEG'])
 

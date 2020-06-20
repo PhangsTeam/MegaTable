@@ -261,8 +261,8 @@ def gen_phys_props_table(
     # initiate new table
     pt = RadialMegaTable(
         rt.meta['RA_DEG'], rt.meta['DEC_DEG'],
-        rt.meta['RBIN_AS'],
-        rgal_max_arcsec=rt.meta['RMAX_AS'],
+        rt.meta['RBIN_DEG']*3600,
+        rgal_max_arcsec=rt.meta['RMAX_DEG']*3600,
         gal_incl_deg=rt.meta['INCL_DEG'],
         gal_posang_deg=rt.meta['PA_DEG'])
     for key in rt.meta:
@@ -445,8 +445,8 @@ def gen_phys_props_table(
 
     # record metadata
     pt.meta['LOGMSTAR'] = gal_logMstar
-    pt.meta['REFF_AS'] = gal_Reff_arcsec
-    pt.meta['RDISK_AS'] = gal_Rstar_arcsec
+    pt.meta['REFF_DEG'] = gal_Reff_arcsec / 3600
+    pt.meta['RDISK_DEG'] = gal_Rstar_arcsec / 3600
     pt.meta['TBLNOTE'] = str(note)
     pt.meta['VERSION'] = float(version)
 

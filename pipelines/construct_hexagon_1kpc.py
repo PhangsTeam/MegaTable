@@ -247,8 +247,8 @@ def gen_phys_props_table(
     # initiate new table
     pt = TessellMegaTable(
         fits.Header(rt.meta),
-        aperture_shape=rt.meta['APERTYPE'],
-        aperture_size_arcsec=rt.meta['APER_AS'],
+        aperture_shape=rt.meta['APER_DEF'],
+        aperture_size_arcsec=rt.meta['APER_DEG']*3600,
         gal_ra_deg=rt.meta['RA_DEG'],
         gal_dec_deg=rt.meta['DEC_DEG'])
     pt.table = QTable()

@@ -34,6 +34,7 @@ HI,1000,Sigma_atom,"Msun pc-2",".3e","Kpc-scale atomic gas surface density (21cm
 H2,1000,Sigma_mol,"Msun pc-2",".3e","Kpc-scale molecular gas surface density (CO21)"
 H2,1000,I_CO21,"K km s-1",".3e","Kpc-scale CO(2-1) line intensity"
 
+P_DE,1000,rho_star_midplane,"Msun pc-3",".3e","Kpc-scale stellar mass volume density near disk mid-plane"
 P_DE,1000,P_DE_L08,"K cm-3",".3e","Kpc-scale ISM dynamical equilibrium pressure (Leroy+08 prescription)"
 P_DE,1000,P_DE_S20,"K cm-3",".3e","Kpc-scale ISM dynamical equilibrium pressure (Sun+20 prescription)"
 

@@ -460,6 +460,9 @@ def gen_phys_props_table(
 
     if 'P_DE' in config['group']:
         # dynamical equilibrium pressure
+        pt["rho_star_midplane"] = (
+            pt['Sigma_star'] / 4 /
+            get_h_star(gal_Rstar, diskshape='flat'))
         Sigma_gas = pt['Sigma_mol'] + pt['Sigma_atom']
         if 'CO_stats' in config['group']:
             res_fid = np.max(
@@ -473,18 +476,17 @@ def gen_phys_props_table(
         else:
             vdisp_z = np.nan
         vdisp_z_L08 = 11 * u.Unit('km s-1')
-        rho_star = (
-            pt['Sigma_star'] / 4 /
-            get_h_star(gal_Rstar, diskshape='flat'))
         pt["P_DE_L08"] = (
             (np.pi * const.G / 2 * Sigma_gas**2 +
              Sigma_gas * vdisp_z_L08 *
-             np.sqrt(2 * const.G * rho_star)) / const.k_B)
+             np.sqrt(2 * const.G * pt["rho_star_midplane"])) /
+            const.k_B)
         pt["P_DE_S20"] = (
             # Sun+20 Eq.12
             (np.pi * const.G / 2 * Sigma_gas**2 +
              Sigma_gas * vdisp_z *
-             np.sqrt(2 * const.G * rho_star)) / const.k_B)
+             np.sqrt(2 * const.G * pt["rho_star_midplane"])) /
+            const.k_B)
 
     # clean and format table
     new_table = Table(pt[list(config['colname'])])
@@ -561,14 +563,13 @@ if __name__ == '__main__':
         dec = row['ORIENT_DEC'] * u.deg
         incl = row['ORIENT_INCL'] * u.deg
         posang = row['ORIENT_POSANG'] * u.deg
+        Rstar = row['SIZE_LSTAR_S4G'] * u.arcsec
         # logMstar = row['MSTAR_LOGMSTAR']
-        # Rstar = row['SIZE_S4G_RSTAR'] * u.arcsec
         # Reff = row['SIZE_W1_R50'] * u.arcsec
         # ==> changed to below to better replicate
         # the methods used in Sanchez+19 and Sanchez+14
         logMstar = np.log10(row['MSTAR_MAP']) + 0.21
-        Rstar = row['SIZE_LSTAR_MASS'] * u.arcsec
-        Reff = Rstar * 1.67
+        Reff = row['SIZE_LSTAR_MASS'] * 1.67 * u.arcsec
 
         # skip targets with bad geometrical information
         if not ((incl >= 0*u.deg) and (incl < 90*u.deg) and

@@ -236,17 +236,6 @@ def deproject(
 # --------------------------------------------------------------------
 
 
-def get_alpha3p6um(ref='MS14'):
-    # I_3.6um -> Sigma_star
-    if ref == 'MS14':  # Y3.6 = 0.47 Msun/Lsun
-        alpha3p6um = 330 * u.Msun/u.pc**2/(u.MJy/u.sr)
-    elif ref == 'Q15':  # Y3.6 = 0.6 Msun/Lsun
-        alpha3p6um = 420 * u.Msun/u.pc**2/(u.MJy/u.sr)
-    else:
-        raise ValueError("")
-    return alpha3p6um
-
-
 def get_h_star(Rstar, diskshape='flat', Rgal=None):
     # stellar disk scale height (see Leroy+08 and Ostriker+10)
     flat_ratio = 7.3  # Kregel+02

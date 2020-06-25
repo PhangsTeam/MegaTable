@@ -10,8 +10,7 @@ from astropy.io import fits
 from AlmaTools.XCO import predict_alphaCO10
 from mega_table.table import TessellMegaTable
 from mega_table.mixin import PhangsAlmaMixin, EnvMaskMixin
-from mega_table.utils import (
-    get_alpha3p6um, get_h_star, nanaverage, deproject)
+from mega_table.utils import get_h_star, nanaverage, deproject
 
 warnings.filterwarnings('ignore')
 
@@ -77,8 +76,6 @@ def get_data_path(datatype, galname=None, lin_res=None):
         fname_seq = [galname] + datatypes[1:]
         if lin_res is not None:
             fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
-        else:
-            fname_seq += ['gauss15']
 
     elif datatypes[0] == 'S4G':
         # S4G data
@@ -227,10 +224,10 @@ def gen_raw_measurement_table(
 
 
 def gen_phys_props_table(
-        rtfile, gal_name=None,
+        rtfile, config=None, gal_name=None,
         # gal_logMstar=None, gal_Reff_arcsec=None,
         gal_Rstar_arcsec=None,
-        config=None, note='', version=0, writefile='',
+        note='', version=0, writefile='',
         **params):
 
     # read raw measurement table
@@ -293,44 +290,76 @@ def gen_phys_props_table(
                 pt[key].description = '[coarser resolution]'
             else:
                 pt[key] = np.nan * u.Unit('Msun yr-1 kpc-2')
-            if (np.isfinite(pt[key]).sum() != 0 and
-                    np.isfinite(pt['Sigma_SFR']).sum() == 0):
+            if np.isfinite(pt['Sigma_SFR']).sum() == 0:
                 pt['Sigma_SFR'] = pt[key]
                 pt['Sigma_SFR'].description = (
                     f"({key.replace('Sigma_SFR_', '')})")
     else:
         pt['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
 
+    if 'MtoL' in config['group']:
+        # M/L ratio
+        if np.isfinite(rt['MtoL_3p4um_kpc']).sum() != 0:
+            pt['MtoL_3p4um'] = rt['MtoL_3p4um_kpc']
+        elif 'MtoL_3p4um_nat' in rt.colnames:
+            pt['MtoL_3p4um'] = rt['MtoL_3p4um_nat']
+            pt['MtoL_3p4um'].description = '[coarser resolution]'
+        else:
+            pt['MtoL_3p4um'] = np.nan * u.Unit('Msun Lsun-1')
+    else:
+        pt['MtoL_3p4um'] = np.nan * u.Unit('Msun Lsun-1')
+
     if 'star' in config['group']:
+        alpha3p4um = (
+            pt['MtoL_3p4um']*u.Lsun /
+            (params['IR_Lsun3p4um'] *
+             u.Unit(params['IR_Lsun3p4um_unit'])) *
+            4*np.pi*u.sr *
+            (3.4*u.um).to('Hz', equivalencies=u.spectral())
+        ).to('Msun pc-2 MJy-1 sr')
+        alpha3p6um = (
+            pt['MtoL_3p4um']*u.Lsun /
+            (params['IR_Lsun3p6um'] *
+             u.Unit(params['IR_Lsun3p6um_unit'])) *
+            4*np.pi*u.sr *
+            (3.6*u.um).to('Hz', equivalencies=u.spectral())
+        ).to('Msun pc-2 MJy-1 sr')
         # stellar mass surface density
         pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
         for key in config[config['group'] == 'star']['colname']:
             if key == 'Sigma_star':
                 continue
-            pt[key] = (
-                rt[key.replace('Sigma_star', 'I')+'_kpc'] *
-                gal_cosi * get_alpha3p6um(ref='MS14'))
-            if (np.isfinite(pt[key]).sum() != 0 and
-                np.isfinite(pt['Sigma_star']).sum() == 0):
+            rtkey = key.replace('Sigma_star', 'I') + '_kpc'
+            if (np.isfinite(rt[rtkey]).sum() == 0 and
+                    rtkey.replace('kpc', 'raw') in rt.colnames):
+                rtkey = rtkey.replace('kpc', 'raw')
+            if key[11:16] == '3p6um':
+                pt[key] = rt[rtkey] * gal_cosi * alpha3p6um
+            elif key[11:16] == '3p4um':
+                pt[key] = rt[rtkey] * gal_cosi * alpha3p4um
+            else:
+                raise ValueError('?')
+            if rtkey[-3:] == 'raw':
+                pt[key].description = '[coarser resolution]'
+            if np.isfinite(pt['Sigma_star']).sum() == 0:
                 pt['Sigma_star'] = pt[key]
                 pt['Sigma_star'].description = (
                     f"({key.replace('Sigma_star_', '')})")
+        del alpha3p4um, alpha3p6um
     else:
         pt['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
 
     if 'HI' in config['group']:
         # atomic gas mass surface density
         if np.isfinite(rt['I_21cm_kpc']).sum() != 0:
-            pt['Sigma_atom'] = (
-                rt['I_21cm_kpc'] * gal_cosi *
-                params['alpha21cm'] *
-                u.Unit(params['alpha21cm_unit']))
+            pt['I_21cm'] = rt['I_21cm_kpc']
         else:
-            pt['Sigma_atom'] = (
-                rt['I_21cm_nat'] * gal_cosi *
-                params['alpha21cm'] *
-                u.Unit(params['alpha21cm_unit']))
-            pt['Sigma_atom'].description = '[coarser resolution]'
+            pt['I_21cm'] = rt['I_21cm_nat']
+            pt['I_21cm'].description = '[coarser resolution]'
+        pt['Sigma_atom'] = (
+            pt['I_21cm'] * gal_cosi *
+            params['HI_alpha21cm'] *
+            u.Unit(params['HI_alpha21cm_unit']))
     else:
         pt['Sigma_atom'] = np.nan * u.Unit('Msun pc-2')
 
@@ -383,7 +412,8 @@ def gen_phys_props_table(
     if 'H2' in config['group']:
         # molecular gas mass surface density
         pt['I_CO21'] = rt['I_CO21_kpc']
-        pt['Sigma_mol'] = pt['I_CO21'] * pt['alphaCO21'] * gal_cosi
+        pt['Sigma_mol'] = (
+            pt['I_CO21'] * pt['alphaCO21'] * gal_cosi)
     else:
         pt['Sigma_mol'] = np.nan * u.Unit('Msun pc-2')
 

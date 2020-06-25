@@ -1,6 +1,12 @@
 {
-    "alpha21cm": 0.0197,
-    "alpha21cm_unit": "Msun pc-2 K-1 km-1 s",
-    "alpha21cm_comment": "Heavy elements included",
+    "IR_Lsun3p6um": 0.037,
+    "IR_Lsun3p6um_unit": "Lsun",
+    "IR_Lsun3p6um_comment": "Leroy+19 Eq.7",
+    "IR_Lsun3p4um": 0.042,
+    "IR_Lsun3p4um_unit": "Lsun",
+    "IR_Lsun3p4um_comment": "Leroy+19 Eq.9",
+    "HI_alpha21cm": 0.0197,
+    "HI_alpha21cm_unit": "Msun pc-2 K-1 km-1 s",
+    "HI_alpha21cm_comment": "Heavy elements included",
     "CO_R21": 0.65
 }

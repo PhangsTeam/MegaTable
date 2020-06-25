@@ -8,13 +8,6 @@ coord,0,phi_gal,deg,".2f","Deprojected angle (0 = major axis receding side)"
 metal,0,Zprime,"1",".3e","Gas-phase metallicity relative to solar value"
 metal,0,log(O/H)_MZR+GRD,"1",".3f","Oxygen abundance predicted by scaling relations (Sanchez+14; Sanchez+19)"
 
-alphaCO,0,alphaCO10,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(1-0) line"
-alphaCO,0,alphaCO10_MW,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (MW value)"
-alphaCO,0,alphaCO10_PHANGS,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (PHANGS prescription)"
-alphaCO,0,alphaCO10_N12,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (Narayanan+12 prescription)"
-alphaCO,0,alphaCO10_B13,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (Bolatto+13 prescription)"
-alphaCO,0,alphaCO21,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(2-1) line"
-
 SFR,1000,Sigma_SFR,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density"
 SFR,1000,Sigma_SFR_FUVW4,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (GALEX FUV + WISE 22um)"
 SFR,1000,Sigma_SFR_NUVW4,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (GALEX NUV + WISE 22um)"
@@ -25,11 +18,22 @@ SFR,1000,Sigma_SFR_W3ONLY,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density
 SFR,1000,Sigma_SFR_HaW4,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (duPont/WFI Halpha + WISE 22um)"
 SFR,1000,Sigma_SFR_HaONLY,"Msun yr-1 kpc-2",".3e","Kpc-scale SFR surface density (duPont/WFI Halpha)"
 
+MtoL,1000,MtoL_3p4um,"Msun Lsun-1",".3e","Mass-to-light ratio at 3.4um (Leroy+inprep)"
+
 star,1000,Sigma_star,"Msun pc-2",".3e","Kpc-scale stellar mass surface density"
 star,1000,Sigma_star_3p6um_ICA,"Msun pc-2",".3e","Kpc-scale stellar mass surface density (S4G 3.6um ICA)"
 star,1000,Sigma_star_3p6um_raw,"Msun pc-2",".3e","Kpc-scale stellar mass surface density (S4G 3.6um raw)"
+star,1000,Sigma_star_3p4um,"Msun pc-2",".3e","Kpc-scale stellar mass surface density (WISE 3.4um)"
 
 HI,1000,Sigma_atom,"Msun pc-2",".3e","Kpc-scale atomic gas surface density (21cm)"
+HI,1000,I_21cm,"K km s-1",".3e","Kpc-scale HI 21cm line intensity"
+
+alphaCO,0,alphaCO10,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(1-0) line"
+alphaCO,0,alphaCO10_MW,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (MW value)"
+alphaCO,0,alphaCO10_PHANGS,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (PHANGS prescription)"
+alphaCO,0,alphaCO10_N12,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (Narayanan+12 prescription)"
+alphaCO,0,alphaCO10_B13,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (Bolatto+13 prescription)"
+alphaCO,0,alphaCO21,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(2-1) line"
 
 H2,1000,Sigma_mol,"Msun pc-2",".3e","Kpc-scale molecular gas surface density (CO21)"
 H2,1000,I_CO21,"K km s-1",".3e","Kpc-scale CO(2-1) line intensity"

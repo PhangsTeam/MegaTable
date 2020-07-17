@@ -39,8 +39,8 @@ def get_data_path(datatype, galname=None, lin_res=None):
     # PHANGS data parent directory
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
 
-    if datatypes[0] == 'sample_table':
-        return PHANGSdir / 'sample' / 'sample_Sun+20b.ecsv'
+    if datatypes[0] == 'sample':
+        return Path('.') / 'sample.ecsv'
 
     elif datatypes[0] == 'ALMA':
         # PHANGS-ALMA data
@@ -53,11 +53,15 @@ def get_data_path(datatype, galname=None, lin_res=None):
                 fname_seq += [f"{lin_res.to('pc').value:.0f}pc"]
         elif datatypes[1] == 'CPROPS':
             # PHANGS-ALMA CPROPS catalog
-            basedir /= 'v3-CPROPS'
-            fname_seq = [galname.lower(), 'co21', 'native', 'props']
+            basedir = basedir / 'v3p4-CPROPS' / 'STv1p2' / 'native'
+            fname_seq = [
+                galname.lower(),
+                '12m+7m+tp', 'co21', 'native', 'props']
             if lin_res is not None:
-                basedir /= f"fixed_{lin_res.to('pc').value:.0f}pc"
-                fname_seq[2] = f"{lin_res.to('pc').value:.0f}pc"
+                basedir = (
+                    basedir / '..' /
+                    f"{lin_res.to('pc').value:.0f}pc_matched")
+                fname_seq[-2] = f"{lin_res.to('pc').value:.0f}pc"
         elif datatypes[1] == 'alphaCO':
             # PHANGS alphaCO map
             basedir = basedir / 'alphaCO'  # / 'v0p1'
@@ -449,7 +453,8 @@ def gen_phys_props_table(
 
     if 'CPROPS_stats' in config['group']:
         # CPROPS cloud statistics
-        R_factor = np.sqrt(5) / 1.91  # Rosolowsky&Leroy06 Sec.3.1
+        # R_factor = np.sqrt(5) / 1.91  # Sun+20 Eq.30
+        R_factor = 1.0  # Rosolowsky+20 (PyCPROPS)
         for res_pc in (
                 config[config['group'] == 'CPROPS_stats']['res_pc']):
             los_depth = 100 * u.pc
@@ -467,24 +472,31 @@ def gen_phys_props_table(
                     # Note that R [=] arcsec
                     rt[f"{wstr}<R_CPROPS_{rstr}>"] *
                     R_factor * gal_dist / u.rad)
-                pt[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"] = (
-                    rt[f"{wstr}<F/R^2_CPROPS_{rstr}>"] *
-                    pt['alphaCO21'] / (np.pi*R_factor**2))
                 pt[f"{wstr}<vdisp_mol_CPROPS_{rstr}>"] = (
                     rt[f"{wstr}<sigv_CPROPS_{rstr}>"])
+                pt[f"{wstr}<Sigma_mol_CPROPS_{rstr}>"] = (
+                    rt[f"{wstr}<F/R^2_CPROPS_{rstr}>"] *
+                    pt['alphaCO21'] /
+                    # (np.pi*R_factor**2))  # CPROPS
+                    (2*np.pi*R_factor**2))  # PyCPROPS
                 pt[f"{wstr}<P_turb_CPROPS_sph_{rstr}>"] = (
                     # Sun+20 Eq.28
-                    3 / (4*np.pi) * pt['alphaCO21'] *
+                    # 3 / (4*np.pi) *  # CPROPS
+                    3 / (8*np.pi) *  # PyCPROPS
+                    pt['alphaCO21'] *
                     rt[f"{wstr}<F*sigv^2/R^3_CPROPS_{rstr}>"] /
                     R_factor**3 / (gal_dist / u.rad) / const.k_B)
                 pt[f"{wstr}<P_turb_CPROPS_cyl_{rstr}>"] = (
                     # Sun+20 Sec.6.3
-                    3 / (2*np.pi) * pt['alphaCO21'] *
+                    # 3 / (2*np.pi) *  # CPROPS
+                    3 / (4*np.pi) *  # PyCPROPS
+                    pt['alphaCO21'] *
                     rt[f'{wstr}<F*sigv^2/R^2_CPROPS_{rstr}>'] /
                     R_factor**2 / los_depth / const.k_B)
                 pt[f"{wstr}<alpha_vir_CPROPS_sph_{rstr}>"] = (
                     # Sun+18 Eq.6
-                    5 / const.G *
+                    # 5 / const.G *  # CPROPS
+                    10 / const.G *  # PyCPROPS
                     rt[f"{wstr}<R*sigv^2/F_CPROPS_{rstr}>"] /
                     pt['alphaCO21'] * R_factor / (gal_dist / u.rad))
 
@@ -580,11 +592,11 @@ if __name__ == '__main__':
         config_params = json.load(f)
 
     # read PHANGS sample table
-    catalog = Table.read(get_data_path('sample_table'))
+    t_sample = Table.read(get_data_path('sample'))
     # only keep targets with the 'HAS_ALMA' tag
-    catalog = catalog[catalog['HAS_ALMA'] == 1]
+    t_sample = t_sample[t_sample['HAS_ALMA'] == 1]
     # loop through sample table
-    for row in catalog:
+    for row in t_sample:
 
         # galaxy parameters
         name = row['NAME'].strip()
@@ -651,12 +663,12 @@ if __name__ == '__main__':
                 config=config_phys,
                 note=(
                     'PHANGS-ALMA v3.4; '
-                    'PHANGS-CPROPS v3; '
-                    'PHANGS-alphaCO v0.1; '
+                    'CPROPS catalogs v3.4 (ST1.2); '
+                    'alphaCO maps v0.1; '
                     'PHANGS-VLA v1.0; '
                     'PHANGS-Halpha v0.1&0.3; '
                     'sample table v1.4 (dist=v1.2)'),
-                version=1.1, writefile=ptfile, **config_params)
+                version=1.2, writefile=ptfile, **config_params)
 
         # ------------------------------------------------------------
 

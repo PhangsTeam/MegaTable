@@ -39,7 +39,7 @@ I_21cm_kpc,HI:mom0,1000,K km s-1,resample
 I_21cm_nat,HI:mom0,0,K km s-1,resample
 A<I_21cm>,HI:mom0,0,K km s-1,area_mean
 
-I_CO21_kpc,ALMA:CO:mom0:strict,1000,K km s-1,resample
+I_CO21_kpc,ALMA:CO:mom0:broad,1000,K km s-1,resample
 
 log(O/H)_MZR+GRD,ALMA:alphaCO:logOH:predicted,0,1,resample
 Zprime,ALMA:alphaCO:Zprime,0,1,resample

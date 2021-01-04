@@ -5,7 +5,7 @@ from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-from .utils import identical_units, reduce_image_input
+from .utils import identical_units, reduce_image_input, HDU_types
 
 
 ######################################################################
@@ -99,7 +99,7 @@ class BaseTable(object):
 ######################################################################
 
 
-class StatsMixin(object):
+class StatsMixin(BaseTable):
 
     """
     Mixin class offering tools for calculating catalog/image stats.

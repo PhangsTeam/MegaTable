@@ -19,17 +19,6 @@ logging = False
 # --------------------------------------------------------------------
 
 
-class MyTessellMegaTable(
-        PhangsAlmaMixin, EnvMaskMixin, TessellMegaTable):
-
-    """
-    Enhanced TessellMegaTable.
-    """
-
-
-# --------------------------------------------------------------------
-
-
 def get_data_path(datatype, galname=None, lin_res=None):
     """
     Get the path to any required data on disk.
@@ -109,6 +98,17 @@ def get_data_path(datatype, galname=None, lin_res=None):
 # --------------------------------------------------------------------
 
 
+class PhangsTessellMegaTable(
+        PhangsAlmaMixin, EnvMaskMixin, TessellMegaTable):
+
+    """
+    Enhanced TessellMegaTable.
+    """
+
+
+# --------------------------------------------------------------------
+
+
 def gen_raw_measurement_table(
         gal_name, gal_dist_Mpc=None,
         gal_ra_deg=None, gal_dec_deg=None,
@@ -130,7 +130,7 @@ def gen_raw_measurement_table(
             print("")
         return
     with fits.open(infile) as hdul:
-        rt = MyTessellMegaTable(
+        rt = PhangsTessellMegaTable(
             hdul[0].header,
             aperture_shape=aperture_shape,
             aperture_size_arcsec=aperture_size_arcsec,
@@ -204,7 +204,7 @@ def gen_raw_measurement_table(
 
         else:
             raise ValueError(
-                f"Inavlid method {row['method']} - check config file")
+                f"Invalid method {row['method']} - check config file")
 
     # record metadata
     rt.meta['GALAXY'] = str(gal_name)
@@ -231,7 +231,7 @@ def gen_phys_props_table(
         rtfile, config=None, gal_name=None,
         # gal_logMstar=None, gal_Reff_arcsec=None,
         gal_Rstar_arcsec=None,
-        note='', version=0, writefile='',
+        note='', version=0.0, writefile='',
         **params):
 
     # read raw measurement table
@@ -653,7 +653,7 @@ if __name__ == '__main__':
             workdir /
             f"{name}_{aperture_shape}_stats_"
             f"{aperture_size.to('kpc').value:.0f}kpc_phys.fits")
-        if (rtfile.is_file() and not ptfile.is_file()):
+        if rtfile.is_file() and not ptfile.is_file():
             print(f"Constructing physical property table for {name}")
             gen_phys_props_table(
                 rtfile, gal_name=name,

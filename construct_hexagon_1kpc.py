@@ -202,7 +202,7 @@ def gen_tessell_mega_table(
         if verbose:
             print("  Calculating CO-to-H2 conversion factor")
         t['alphaCO10'] = t['alphaCO21'] = (
-                np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
+            np.nan * u.Unit('Msun pc-2 K-1 km-1 s'))
         for row in config[config['group'] == 'alphaCO']:
             if row['colname'] in ('alphaCO10', 'alphaCO21'):
                 continue
@@ -251,7 +251,7 @@ def gen_tessell_mega_table(
                 t['alphaCO10'].description = (
                     f"({row['colname'].replace('alphaCO10_', '')})")
                 t['alphaCO21'] = (
-                        t['alphaCO10'] / phys_params['CO_R21'])
+                    t['alphaCO10'] / phys_params['CO_R21'])
                 t['alphaCO21'].description = (
                     t['alphaCO10'].description)
 
@@ -548,7 +548,7 @@ if __name__ == '__main__':
                 f"{gal_params['name']}")
             print("")
             continue
-        if not gal_params['name'] == 'NGC3351': continue
+
         print(f"Processing data for {gal_params['name']}")
 
         mtfile = (
@@ -571,14 +571,14 @@ if __name__ == '__main__':
 
         # ------------------------------------------------------------
 
-        mtfile_new = (
-            workdir /
-            f"{gal_params['name']}_{aperture_shape}_stats_"
-            f"{aperture_size.to('kpc').value:.0f}kpc.ecsv")
-        if mtfile.is_file() and not mtfile_new.is_file():
-            print("Converting FITS table to ECSV format")
-            t = Table.read(mtfile)
-            t.write(mtfile_new, delimiter=',', overwrite=True)
+        # mtfile_new = (
+        #     workdir /
+        #     f"{gal_params['name']}_{aperture_shape}_stats_"
+        #     f"{aperture_size.to('kpc').value:.0f}kpc.ecsv")
+        # if mtfile.is_file() and not mtfile_new.is_file():
+        #     print("Converting FITS table to ECSV format")
+        #     t = Table.read(mtfile)
+        #     t.write(mtfile_new, delimiter=',', overwrite=True)
 
         # ------------------------------------------------------------
 

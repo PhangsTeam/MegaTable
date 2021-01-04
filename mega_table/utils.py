@@ -231,19 +231,3 @@ def deproject(
         return radius_deg, projang_deg, dx_deg, dy_deg
     else:
         return radius_deg, projang_deg
-
-
-# --------------------------------------------------------------------
-
-
-def get_h_star(Rstar, diskshape='flat', Rgal=None):
-    # stellar disk scale height (see Leroy+08 and Ostriker+10)
-    flat_ratio = 7.3  # Kregel+02
-    if diskshape == 'flat':
-        hstar = Rstar / flat_ratio
-    elif diskshape == 'flared':
-        hstar = Rstar / flat_ratio * np.exp(
-            (Rgal/Rstar).to('').value - 1)
-    else:
-        raise ValueError("`diskshape` must be 'flat' or 'flared'")
-    return hstar

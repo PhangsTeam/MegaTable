@@ -99,11 +99,33 @@ class BaseTable(object):
 ######################################################################
 
 
-class StatsMixin(BaseTable):
+class StatsTable(BaseTable):
 
     """
-    Mixin class offering tools for calculating catalog/image stats.
+    Table class offering tools for calculating catalog/image stats.
     """
+
+    # ----------------------------------------------------------------
+
+    def find_coords_in_regions(self, ra, dec):
+        """
+        Placeholder function (to be overwritten by descendant classes)
+
+        Parameters
+        ----------
+        ra : array_like
+            R.A. of the coordinates in question
+        dec : array_like
+            Declication of the coordinates in question
+
+        Return
+        ------
+        flagarr : 2-D boolean array
+            A boolean array indicating whether each region contains
+            each input coordinate. The shape of this array is:
+            [# of coordinates, # of regions]
+        """
+        return np.full([len(ra), len(self)], False)
 
     # ----------------------------------------------------------------
 
@@ -265,7 +287,7 @@ class StatsMixin(BaseTable):
 ######################################################################
 
 
-class GeneralRegionTable(StatsMixin, BaseTable):
+class GeneralRegionTable(StatsTable):
 
     """
     Table build from a set of user-defined regions on the sky.
@@ -366,7 +388,7 @@ class GeneralRegionTable(StatsMixin, BaseTable):
 ######################################################################
 
 
-class VoronoiTessTable(StatsMixin, BaseTable):
+class VoronoiTessTable(StatsTable):
 
     """
     Table built from a Voronoi tessellation of (a part of) the sky.

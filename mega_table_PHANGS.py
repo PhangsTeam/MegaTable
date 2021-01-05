@@ -158,25 +158,45 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_Sigma_mol(
-            self, I_CO=None, alpha_CO=None, cosi=1.,
+            self, COm0file=None, alpha_CO=None, cosi=1.,
             colname=None, unit=None):
-        self[colname] = (I_CO * alpha_CO * cosi).to(unit)
+        self.calc_image_stats(
+            COm0file, stat_func=nanaverage,
+            colname='_I_CO', unit='header')
+        self[colname] = (self['_I_CO'] * alpha_CO * cosi).to(unit)
+        self.table.remove_column('_I_CO')
 
     # ----------------------------------------------------------------
 
     def add_Sigma_atom(
-            self, I_21cm=None, alpha_21cm=None, cosi=1.,
+            self, HIm0file=None, alpha_21cm=None, cosi=1.,
             colname=None, unit=None):
-        self[colname] = (I_21cm * alpha_21cm * cosi).to(unit)
+        self.calc_image_stats(
+            HIm0file, stat_func=nanaverage,
+            colname='_I_21cm', unit='header')
+        self[colname] = (self['_I_21cm'] * alpha_21cm * cosi).to(unit)
+        self.table.remove_column('_I_21cm')
+
+    # ----------------------------------------------------------------
+
+    def add_Sigma_SFR(
+            self, SFRfile=None, cosi=1.,
+            colname=None, unit=None):
+        self.calc_image_stats(
+            SFRfile, stat_func=nanaverage,
+            colname='_SFR', unit='header')
+        self[colname] = (self['_SFR'] * cosi).to(unit)
+        self.table.remove_column('_SFR')
 
     # ----------------------------------------------------------------
 
     def add_Sigma_star(
-            self, image,
+            self, IRfile,
             MtoL=None, band='3p4um', Lsun_IR=None, cosi=1.,
-            colname=None, unit=None, **kwargs):
+            colname=None, unit=None):
         self.calc_image_stats(
-            image, colname='_I_IR', unit='MJy sr-1', **kwargs)
+            IRfile, stat_func=nanaverage,
+            colname='_I_IR', unit='header')
         if band[-2:] == 'um':
             freq = (
                 float(band[:-2].replace('p', '.')) * u.um
@@ -526,8 +546,8 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_env_frac(
-            self, envfile=None, wfile=None, colname=None, unit=None,
-            **kwargs):
+            self, envfile=None, wfile=None,
+            colname=None, unit=None):
         if wfile is None:
             with fits.open(envfile) as hdul:
                 envmap = hdul[0].data.copy()
@@ -543,6 +563,6 @@ class PhangsMegaTable(StatsTable):
                     hdul[0], hdr, order=0)
                 envmap[~footprint.astype('?')] = 0
         self.calc_image_stats(
-            (envmap > 0).astype('float'),
-            header=hdr, stat_func=nanaverage,
-            weight=wmap, colname=colname, unit=unit, **kwargs)
+            (envmap > 0).astype('float'), header=hdr,
+            stat_func=nanaverage, weight=wmap,
+            colname=colname, unit=unit)

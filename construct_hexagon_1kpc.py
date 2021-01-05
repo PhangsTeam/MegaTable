@@ -136,13 +136,15 @@ def gen_tessell_mega_table(
             Lsun = (
                 phys_params[f"IR_Lsun{band}"] *
                 u.Unit(phys_params[f"IR_Lsun{band}_unit"]))
+            IRfile = get_data_path(
+                row['source'], gal_name, row['res_pc']*u.pc)
+            if not IRfile.is_file():
+                t[row['colname']] = np.nan * u.Unit(row['unit'])
+                continue
             t.add_Sigma_star(
-                get_data_path(
-                    row['source'], gal_name, row['res_pc']*u.pc),
-                MtoL=t['MtoL_3p4um'], band=band, Lsun_IR=Lsun,
-                cosi=gal_cosi,
-                colname=row['colname'], unit=u.Unit(row['unit']),
-                suppress_error=True, stat_func=nanaverage)
+                IRfile, MtoL=t['MtoL_3p4um'],
+                band=band, Lsun_IR=Lsun, cosi=gal_cosi,
+                colname=row['colname'], unit=u.Unit(row['unit']))
             if np.isfinite(t['Sigma_star']).sum() == 0:
                 t['Sigma_star'] = t[row['colname']]
                 t['Sigma_star'].description = (
@@ -160,14 +162,17 @@ def gen_tessell_mega_table(
                     colname=row['colname'], unit=row['unit'],
                     suppress_error=True, stat_func=nanaverage)
             elif row['colname'] == 'Sigma_atom':
-                if 'I_21cm' not in t.colnames:
-                    raise ValueError("No I_21cm column found")
+                HIm0file = get_data_path(
+                    row['source'], gal_name, row['res_pc']*u.pc)
+                if not HIm0file.is_file():
+                    t[row['colname']] = np.nan * u.Unit(row['unit'])
+                    continue
                 alpha_21cm = (
                     phys_params['HI_alpha21cm'] *
                     u.Unit(phys_params['HI_alpha21cm_unit']))
                 t.add_Sigma_atom(
-                    I_21cm=t['I_21cm'], alpha_21cm=alpha_21cm,
-                    cosi=gal_cosi,
+                    HIm0file=HIm0file,
+                    alpha_21cm=alpha_21cm, cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
@@ -267,13 +272,16 @@ def gen_tessell_mega_table(
                     colname=row['colname'], unit=row['unit'],
                     suppress_error=True, stat_func=nanaverage)
             elif row['colname'] == 'Sigma_mol':
-                if 'I_CO21' not in t.colnames:
-                    raise ValueError("No I_CO column found")
                 if 'alphaCO21' not in t.colnames:
                     raise ValueError("No alphaCO column found")
+                COm0file = get_data_path(
+                    row['source'], gal_name, row['res_pc']*u.pc)
+                if not COm0file.is_file():
+                    t[row['colname']] = np.nan * u.Unit(row['unit'])
+                    continue
                 t.add_Sigma_mol(
-                    I_CO=t['I_CO21'], alpha_CO=t['alphaCO21'],
-                    cosi=gal_cosi,
+                    COm0file=COm0file,
+                    alpha_CO=t['alphaCO21'], cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
@@ -426,11 +434,14 @@ def gen_tessell_mega_table(
                 continue
             if verbose:
                 print(f"    {row['colname']}")
-            t.calc_image_stats(
-                get_data_path(
-                    row['source'], gal_name, row['res_pc']*u.pc),
-                colname=row['colname'], unit=u.Unit(row['unit']),
-                suppress_error=True, stat_func=nanaverage)
+            SFRfile = get_data_path(
+                row['source'], gal_name, row['res_pc']*u.pc)
+            if not SFRfile.is_file():
+                t[row['colname']] = np.nan * u.Unit(row['unit'])
+                continue
+            t.add_Sigma_SFR(
+                SFRfile=SFRfile, cosi=gal_cosi,
+                colname=row['colname'], unit=u.Unit(row['unit']))
             if np.isfinite(t['Sigma_SFR']).sum() == 0:
                 t['Sigma_SFR'] = t[row['colname']]
                 t['Sigma_SFR'].description = (

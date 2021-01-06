@@ -50,9 +50,6 @@ def gen_tessell_mega_table(
     gal_name = gal_params['name']
     gal_cosi = np.cos(np.deg2rad(gal_params['incl_deg']))
     gal_dist = gal_params['dist_Mpc'] * u.Mpc
-    gal_Reff = (
-        (gal_params['Reff_arcsec'] * u.arcsec).to('rad').value *
-        gal_params['dist_Mpc'] * u.Mpc).to('kpc')
     gal_Rstar = (
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc')
@@ -210,7 +207,7 @@ def gen_tessell_mega_table(
                     raise ValueError("No coordinate info found")
                 t.add_metallicity(
                     Mstar=gal_params['Mstar_Msun']*u.Msun,
-                    r_gal=t['r_gal'], Re=gal_Reff,
+                    r_gal=t['r_gal'], Rdisk=gal_Rstar,
                     logOH_solar=phys_params['abundance_solar'],
                     colname=row['colname'], unit=row['unit'])
             else:
@@ -491,8 +488,7 @@ def gen_tessell_mega_table(
     t.meta['INCL_DEG'] = gal_params['incl_deg']
     t.meta['PA_DEG'] = gal_params['posang_deg']
     t.meta['LOGMSTAR'] = np.log10(gal_params['Mstar_Msun'])
-    t.meta['REFF_KPC'] = gal_Reff.to('kpc').value
-    t.meta['RDIS_KPC'] = gal_Rstar.to('kpc').value
+    t.meta['RDISKKPC'] = gal_Rstar.to('kpc').value
     t.meta['CO_R21'] = phys_params['CO_R21']
     t.meta['H_MOL_PC'] = phys_params['CO_los_depth']
     t.meta['ABUN_SUN'] = phys_params['abundance_solar']
@@ -545,36 +541,34 @@ if __name__ == '__main__':
 
     # read PHANGS sample table
     t_sample = Table.read(get_data_path('sample'))
-    # only keep targets with the 'HAS_ALMA' tag
-    t_sample = t_sample[t_sample['HAS_ALMA'] == 1]
+
     # loop through sample table
     for row in t_sample:
 
         # galaxy parameters
         gal_params = {
-            'name': row['NAME'].strip(),
-            'dist_Mpc': row['DIST'],
-            'ra_deg': row['ORIENT_RA'],
-            'dec_deg': row['ORIENT_DEC'],
-            'incl_deg': row['ORIENT_INCL'],
-            'posang_deg': row['ORIENT_POSANG'],
-            'Mstar_Msun': row['MSTAR_MAP'] * 10**0.21,
-            'Reff_arcsec': row['SIZE_LSTAR_MASS'] * 1.67,
-            'Rstar_arcsec': row['SIZE_LSTAR_S4G'],
+            'name': row['name'].strip().upper(),
+            'dist_Mpc': row['dist'],
+            'ra_deg': row['orient_ra'],
+            'dec_deg': row['orient_dec'],
+            'incl_deg': row['orient_incl'],
+            'posang_deg': row['orient_posang'],
+            'Mstar_Msun': row['props_mstar'],
+            'Rstar_arcsec': row['size_scalelength'],
         }
 
-        # skip targets with bad geometrical information
-        if not (0 <= gal_params['incl_deg'] < 90 and
-                np.isfinite(gal_params['posang_deg'])):
-            print(
-                f"Bad orientation measurement - skipping "
-                f"{gal_params['name']}")
-            print("")
-            continue
         # skip targets with bad distance
         if not gal_params['dist_Mpc'] > 0:
             print(
                 f"Bad distance measurement - skipping "
+                f"{gal_params['name']}")
+            print("")
+            continue
+        # skip targets with edge-on viewing angle
+        if not (0 <= gal_params['incl_deg'] <= 75.1 and
+                np.isfinite(gal_params['posang_deg'])):
+            print(
+                f"Edge-on viewing angle - skipping "
                 f"{gal_params['name']}")
             print("")
             continue

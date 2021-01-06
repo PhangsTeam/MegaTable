@@ -122,11 +122,14 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_metallicity(
-            self, Mstar=None, r_gal=None, Re=None, logOH_solar=None,
+            self, Mstar=None,
+            r_gal=None, Rdisk=None, logOH_solar=None,
             colname=None, unit=None):
-        logOH_Re = metallicity.predict_logOH_SAMI19(Mstar)
+        logOH_Re = metallicity.predict_logOH_SAMI19(
+            Mstar * 10**0.10)  # Fig. A1 in Sanchez+19
         logOH = metallicity.extrapolate_logOH_radially(
-            logOH_Re, gradient='CALIFA14', Rgal=r_gal, Re=Re)
+            logOH_Re, gradient='CALIFA14',
+            Rgal=r_gal, Re=Rdisk*1.68)  # Eq. A.3 in Sanchez+14
         self[colname] = (
             10**(logOH - logOH_solar) * u.Unit('')).to(unit)
 

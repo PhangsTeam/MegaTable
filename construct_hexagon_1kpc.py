@@ -105,6 +105,25 @@ def gen_tessell_mega_table(
                 raise ValueError(
                     f"Unrecognized column name: {row['colname']}")
 
+    if 'rotcurve' in config['group']:
+        # rotation curve-related quantities
+        if verbose:
+            print("  Calculating rotation curve-related quantities")
+        for row in config[config['group'] == 'rotcurve']:
+            if row['colname'] in ('V_circ', 'q_shear'):
+                modelfile = get_data_path(
+                    row['source'], gal_name)
+                if not modelfile.is_file():
+                    t[row['colname']] = np.nan * u.Unit(row['unit'])
+                    continue
+                if 'r_gal' not in t.colnames:
+                    raise ValueError("No coordinate info found")
+                r_gal_angle = (
+                    t['r_gal'] / gal_dist * u.rad).to('arcsec')
+                t.add_rotcurve(
+                    modelfile=modelfile, r_gal_angle=r_gal_angle,
+                    colname=row['colname'], unit=row['unit'])
+
     if 'MtoL' in config['group']:
         # stellar M/L ratio
         if verbose:

@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
 import numpy as np
+from scipy import interpolate
 from astropy import units as u, constants as const
 from astropy.io import fits
+from astropy.table import Table
 from reproject import reproject_interp
 from mega_table.core import StatsTable
 from mega_table.utils import nanaverage
@@ -11,7 +13,7 @@ from CO_conversion_factor import metallicity, alphaCO
 # --------------------------------------------------------------------
 
 
-def get_data_path(datatype, galname=None, lin_res=None):
+def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
     """
     Get the path to any required data on disk.
     """
@@ -50,9 +52,9 @@ def get_data_path(datatype, galname=None, lin_res=None):
                     basedir / '..' /
                     f"{res.to('pc').value:.0f}pc_matched")
                 fname_seq[-2] = f"{res.to('pc').value:.0f}pc"
-        elif datatypes[1] == 'alphaCO':
-            # PHANGS alphaCO map
-            basedir = basedir / 'alphaCO'  # / 'v0p1'
+        elif datatypes[1] == 'rotcurve':
+            # PHANGS-ALMA rotation curve
+            basedir = basedir / 'rotation_curve'
             fname_seq = [galname] + datatypes[2:]
 
     elif datatypes[0] == 'HI':
@@ -91,7 +93,7 @@ def get_data_path(datatype, galname=None, lin_res=None):
     else:
         raise ValueError("Unrecognized dataset")
 
-    return basedir / ('_'.join(fname_seq) + '.fits')
+    return basedir / ('_'.join(fname_seq) + '.' + ext)
 
 
 # --------------------------------------------------------------------
@@ -102,6 +104,19 @@ class PhangsMegaTable(StatsTable):
     """
     PHANGS-specific mega-table construction toolkit
     """
+
+    # ----------------------------------------------------------------
+
+    def add_rotcurve(
+            self, modelfile=None, r_gal_angle=None,
+            colname=None, unit=None):
+        t_model = Table.read(modelfile)
+        model = interpolate.interp1d(
+            t_model['r_gal'].quantity.to('arcsec').value,
+            t_model[colname.lower()].quantity.value)
+        self[colname] = (
+            model(r_gal_angle.to('arcsec').value) *
+            t_model[colname.lower()].quantity.unit).to(unit)
 
     # ----------------------------------------------------------------
 

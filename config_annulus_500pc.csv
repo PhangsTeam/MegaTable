@@ -5,6 +5,9 @@ label,,0,REGION,,"s","Region name"
 coord,,0,r_gal_min,"kpc",".3f","Inner boundary of the ring"
 coord,,0,r_gal_max,"kpc",".3f","Outer boundary of the ring"
 
+rotcurve,ALMA:rotcurve:spline_model,0,V_circ,"km s-1",".3e","Circular rotation velocity"
+rotcurve,ALMA:rotcurve:spline_model,0,q_shear,"1",".3e","Local shear parameter (- d ln(Omega) / d ln(r))"
+
 metal,,0,Zprime,"1",".3e","Gas-phase metallicity relative to solar value"
 metal,,0,Zprime_MZR+GRD,"1",".3e","Gas-phase metallicity relative to solar value (SAMI19 MZR + CALIFA14 gradient)"
 

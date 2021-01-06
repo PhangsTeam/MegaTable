@@ -112,7 +112,7 @@ def gen_tessell_mega_table(
         for row in config[config['group'] == 'rotcurve']:
             if row['colname'] in ('V_circ', 'q_shear'):
                 modelfile = get_data_path(
-                    row['source'], gal_name)
+                    row['source'], gal_name, ext='ecsv')
                 if not modelfile.is_file():
                     t[row['colname']] = np.nan * u.Unit(row['unit'])
                     continue

@@ -572,10 +572,10 @@ if __name__ == '__main__':
                 rgal_max_kpc=rgal_max.to('kpc').value,
                 note=(
                     'PHANGS-ALMA v3.4; '
-                    'CPROPS catalogs v3.4 (ST1.2); '
+                    'CPROPS catalogs v3.4; '
                     'PHANGS-VLA v1.0; '
                     'PHANGS-Halpha v0.1&0.3; '
-                    'sample table v1.4 (dist=v1.2)'),
+                    'sample table v1.6 (dist=v1.2)'),
                 version=1.3, writefile=mtfile)
 
         # ------------------------------------------------------------

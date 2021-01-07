@@ -1,6 +1,107 @@
+import os
 import numpy as np
+from pathlib import Path
 from astropy import units as u
 from astropy.wcs import WCS
+from astropy.io import fits
+
+HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
+
+# --------------------------------------------------------------------
+
+
+def identical_units(u1, u2):
+    if not u.Unit(u1).is_equivalent(u.Unit(u2)):
+        return False
+    elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
+        return False
+    else:
+        return True
+
+
+# --------------------------------------------------------------------
+
+
+def nanaverage(a, **kwargs):
+    """
+    Compute weighted average along a specified axis, ignoring NaNs.
+
+    Parameters
+    ----------
+    a : array_like
+        Array containing data to be averaged.
+    **kwargs
+        Keyword arguments to be passed to `~numpy.ma.average`
+
+    Return
+    ------
+    avg : ndarray or scalar
+        Return the average along the specified axis.
+    """
+    avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
+    avg = np.ma.filled(avg, np.nan)
+    return avg if avg.size > 1 else avg.item()
+
+
+# --------------------------------------------------------------------
+
+
+def reduce_image_input(
+        image, ihdu, header, suppress_error=False):
+    """
+    Reduce any combination of input values to (data, header, wcs).
+
+    Parameters
+    ----------
+    image : str, fits.HDUList, fits.HDU, or np.ndarray
+        The input image.
+    ihdu : int, optional
+        If 'image' is a str or an HDUList, this keyword should
+        specify which HDU (extension) to use (default=0)
+    header : astropy.fits.Header, optional
+        If 'image' is an ndarray, this keyword should be a FITS
+        header providing the WCS information.
+    suppress_error : bool, optional
+        Whether to suppress the error message if 'image' looks
+        like a file but is not found on disk (default=False)
+
+    Returns
+    -------
+    data : np.ndarray
+    hdr : fits.Header object
+    wcs : astropy.wcs.WCS object
+    """
+    if isinstance(image, np.ndarray):
+        data = image
+        hdr = header
+    elif isinstance(image, HDU_types):
+        data = image.data
+        hdr = image.header
+    elif isinstance(image, fits.HDUList):
+        data = np.copy(image[ihdu].data)
+        hdr = image[ihdu].header.copy()
+    else:
+        if (isinstance(image, (str, bytes, os.PathLike)) and
+                not Path(image).is_file()):
+            if suppress_error:
+                return None, None, None
+            else:
+                raise ValueError("Input image not found")
+        with fits.open(image) as hdul:
+            data = np.copy(hdul[ihdu].data)
+            hdr = hdul[ihdu].header.copy()
+    wcs = WCS(hdr)
+    if not (data.ndim == hdr['NAXIS'] == 2):
+        raise ValueError(
+            "Input image and/or header is not 2-dimensional")
+    if not data.shape == (hdr['NAXIS2'], hdr['NAXIS1']):
+        raise ValueError(
+            "Input image and header have inconsistent shape")
+    if not wcs.axis_type_names == ['RA', 'DEC']:
+        raise ValueError(
+            "Input header have unexpected axis type")
+    return data, hdr, wcs
+
 
 # --------------------------------------------------------------------
 
@@ -130,39 +231,3 @@ def deproject(
         return radius_deg, projang_deg, dx_deg, dy_deg
     else:
         return radius_deg, projang_deg
-
-
-#---------------------------------------------------------------------
-
-
-def identical_units(u1, u2):
-    if not u.Unit(u1).is_equivalent(u.Unit(u2)):
-        return False
-    elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
-        return False
-    else:
-        return True
-
-
-#---------------------------------------------------------------------
-
-
-def nanaverage(a, **kwargs):
-    """
-    Compute the weighted average along the specified axis, ignoring NaNs.
-
-    Parameters
-    ----------
-    a : array_like
-        Array containing data to be averaged.
-    **kwargs
-        Keyword arguments to be passed to `~numpy.ma.average`
-
-    Return
-    ------
-    avg : ndarray or scalar
-        Return the average along the specified axis.
-    """
-    avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
-    avg = np.ma.filled(avg, np.nan)
-    return avg if avg.size > 1 else avg.item()

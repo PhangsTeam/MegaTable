@@ -1,68 +1,64 @@
-import os
 import warnings
-from pathlib import Path
 import numpy as np
 from astropy import units as u
-from astropy.table import Table
+from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-from .utils import identical_units
-
-HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
+from .utils import identical_units, reduce_image_input, HDU_types
 
 
 ######################################################################
 ######################################################################
 
 
-class HiddenTable(object):
+class BaseTable(object):
 
     """
-    Use protected attribute to hide an astropy table.
+    A simple wrapper around `~astropy.tabel.QTable`.
 
     Parameters
     ----------
-    table : astropy.table.Table
-        The table to hide
+    table : `~astropy.table.QTable`
+        Core table
     """
 
-    __name__ = "HiddenTable"
+    __name__ = "BaseTable"
 
     def __init__(self, table=None):
         if table is not None:
-            self._table = table
+            self.table = QTable(table)
         else:
-            self._table = Table()
+            self.table = QTable()
 
     def __str__(self):
-        return self._table.__str__()
+        return self.table.__str__()
 
     def __repr__(self):
-        return self._table.__repr__()
+        return self.table.__repr__()
 
     def __len__(self):
-        return len(self._table)
+        return len(self.table)
 
     def __getitem__(self, key):
-        return self._table[key]
+        return self.table[key]
 
     def __setitem__(self, key, value):
-        self._table[key] = value
+        self.table[key] = value
 
     @property
     def colnames(self):
-        return self._table.colnames
+        return self.table.colnames
 
     @property
     def meta(self):
-        return self._table.meta
+        return self.table.meta
 
     def write(
             self, filename, keep_metadata=True, add_timestamp=True,
             **kwargs):
         """
-        Write the hidden table to a file.
+        Write table to file.
 
         Parameters
         ----------
@@ -76,18 +72,18 @@ class HiddenTable(object):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.write`
         """
-        t = self._table.copy()
+        t = self.table.copy()
         if not keep_metadata:
             # remove all metadata
-            for key in self._table.meta:
+            for key in self.meta:
                 t.meta.pop(key)
         else:
             # remove metadata not allowed in FITS headers
             hdr = fits.Header()
-            for key in self._table.meta:
+            for key in self.meta:
                 try:
                     hdr[key] = t.meta[key]
-                except:
+                except ValueError:
                     t.meta.pop(key)
         if 'TIMESTMP' in t.meta:
             # remove previous time stamp
@@ -103,13 +99,35 @@ class HiddenTable(object):
 ######################################################################
 
 
-class StatsMixin(object):
+class StatsTable(BaseTable):
 
     """
-    Mixin class offering tools for calculating catalog/image stats.
+    Table class offering tools for calculating catalog/image stats.
     """
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
+
+    def find_coords_in_regions(self, ra, dec):
+        """
+        Placeholder function (to be overwritten by descendant classes)
+
+        Parameters
+        ----------
+        ra : array_like
+            R.A. of the coordinates in question
+        dec : array_like
+            Declication of the coordinates in question
+
+        Return
+        ------
+        flagarr : 2-D boolean array
+            A boolean array indicating whether each region contains
+            each input coordinate. The shape of this array is:
+            [# of coordinates, # of regions]
+        """
+        return np.full([len(ra), len(self)], False)
+
+    # ----------------------------------------------------------------
 
     def calc_catalog_stats(
             self, entry, ra, dec, stat_func=None, weight=None,
@@ -154,88 +172,36 @@ class StatsMixin(object):
         """
         if weight is not None:
             weights = np.broadcast_to(weight, entry.shape)
+        else:
+            weights = None
 
         # find object coordinates in regions
-        flagarr = self.find_coords_in_regions(ra, dec)
+        findarr = self.find_coords_in_regions(ra, dec)
 
         # calculate (weighted) statistics within each region
         if not callable(stat_func):
             raise ValueError("Invalid input for 'stat_func'")
         arr = np.full(len(self), np.nan)
         for ind in range(len(self)):
+            if findarr.ndim == 2:  # 2D boolean flag
+                flagarr = findarr[:, ind]
+            else:  # 1D index array
+                flagarr = (findarr == ind)
             if weight is None:
                 arr[ind] = stat_func(
-                    entry.astype('float')[flagarr[:, ind]],
+                    entry.astype('float')[flagarr],
                     **kwargs)
             else:
                 arr[ind] = stat_func(
-                    entry.astype('float')[flagarr[:, ind]],
-                    weights=weights.astype('float')[flagarr[:, ind]],
+                    entry.astype('float')[flagarr],
+                    weights=weights.astype('float')[flagarr],
                     **kwargs)
 
         # save the output values as a new column in the table
-        self._table[colname] = arr
-        self._table[colname].unit = u.Unit(unit)
+        self[colname] = arr
+        self[colname].unit = u.Unit(unit)
 
-    #-----------------------------------------------------------------
-
-    def _reduce_image_input(
-            self, image, ihdu, header, suppress_error=False):
-        """
-        Reduce any combination of input values to (data, header, wcs).
-
-        Parameters
-        ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
-            The input image.
-        ihdu : int, optional
-            If 'image' is a str or an HDUList, this keyword should
-            specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
-            If 'image' is an ndarray, this keyword should be a FITS
-            header providing the WCS information.
-        suppress_error : bool, optional
-            Whether to suppress the error message if 'image' looks
-            like a file but is not found on disk (default=False)
-
-        Returns
-        -------
-        data : np.ndarray
-        hdr : fits.Header object
-        wcs : astropy.wcs.WCS object
-        """
-        if isinstance(image, np.ndarray):
-            data = image
-            hdr = header
-        elif isinstance(image, HDU_types):
-            data = image.data
-            hdr = image.header
-        elif isinstance(image, fits.HDUList):
-            data = np.copy(image[ihdu].data)
-            hdr = image[ihdu].header.copy()
-        else:
-            if (isinstance(image, (str, bytes, os.PathLike)) and
-                not Path(image).is_file()):
-                if suppress_error:
-                    return None, None, None
-                else:
-                    raise ValueError("Input image not found")
-            with fits.open(image) as hdul:
-                data = np.copy(hdul[ihdu].data)
-                hdr = hdul[ihdu].header.copy()
-        wcs = WCS(hdr)
-        if not (data.ndim == hdr['NAXIS'] == 2):
-            raise ValueError(
-                "Input image and/or header is not 2-dimensional")
-        if not data.shape == (hdr['NAXIS2'], hdr['NAXIS1']):
-            raise ValueError(
-                "Input image and header have inconsistent shape")
-        if not wcs.axis_type_names == ['RA', 'DEC']:
-            raise ValueError(
-                "Input header have unexpected axis type")
-        return data, hdr, wcs
-
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def calc_image_stats(
             self, image, ihdu=0, header=None,
@@ -279,14 +245,17 @@ class StatsMixin(object):
             Keyword arguments to be passed to 'stat_func'
         """
 
-        data, hdr, wcs = self._reduce_image_input(
+        data, hdr, wcs = reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self._table[colname] = (
-                np.full(len(self), np.nan) * u.Unit(unit))
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
             return
 
-        # find pixels in regions
+        # generate RA & Dec arrays
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = wcs.all_pix2world(
@@ -318,7 +287,7 @@ class StatsMixin(object):
 ######################################################################
 
 
-class GeneralRegionTable(StatsMixin, HiddenTable):
+class GeneralRegionTable(StatsTable):
 
     """
     Table build from a set of user-defined regions on the sky.
@@ -347,15 +316,14 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
 
     __name__ = "GeneralRegionTable"
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
-    def __init__(
-        self, region_defs, names=None):
+    def __init__(self, region_defs, names=None):
 
         # verify the region definitions
         for ireg, reg_def in enumerate(region_defs):
             if (not isinstance(reg_def, HDU_types) and
-                not callable(reg_def)):
+                    not callable(reg_def)):
                 raise ValueError(
                     f"Invalid region definition: #{ireg}")
 
@@ -364,8 +332,8 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
         self._region_defs = region_defs
         if names is None:
             names = [f"REGION#{i}" for i in range(len(region_defs))]
-        self._table['REGION'] = names
-        self._table.meta['TBLTYPE'] = self.__name__
+        self['REGION'] = names
+        self.meta['TBLTYPE'] = self.__name__
 
     def find_coords_in_regions(self, ra, dec):
         """
@@ -420,7 +388,7 @@ class GeneralRegionTable(StatsMixin, HiddenTable):
 ######################################################################
 
 
-class VoronoiTessTable(StatsMixin, HiddenTable):
+class VoronoiTessTable(StatsTable):
 
     """
     Table built from a Voronoi tessellation of (a part of) the sky.
@@ -459,7 +427,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
     __name__ = "VoronoiTessTable"
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def __init__(
             self, header, seeds_ra=None, seeds_dec=None,
@@ -467,7 +435,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
         # if seed locations are specified, write them into the table
         if seeds_ra is not None and seeds_dec is not None:
-            t = Table()
+            t = QTable()
             t['RA'] = np.atleast_1d(seeds_ra)*u.deg
             t['DEC'] = np.atleast_1d(seeds_dec)*u.deg
             super().__init__(t)
@@ -481,7 +449,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
             else:
                 self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-            self._table.meta['TBLTYPE'] = self.__name__
+            self.meta['TBLTYPE'] = self.__name__
             return
 
         # if seed locations are not specified, generate a list of
@@ -532,7 +500,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             dec_arr = (
                 self._ref_coord.dec.value +
                 iy.flatten() * spacing.value)
-        elif tile_shape == 'hexagon':
+        else:
             ra_arr = (
                 self._ref_coord.ra.value +
                 np.concatenate([ix, ix+0.5], axis=None) *
@@ -542,20 +510,20 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                 self._ref_coord.dec.value +
                 np.concatenate([iy, iy+0.5], axis=None) *
                 spacing.value * np.sqrt(3))
-        self._table['RA'] = ra_arr * u.deg
-        self._table['DEC'] = dec_arr * u.deg
+        self['RA'] = ra_arr * u.deg
+        self['DEC'] = dec_arr * u.deg
         # discard tiles outside the FITS header footprint
         iax0 = np.arange(self._wcs._naxis[0])
         iax1 = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = self._wcs.all_pix2world(
             iax0, iax1, 0, ra_dec_order=True)
-        flagarr = self.find_coords_in_regions(ramap, decmap)
-        self._table = self[flagarr.any(axis=0)]
-        self._table.meta['TBLTYPE'] = self.__name__
+        indices = self.find_coords_in_regions(ramap, decmap)
+        self.table = self[np.isin(np.arange(len(ra_arr)), indices)]
+        self.meta['TBLTYPE'] = self.__name__
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
-    def find_coords_in_regions(self, ra, dec):
+    def find_coords_in_regions(self, ra, dec, fill_value=-1):
         """
         Find out which regions(tiles) contain which input coordinates.
 
@@ -565,13 +533,16 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             R.A. of the coordinates in question
         dec : array_like
             Declication of the coordinates in question
+        fill_value : float, optional
+            The index value to return for input coordinates that have
+            no matched regions (default: -1).
 
         Return
         ------
-        flagarr : 2-D boolean array
-            A boolean array indicating whether each tile contains
-            each input coordinate. The shape of this array is:
-            [# of coordinates, # of tiles]
+        indices : 1-D index array
+            An index array indicating which tile each input coordinate
+            belongs to. The length of this array equals the number of
+            input coordinates.
         """
         from scipy.spatial import cKDTree
 
@@ -583,8 +554,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
 
         # find the angular offset coordinates for the seeds
         radec_seeds = np.stack(
-            [self['RA'].quantity.value,
-             self['DEC'].quantity.value], axis=-1)
+            [self['RA'].value, self['DEC'].value], axis=-1)
         offset_seeds = (radec_seeds - radec_ctr) * scale_arr
 
         # find the angular offset coordinates for input locations
@@ -594,21 +564,19 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
         # find coordinates in tiles
         kdtree = cKDTree(offset_seeds)
         _, indices = kdtree.query(offset_loc)
-        flagarr = np.full([len(offset_loc), len(offset_seeds)], False)
-        flagarr[np.arange(len(offset_loc)), indices] = True
 
-        # "Unfind" all coordinates that are outside the footprint
-        # of the FITS header used to generate the Voronoi diagram
+        # for all coordinates outside the WCS footprint, overwrite
+        # their matched indices with "fill_value"
         nax0, nax1 = self._wcs._naxis
         iax0, iax1 = self._wcs.all_world2pix(
             ra.flatten(), dec.flatten(), 0, ra_dec_order=False)
         mask = ((iax0 < 0) | (iax0 > nax0-1) |
                 (iax1 < 0) | (iax1 > nax1-1))
-        flagarr[mask, :] = False
+        indices[mask] = fill_value
 
-        return flagarr
+        return indices
 
-    #-----------------------------------------------------------------
+    # ----------------------------------------------------------------
 
     def resample_image(
             self, image, ihdu=0, header=None,
@@ -647,18 +615,19 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             like a file but is not found on disk (default=False)
         """
 
-        data, hdr, wcs = self._reduce_image_input(
+        data, hdr, wcs = reduce_image_input(
             image, ihdu, header, suppress_error=suppress_error)
         if data is None:
-            self._table[colname] = (
-                np.full(len(self), np.nan) * u.Unit(unit))
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
             return
 
         # find nearest the nearest pixel for each seed location
         iax0, iax1 = wcs.all_world2pix(
-            self['RA'].quantity.value,
-            self['DEC'].quantity.value,
-            0, ra_dec_order=True)
+            self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
         iax0 = np.round(iax0).astype('int')
         iax1 = np.round(iax1).astype('int')
         mask = ((iax0 < 0) | (iax0 > wcs._naxis[0]-1) |
@@ -676,9 +645,9 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
             sub_data[mask] = fill_outside
 
         # save the resampled values as a new column in the table
-        self._table[colname] = sub_data
+        self[colname] = sub_data
         if unit == 'header':
-            self._table[colname].unit = u.Unit(hdr['BUNIT'])
+            self[colname].unit = u.Unit(hdr['BUNIT'])
         else:
             if 'BUNIT' in hdr:
                 if not identical_units(
@@ -686,7 +655,7 @@ class VoronoiTessTable(StatsMixin, HiddenTable):
                     warnings.warn(
                         "Specified unit is not the same as the unit "
                         "recorded in the FITS header")
-            self._table[colname].unit = u.Unit(unit)
+            self[colname].unit = u.Unit(unit)
 
 
 ######################################################################

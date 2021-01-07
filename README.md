@@ -1,2 +1,2 @@
-# mega_table
+# MegaTable
 Tools for generating rich multi-wavelength data tables (a.k.a., mega-tables)

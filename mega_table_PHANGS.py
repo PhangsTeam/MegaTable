@@ -274,7 +274,7 @@ class PhangsMegaTable(StatsTable):
                 "Input maps have inconsistent shape")
         tpkmap[~np.isfinite(tpkmap)] = np.nan
         bm0map[~np.isfinite(bm0map)] = np.nan
-        wtmap = np.ones_like(sm0map).astype('float')
+        wtmap = sm0map.copy().astype('float')
         wtmap[~np.isfinite(sm0map) | (sm0map <= 0) |
               ~np.isfinite(sewmap) | (sewmap <= 0)] = 0
         sm0map[wtmap == 0] = np.nan

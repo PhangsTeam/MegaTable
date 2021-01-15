@@ -315,7 +315,7 @@ class PhangsMegaTable(StatsTable):
                 header=header, stat_func=nanaverage,
                 colname='_F<ICO>', unit='')
             self.calc_image_stats(
-                sm0map.astype('float'), weight=None,
+                wtmap, weight=None,
                 header=header, stat_func=nanaverage,
                 colname='_A<ICO>', unit='')
             self[colname] = (

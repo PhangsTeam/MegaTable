@@ -136,6 +136,7 @@ class RadialMegaTable(GeneralRegionTable):
             rgal_max_arcsec=t.meta['RMAX_DEG']*3600)
 
         # overwrite the underlying data table
+        mt.table = QTable()
         for key in t.colnames:
             mt[key] = t[key]
         for key in t.meta:
@@ -280,7 +281,7 @@ class TessellMegaTable(VoronoiTessTable):
     # ----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, ignore_inconsistency=False, **kwargs):
+    def read(cls, filename, **kwargs):
         """
         Read (and reconstruct) a TessellMegaTable from file.
 
@@ -288,9 +289,6 @@ class TessellMegaTable(VoronoiTessTable):
         ----------
         filename : str
             Name of the file to read from.
-        ignore_inconsistency : bool, optional
-            Whether to suppress the error message if metadata seems
-            inconsistent with table content (default: False)
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
@@ -323,18 +321,11 @@ class TessellMegaTable(VoronoiTessTable):
             gal_dec_deg=t.meta['DEC_DEG'])
 
         # overwrite the underlying data table
-        if len(mt) != len(t):
-            if ignore_inconsistency:
-                mt.table = QTable()
-            else:
-                raise ValueError(
-                    "Table content and metadata are inconsistent")
+        mt.table = QTable()
         for key in t.colnames:
             mt[key] = t[key]
-
-        # read metadata
-        for key in hdr:
-            mt.meta[key] = hdr[key]
+        for key in t.meta:
+            mt.meta[key] = t.meta[key]
 
         return mt
 

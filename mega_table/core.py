@@ -51,6 +51,10 @@ class BaseTable(object):
         return self.table.colnames
 
     @property
+    def info(self):
+        return self.table.info
+
+    @property
     def meta(self):
         return self.table.meta
 

@@ -57,8 +57,7 @@ def gen_tessell_mega_table(
     # initialize table
     if verbose:
         print("  Initializing mega table")
-    infile = get_data_path(
-        'ALMA:CO:tpeak', gal_name, aperture_size_kpc*u.kpc)
+    infile = get_data_path('ALMA:CO:tpeak', gal_name)
     if not infile.is_file():
         if verbose:
             print(f"No CO low resolution data found for {gal_name}")

@@ -31,8 +31,8 @@ MtoL,z0MGS:MtoL:3p4um:gauss7p5,0,MtoL_3p4um,"Msun Lsun-1",".3e","Mass-to-light r
 HI,HI:mom0,0,I_21cm,"K km s-1",".3e","Region-average HI 21cm line integrated intensity"
 HI,HI:mom0,0,Sigma_atom,"Msun pc-2",".3e","Region-average atomic gas surface density"
 
-H2,ALMA:CO:mom0:broad,150,I_CO21,"K km s-1",".3e","Region-average CO(2-1) line integrated intensity"
-H2,ALMA:CO:mom0:broad,150,Sigma_mol,"Msun pc-2",".3e","Region-average molecular gas surface density"
+H2,ALMA:CO:mom0:broad,0,I_CO21,"K km s-1",".3e","Region-average CO(2-1) line integrated intensity"
+H2,ALMA:CO:mom0:broad,0,Sigma_mol,"Msun pc-2",".3e","Region-average molecular gas surface density"
 
 alphaCO,,0,alphaCO10,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(1-0) line"
 alphaCO,,0,alphaCO10_PHANGS,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (PHANGS prescription)"

@@ -41,6 +41,8 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
             fname_seq = [galname, 'CO21'] + datatypes[2:]
             if res is not None:
                 fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            else:
+                fname_seq += ['native']
         elif datatypes[1] == 'CPROPS':
             # PHANGS-ALMA CPROPS catalog
             basedir = basedir / 'v4-CPROPS' / 'native'

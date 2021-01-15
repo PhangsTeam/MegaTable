@@ -586,12 +586,11 @@ if __name__ == '__main__':
                 aperture_shape=aperture_shape,
                 aperture_size_kpc=aperture_size.to('kpc').value,
                 note=(
-                    'PHANGS-ALMA v3.4; '
-                    'CPROPS catalogs v3.4; '
+                    'PHANGS-ALMA v4; '
                     'PHANGS-VLA v1.0; '
                     'PHANGS-Halpha v0.1&0.3; '
-                    'sample table v1.6 (dist=v1.2)'),
-                version=1.3, writefile=mtfile)
+                    'sample table v1.6'),
+                version=2.0, writefile=mtfile)
 
         # ------------------------------------------------------------
 

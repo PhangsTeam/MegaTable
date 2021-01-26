@@ -144,8 +144,6 @@ def gen_tessell_mega_table(
         # stellar mass surface density
         if verbose:
             print("  Calculating stellar mass surface density")
-        if 'MtoL_3p4um' not in t.colnames:
-            raise ValueError("No stellar M/L ratio data found")
         t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
         for row in config[config['group'] == 'star']:
             if row['colname'] == 'Sigma_star':
@@ -161,9 +159,18 @@ def gen_tessell_mega_table(
             if not IRfile.is_file():
                 t[row['colname']] = np.nan * u.Unit(row['unit'])
                 continue
+            if row['colname'] == 'Sigma_star_3p6umICA':
+                MtoL = (
+                    phys_params["IR_MtoL_S4GICA"] *
+                    u.Unit(phys_params["IR_MtoL_S4GICA_unit"]))
+            else:
+                if 'MtoL_3p4um' not in t.colnames:
+                    raise ValueError(
+                        "No stellar M/L ratio info found")
+                MtoL = t['MtoL_3p4um'].to('Msun Lsun-1')
             t.add_Sigma_star(
-                IRfile, MtoL=t['MtoL_3p4um'],
-                band=band, Lsun_IR=Lsun, cosi=gal_cosi,
+                IRfile,
+                MtoL=MtoL, band=band, Lsun_IR=Lsun, cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
             if np.isfinite(t['Sigma_star']).sum() == 0:
                 t['Sigma_star'] = t[row['colname']]

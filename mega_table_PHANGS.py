@@ -71,15 +71,15 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         if res is not None:
             fname_seq += [f"{res.to('pc').value:.0f}pc"]
 
-    elif datatypes[0] == 'S4G':
-        # S4G data
-        basedir = PHANGSdir / 'S4G'
+    elif datatypes[0] == 'IRAC':
+        # IRAC data
+        basedir = PHANGSdir / 'IRAC'
         if datatypes[1] == 'env_mask':
             # S4G morphological maps
             basedir /= 'environmental_masks'
             fname_seq = [galname, 'mask'] + datatypes[2:]
         else:
-            fname_seq = [galname, 'S4G'] + datatypes[1:]
+            fname_seq = [galname, 'IRAC'] + datatypes[1:]
             if res is not None:
                 fname_seq += [f"{res.to('pc').value:.0f}pc"]
 

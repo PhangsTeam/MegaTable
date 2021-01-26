@@ -73,15 +73,15 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         if res is not None:
             fname_seq += [f"{res.to('pc').value:.0f}pc"]
 
-    elif datatypes[0] == 'S4G':
-        # S4G data
-        basedir = PHANGSdir / 'S4G'
+    elif datatypes[0] == 'IRAC':
+        # IRAC data
+        basedir = PHANGSdir / 'IRAC'
         if datatypes[1] == 'env_mask':
             # S4G morphological maps
             basedir /= 'environmental_masks'
             fname_seq = [galname, 'mask'] + datatypes[2:]
         else:
-            fname_seq = [galname, 'S4G'] + datatypes[1:]
+            fname_seq = [galname, 'IRAC'] + datatypes[1:]
             if res is not None:
                 fname_seq += [f"{res.to('pc').value:.0f}pc"]
 
@@ -115,11 +115,11 @@ class PhangsMegaTable(StatsTable):
         t_model = Table.read(modelfile)
         model = interpolate.interp1d(
             t_model['r_gal'].quantity.to('arcsec').value,
-            t_model[colname.lower()].quantity.value,
+            t_model[colname].quantity.value,
             bounds_error=False, fill_value=np.nan)
         self[colname] = (
             model(r_gal_angle.to('arcsec').value) *
-            t_model[colname.lower()].quantity.unit).to(unit)
+            t_model[colname].quantity.unit).to(unit)
 
     # ----------------------------------------------------------------
 
@@ -175,6 +175,8 @@ class PhangsMegaTable(StatsTable):
                 WCO10kpc=self['_WCO_kpc'], Sigmaelsekpc=Sigmaelse,
                 suppress_error=True).to(unit)
             self.table.remove_columns(['_WCO_GMC', '_WCO_kpc'])
+        else:
+            raise ValueError(f"Unrecognized `method`: {method}")
 
     # ----------------------------------------------------------------
 
@@ -250,17 +252,42 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_P_DE(
-            self, Sigma_gas=None, rho_star_mp=None, vdisp_gas_z=None,
+            self, scale='kpc', rho_star_mp=None,
+            Sigma_atom=None, vdisp_atom_z=None,
+            Sigma_mol=None, vdisp_mol_z=None,
+            Sigma_cloud=None, P_selfg_cloud=None, R_cloud=None,
             colname=None, unit=None):
-        if vdisp_gas_z is None:
-            vdisp_gas = 11 * u.Unit('km s-1')  # Leroy+08
+        if scale == 'kpc':
+            if vdisp_atom_z is None:  # Leroy+08, Sun+20a
+                vdisp_atom_z = 10 * u.Unit('km s-1')
+            if vdisp_mol_z is None:  # Leroy+08
+                vdisp_mol_z = vdisp_atom_z
+            Sigma_gas = Sigma_atom + Sigma_mol
+            vdisp_gas_z = (  # Sun+20a Eq.14
+                Sigma_mol * vdisp_mol_z +
+                Sigma_atom * vdisp_atom_z) / Sigma_gas
+            self[colname] = (  # Sun+20a Eq.12
+                (np.pi / 2 * const.G * Sigma_gas**2 +
+                 Sigma_gas * vdisp_gas_z *
+                 np.sqrt(2 * const.G * rho_star_mp)) /
+                const.k_B).to(unit)
+        elif scale == 'cloud':
+            if vdisp_atom_z is None:  # Leroy+08, Sun+20a
+                vdisp_atom_z = 10 * u.Unit('km s-1')
+            P_DE_cloud = (  # Sun+20a Eq.16
+                P_selfg_cloud +
+                np.pi / 2 * const.G / const.k_B *
+                Sigma_cloud * Sigma_mol +
+                3 / 4 * np.pi * const.G / const.k_B *
+                Sigma_cloud * rho_star_mp * 2 * R_cloud)
+            P_DE_atom = (  # Sun+20a Eq.18
+                np.pi / 2 * const.G * Sigma_atom**2 +
+                np.pi * const.G * Sigma_atom * Sigma_mol +
+                Sigma_atom * vdisp_atom_z *
+                np.sqrt(2 * const.G * rho_star_mp)) / const.k_B
+            self[colname] = (P_DE_cloud + P_DE_atom).to(unit)
         else:
-            vdisp_gas = vdisp_gas_z
-        self[colname] = (
-            (np.pi * const.G / 2 * Sigma_gas**2 +
-             Sigma_gas * vdisp_gas *
-             np.sqrt(2 * const.G * rho_star_mp)) /
-            const.k_B).to(unit)
+            raise ValueError(f"Unrecognized `scale`: {scale}")
 
     # ----------------------------------------------------------------
 
@@ -317,7 +344,7 @@ class PhangsMegaTable(StatsTable):
                 header=header, stat_func=nanaverage,
                 colname='_F<ICO>', unit='')
             self.calc_image_stats(
-                sm0map.astype('float'), weight=None,
+                wtmap, weight=None,
                 header=header, stat_func=nanaverage,
                 colname='_A<ICO>', unit='')
             self[colname] = (
@@ -386,6 +413,25 @@ class PhangsMegaTable(StatsTable):
                         f"No column in table named {colname_sph}")
                 self[colname] = (  # Sun+18 Eq.14
                     self[colname_sph] * 2/3).to(unit)
+
+            # cloud weight due to self-gravity
+            elif quantity == 'P_selfg_sph':
+                self.calc_image_stats(
+                    sm0map.astype('float')**2,
+                    header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname='_<I^2>', unit='K2 km2 s-2')
+                self[colname] = (  # Sun+20a Eq.16
+                    3/8 * np.pi * const.G * self['_<I^2>'] *
+                    alpha_CO**2 / const.k_B).to(unit)
+                self.table.remove_column('_<I^2>')
+            elif quantity == 'P_selfg_cyl':
+                colname_sph = colname.replace('cyl', 'sph')
+                if colname_sph not in self.colnames:
+                    raise ValueError(
+                        f"No column in table named {colname_sph}")
+                self[colname] = (
+                    self[colname_sph] * 4/3).to(unit)
 
             # virial parameter
             elif quantity == 'alpha_vir_sph':

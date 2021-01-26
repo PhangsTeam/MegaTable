@@ -92,7 +92,7 @@ def gen_radial_mega_table(
         if verbose:
             print("  Calculating rotation curve-related quantities")
         for row in config[config['group'] == 'rotcurve']:
-            if row['colname'] in ('V_circ', 'q_shear'):
+            if row['colname'] in ('V_circ', 'beta'):
                 modelfile = get_data_path(
                     row['source'], gal_name, ext='ecsv')
                 if not modelfile.is_file():
@@ -106,6 +106,9 @@ def gen_radial_mega_table(
                 t.add_rotcurve(
                     modelfile=modelfile, r_gal_angle=r_gal_angle,
                     colname=row['colname'], unit=row['unit'])
+            else:
+                raise ValueError(
+                    f"Unrecognized column name: {row['colname']}")
 
     if 'MtoL' in config['group']:
         # stellar M/L ratio
@@ -426,7 +429,7 @@ def gen_radial_mega_table(
                         vdisp_mol_z=vdisp_mol_z,
                         colname=row['colname'], unit=row['unit'])
             elif re.fullmatch(
-                    r'F\<P\_DE\_pix\_\d+pc\>', row['colname']):
+                    r'F<P_DE_pix_\d+pc>', row['colname']):
                 vdisp_col = f"F<vdisp_mol_pix_{row['res_pc']}pc>"
                 Sigma_col = f"F<Sigma_mol_pix_{row['res_pc']}pc>"
                 P_selfg_col = f"F<P_selfg_sph_pix_{row['res_pc']}pc>"

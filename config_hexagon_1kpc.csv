@@ -5,8 +5,8 @@ coord,,0,DEC,"deg",".5f","Declination of the aperture center"
 coord,,0,r_gal,"kpc",".2f","Deprojected galactocentric radius"
 coord,,0,phi_gal,"deg",".2f","Deprojected angle (0 = major axis receding side)"
 
-rotcurve,ALMA:rotcurve:spline_model,0,V_circ,"km s-1",".3e","Circular rotation velocity"
-rotcurve,ALMA:rotcurve:spline_model,0,q_shear,"1",".3e","Local shear parameter (- d ln(Omega) / d ln(r))"
+rotcurve,ALMA:rotcurve:legendre_model,0,V_circ,"km s-1",".3e","Circular rotation velocity"
+rotcurve,ALMA:rotcurve:legendre_model,0,beta,"1",".3e","Logarithmic derivative of the rotation curve"
 
 metal,,0,Zprime,"1",".3e","Gas-phase metallicity relative to solar value"
 metal,,0,Zprime_MZR+GRD,"1",".3e","Gas-phase metallicity relative to solar value (SAMI19 MZR + CALIFA14 gradient)"

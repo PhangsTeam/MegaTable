@@ -113,11 +113,11 @@ class PhangsMegaTable(StatsTable):
         t_model = Table.read(modelfile)
         model = interpolate.interp1d(
             t_model['r_gal'].quantity.to('arcsec').value,
-            t_model[colname.lower()].quantity.value,
+            t_model[colname].quantity.value,
             bounds_error=False, fill_value=np.nan)
         self[colname] = (
             model(r_gal_angle.to('arcsec').value) *
-            t_model[colname.lower()].quantity.unit).to(unit)
+            t_model[colname].quantity.unit).to(unit)
 
     # ----------------------------------------------------------------
 

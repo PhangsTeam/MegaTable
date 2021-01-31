@@ -1,3 +1,4 @@
+import re
 import sys
 import json
 import warnings
@@ -91,7 +92,7 @@ def gen_radial_mega_table(
         if verbose:
             print("  Calculating rotation curve-related quantities")
         for row in config[config['group'] == 'rotcurve']:
-            if row['colname'] in ('V_circ', 'q_shear'):
+            if row['colname'] in ('V_circ', 'beta'):
                 modelfile = get_data_path(
                     row['source'], gal_name, ext='ecsv')
                 if not modelfile.is_file():
@@ -105,6 +106,9 @@ def gen_radial_mega_table(
                 t.add_rotcurve(
                     modelfile=modelfile, r_gal_angle=r_gal_angle,
                     colname=row['colname'], unit=row['unit'])
+            else:
+                raise ValueError(
+                    f"Unrecognized column name: {row['colname']}")
 
     if 'MtoL' in config['group']:
         # stellar M/L ratio
@@ -125,8 +129,6 @@ def gen_radial_mega_table(
         # stellar mass surface density
         if verbose:
             print("  Calculating stellar mass surface density")
-        if 'MtoL_3p4um' not in t.colnames:
-            raise ValueError("No stellar M/L ratio data found")
         t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
         for row in config[config['group'] == 'star']:
             if row['colname'] == 'Sigma_star':
@@ -142,9 +144,18 @@ def gen_radial_mega_table(
             if not IRfile.is_file():
                 t[row['colname']] = np.nan * u.Unit(row['unit'])
                 continue
+            if row['colname'] == 'Sigma_star_3p6umICA':
+                MtoL = (
+                    phys_params["IR_MtoL_S4GICA"] *
+                    u.Unit(phys_params["IR_MtoL_S4GICA_unit"]))
+            else:
+                if 'MtoL_3p4um' not in t.colnames:
+                    raise ValueError(
+                        "No stellar M/L ratio info found")
+                MtoL = t['MtoL_3p4um'].to('Msun Lsun-1')
             t.add_Sigma_star(
-                IRfile, MtoL=t['MtoL_3p4um'],
-                band=band, Lsun_IR=Lsun, cosi=gal_cosi,
+                IRfile,
+                MtoL=MtoL, band=band, Lsun_IR=Lsun, cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
             if np.isfinite(t['Sigma_star']).sum() == 0:
                 t['Sigma_star'] = t[row['colname']]
@@ -396,16 +407,16 @@ def gen_radial_mega_table(
                     Rstar=gal_Rstar, diskshape='flat',
                     colname=row['colname'], unit=row['unit'])
             elif row['colname'] in ('P_DE_L08', 'P_DE_S20'):
-                if 'Sigma_mol' not in t.colnames:
-                    raise ValueError("No Sigma_mol column found")
-                if 'Sigma_atom' not in t.colnames:
-                    raise ValueError("No Sigma_atom column found")
-                if 'rho_star_mp' not in t.colnames:
-                    raise ValueError("No rho_star_mp column found")
+                for colname in (
+                        'Sigma_mol', 'Sigma_atom', 'rho_star_mp'):
+                    if colname not in t.colnames:
+                        raise ValueError(
+                            f"No `{colname}` column found")
                 if row['colname'] == 'P_DE_L08':
                     t.add_P_DE(
-                        Sigma_gas=t['Sigma_mol']+t['Sigma_atom'],
-                        rho_star_mp=t['rho_star_mp'],
+                        scale='kpc', rho_star_mp=t['rho_star_mp'],
+                        Sigma_mol=t['Sigma_mol'],
+                        Sigma_atom=t['Sigma_atom'],
                         colname=row['colname'], unit=row['unit'])
                 else:
                     if 'CO_stats' in config['group']:
@@ -413,15 +424,38 @@ def gen_radial_mega_table(
                         res_fid = np.max(rows['res_pc'])
                         vdisp_col = f"F<vdisp_mol_pix_{res_fid}pc>"
                         if vdisp_col not in t.colnames:
-                            raise ValueError("No vdisp data found")
-                        vdisp_gas_z = t[vdisp_col]
+                            raise ValueError(
+                                f"No `{vdisp_col}` column found")
+                        vdisp_mol_z = t[vdisp_col]
                     else:
-                        vdisp_gas_z = np.nan * u.Unit('km s-1')
+                        vdisp_mol_z = np.nan * u.Unit('km s-1')
                     t.add_P_DE(
-                        Sigma_gas=t['Sigma_mol'] + t['Sigma_atom'],
-                        rho_star_mp=t['rho_star_mp'],
-                        vdisp_gas_z=vdisp_gas_z,
+                        scale='kpc', rho_star_mp=t['rho_star_mp'],
+                        Sigma_mol=t['Sigma_mol'],
+                        Sigma_atom=t['Sigma_atom'],
+                        vdisp_mol_z=vdisp_mol_z,
                         colname=row['colname'], unit=row['unit'])
+            elif re.fullmatch(
+                    r'F<P_DE_pix_\d+pc>', row['colname']):
+                vdisp_col = f"F<vdisp_mol_pix_{row['res_pc']}pc>"
+                Sigma_col = f"F<Sigma_mol_pix_{row['res_pc']}pc>"
+                P_selfg_col = f"F<P_selfg_sph_pix_{row['res_pc']}pc>"
+                for colname in (
+                        'Sigma_mol', 'Sigma_atom', 'rho_star_mp',
+                        vdisp_col, Sigma_col, P_selfg_col):
+                    if colname not in t.colnames:
+                        raise ValueError(
+                            f"No `{colname}` column found")
+                R_cloud = row['res_pc'] * u.pc
+                t.add_P_DE(
+                    scale='cloud', rho_star_mp=t['rho_star_mp'],
+                    Sigma_atom=t['Sigma_atom'],
+                    Sigma_mol=t['Sigma_mol'],
+                    vdisp_mol_z=t[vdisp_col],
+                    Sigma_cloud=t[Sigma_col],
+                    P_selfg_cloud=t[P_selfg_col],
+                    R_cloud=R_cloud,
+                    colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
                     f"Unrecognized column name: {row['colname']}")

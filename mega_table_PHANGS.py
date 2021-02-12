@@ -52,10 +52,6 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
                     basedir / '..' /
                     f"{res.to('pc').value:.0f}pc_matched")
                 fname_seq[-2] = f"{res.to('pc').value:.0f}pc"
-        elif datatypes[1] == 'rotcurve':
-            # PHANGS-ALMA rotation curve
-            basedir = basedir / 'rotation_curve'
-            fname_seq = [galname] + datatypes[2:]
 
     elif datatypes[0] == 'HI':
         # HI data
@@ -90,6 +86,11 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         if res is not None:
             fname_seq += [f"{res.to('pc').value:.0f}pc"]
 
+    elif datatypes[0] == 'rotcurve':
+        # rotation curve
+        basedir = PHANGSdir / 'rotcurve'
+        fname_seq = [galname] + datatypes[1:]
+
     else:
         raise ValueError("Unrecognized dataset")
 
@@ -108,16 +109,16 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_rotcurve(
-            self, modelfile=None, r_gal_angle=None,
+            self, modelfile=None, modelcol=None, r_gal_angle=None,
             colname=None, unit=None):
         t_model = Table.read(modelfile)
         model = interpolate.interp1d(
             t_model['r_gal'].quantity.to('arcsec').value,
-            t_model[colname].quantity.value,
+            t_model[modelcol].quantity.value,
             bounds_error=False, fill_value=np.nan)
         self[colname] = (
             model(r_gal_angle.to('arcsec').value) *
-            t_model[colname].quantity.unit).to(unit)
+            t_model[modelcol].quantity.unit).to(unit)
 
     # ----------------------------------------------------------------
 

@@ -108,7 +108,8 @@ def gen_tessell_mega_table(
         if verbose:
             print("  Calculating rotation curve-related quantities")
         for row in config[config['group'] == 'rotcurve']:
-            if row['colname'] in ('V_circ', 'beta'):
+            modelcol = '_'.join(row['colname'].split('_')[:-1])
+            if modelcol in ('V_circ', 'beta'):
                 modelfile = get_data_path(
                     row['source'], gal_name, ext='ecsv')
                 if not modelfile.is_file():
@@ -119,7 +120,8 @@ def gen_tessell_mega_table(
                 r_gal_angle = (
                     t['r_gal'] / gal_dist * u.rad).to('arcsec')
                 t.add_rotcurve(
-                    modelfile=modelfile, r_gal_angle=r_gal_angle,
+                    modelfile=modelfile, modelcol=modelcol,
+                    r_gal_angle=r_gal_angle,
                     colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
@@ -625,7 +627,7 @@ if __name__ == '__main__':
                     'PHANGS-VLA v1.0; '
                     'PHANGS-Halpha v0.1&0.3; '
                     'sample table v1.6 (dist=v1.2)'),
-                version=1.3, writefile=mtfile)
+                version=1.4, writefile=mtfile)
 
         # ------------------------------------------------------------
 

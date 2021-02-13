@@ -41,11 +41,11 @@ class PhangsTessellMegaTable(PhangsMegaTable, TessellMegaTable):
 
 def gen_tessell_mega_table(
         config, gal_params={}, phys_params={},
-        aperture_shape=None, aperture_size_kpc=None,
+        tile_shape=None, tile_size_kpc=None,
         verbose=True, note='', version=0.0, writefile=''):
 
-    aperture_size_arcsec = np.rad2deg(
-        aperture_size_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
+    tile_size_arcsec = np.rad2deg(
+        tile_size_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
 
     # galaxy parameters
     gal_name = gal_params['name']
@@ -59,7 +59,7 @@ def gen_tessell_mega_table(
     if verbose:
         print("  Initializing mega table")
     infile = get_data_path(
-        'ALMA:CO:tpeak', gal_name, aperture_size_kpc*u.kpc)
+        'ALMA:CO:tpeak', gal_name, tile_size_kpc*u.kpc)
     if not infile.is_file():
         if verbose:
             print(f"No CO low resolution data found for {gal_name}")
@@ -68,8 +68,8 @@ def gen_tessell_mega_table(
     with fits.open(infile) as hdul:
         t = PhangsTessellMegaTable(
             hdul[0].header,
-            aperture_shape=aperture_shape,
-            aperture_size_arcsec=aperture_size_arcsec,
+            tile_shape=tile_shape,
+            tile_size_arcsec=tile_size_arcsec,
             gal_ra_deg=gal_params['ra_deg'],
             gal_dec_deg=gal_params['dec_deg'])
 
@@ -545,11 +545,11 @@ def gen_tessell_mega_table(
 
 if __name__ == '__main__':
 
-    # aperture (linear) size
-    aperture_size = 1 * u.kpc
+    # tile (linear) size
+    tile_size = 1 * u.kpc
 
-    # aperture shape
-    aperture_shape = 'hexagon'
+    # tile shape
+    tile_shape = 'hexagon'
 
     # ----------------------------------------------------------------
 
@@ -568,8 +568,8 @@ if __name__ == '__main__':
     # read configuration file
     config = Table.read(
         workdir /
-        f"config_{aperture_shape}_"
-        f"{aperture_size.to('kpc').value:.0f}kpc.csv")
+        f"config_{tile_shape}_"
+        f"{tile_size.to('kpc').value:.0f}kpc.csv")
 
     # read physical parameter file
     with open(workdir / "config_params.json") as f:
@@ -613,14 +613,14 @@ if __name__ == '__main__':
 
         mtfile = (
             workdir /
-            f"{gal_params['name']}_{aperture_shape}_stats_"
-            f"{aperture_size.to('kpc').value:.0f}kpc.fits")
+            f"{gal_params['name']}_{tile_shape}_stats_"
+            f"{tile_size.to('kpc').value:.0f}kpc.fits")
         if not mtfile.is_file():
             print(f"Constructing mega-table for {gal_params['name']}")
             gen_tessell_mega_table(
                 config, gal_params=gal_params, phys_params=phys_params,
-                aperture_shape=aperture_shape,
-                aperture_size_kpc=aperture_size.to('kpc').value,
+                tile_shape=tile_shape,
+                tile_size_kpc=tile_size.to('kpc').value,
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'CPROPS catalogs v3.4; '
@@ -633,8 +633,8 @@ if __name__ == '__main__':
 
         # mtfile_new = (
         #     workdir /
-        #     f"{gal_params['name']}_{aperture_shape}_stats_"
-        #     f"{aperture_size.to('kpc').value:.0f}kpc.ecsv")
+        #     f"{gal_params['name']}_{tile_shape}_stats_"
+        #     f"{tile_size.to('kpc').value:.0f}kpc.ecsv")
         # if mtfile.is_file() and not mtfile_new.is_file():
         #     print("Converting FITS table to ECSV format")
         #     t = Table.read(mtfile)

@@ -1,5 +1,7 @@
+import time
 import warnings
 import numpy as np
+from scipy.spatial import cKDTree
 from astropy import units as u
 from astropy.table import QTable
 from astropy.io import fits
@@ -15,7 +17,7 @@ from .utils import identical_units, reduce_image_input, HDU_types
 class BaseTable(object):
 
     """
-    A simple wrapper around `~astropy.tabel.QTable`.
+    A simple wrapper around `~astropy.table.QTable`.
 
     Parameters
     ----------
@@ -94,7 +96,6 @@ class BaseTable(object):
             t.meta.pop('TIMESTMP')
         if add_timestamp:
             # add current time stamp
-            import time
             t.meta['TIMESTMP'] = time.strftime('%c', time.gmtime())
         t.write(filename, **kwargs)
 
@@ -120,7 +121,7 @@ class StatsTable(BaseTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
 
         Return
         ------
@@ -309,7 +310,7 @@ class GeneralRegionTable(StatsTable):
         table, with each element in the list corresponds to a region.
         - If that element is an HDU object, it should contain a bitmap
         that defines the corresponding region (1=in, 0=out).
-        - If that element is a function oject, it should take an
+        - If that element is a function object, it should take an
         RA array and a DEC array as the only input parameters, and
         return a boolean array specifying whether these coordinates
         are in the region.
@@ -348,7 +349,7 @@ class GeneralRegionTable(StatsTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
 
         Return
         ------
@@ -536,7 +537,7 @@ class VoronoiTessTable(StatsTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
         fill_value : float, optional
             The index value to return for input coordinates that have
             no matched regions (default: -1).
@@ -548,7 +549,6 @@ class VoronoiTessTable(StatsTable):
             belongs to. The length of this array equals the number of
             input coordinates.
         """
-        from scipy.spatial import cKDTree
 
         # identify reference coordinate
         radec_ctr = np.array(

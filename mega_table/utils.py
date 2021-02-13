@@ -121,7 +121,7 @@ def deproject(
     calculates deprojected radii and projected angles based on
     (1) a FITS header (`header`), or
     (2) a WCS object with specified axis sizes (`wcs` + `naxis`), or
-    (3) RA and DEC coodinates (`ra` + `dec`).
+    (3) RA and DEC coordinates (`ra` + `dec`).
     Both deprojected radii and projected angles are defined relative
     to the center in the inclined disk frame. For (1) and (2), the
     outputs are 2D images; for (3), the outputs are arrays with shapes

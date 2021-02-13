@@ -5,6 +5,7 @@ from astropy import units as u
 from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.coordinates import SkyCoord
 from .core import GeneralRegionTable, VoronoiTessTable
 from .utils import deproject
 
@@ -134,6 +135,118 @@ class RadialMegaTable(GeneralRegionTable):
             gal_incl_deg=t.meta['INCL_DEG'],
             gal_posang_deg=t.meta['PA_DEG'],
             rgal_max_arcsec=t.meta['RMAX_DEG']*3600)
+
+        # overwrite the underlying data table
+        mt.table = QTable()
+        for key in t.colnames:
+            mt[key] = t[key]
+        for key in t.meta:
+            mt.meta[key] = t.meta[key]
+
+        return mt
+
+
+######################################################################
+#
+# User-defined Apertures
+#
+######################################################################
+
+
+class ApertureMegaTable(GeneralRegionTable):
+
+    """
+    Mega-table built from apertures centered on specified locations.
+
+    Each aperture corresponds to a row in the table.
+    Once a table is constructed, additional columns can be added
+    by calculating statistics of images within each ring.
+
+    Parameters
+    ----------
+    aperture_ra_deg : array_like
+        Right Ascension of the aperture centers (in degrees).
+    aperture_dec_deg : array_like
+        Declination of the aperture centers (in degrees).
+    aperture_size_arcsec : float
+        The angular size of the apertures (in arcseconds).
+    aperture_names : list of str, optional
+        Names of the apertures.
+    """
+
+    __name__ = "ApertureMegaTable"
+
+    # ----------------------------------------------------------------
+
+    def __init__(
+            self, aperture_ra_deg, aperture_dec_deg,
+            aperture_size_arcsec, aperture_names=None):
+
+        # function that determines whether a set of coordinates locate
+        # inside an aperture
+        def coord2bool(
+                ra, dec, aper_ra=None, aper_dec=None, aper_size=None):
+            coords = SkyCoord(ra*u.deg, dec*u.deg)
+            center_coord = SkyCoord(aper_ra*u.deg, aper_dec*u.deg)
+            angl_sep = center_coord.separation(coords)
+            return angl_sep < aper_size * u.arcsec
+
+        # aperture names and definitions
+        aper_defs = [
+            partial(
+                coord2bool, aper_ra=aper_ra, aper_dec=aper_dec,
+                aper_size=aperture_size_arcsec)
+            for aper_ra, aper_dec in zip(
+                *np.broadcast_arrays(
+                    aperture_ra_deg, aperture_dec_deg))
+        ]
+        if aperture_names is None:
+            aperture_names = [
+                f"Aper#{iaper+1}"
+                for iaper in np.arange(len(aper_defs))]
+
+        # initialize object
+        GeneralRegionTable.__init__(
+            self, aper_defs, names=aperture_names)
+        # save aperture parameters in the table
+        self['RA'] = aperture_ra_deg * u.deg
+        self['DEC'] = aperture_dec_deg * u.deg
+
+        # record meta data in table
+        self.meta['APER_DEG'] = aperture_size_arcsec / 3600
+
+    # ----------------------------------------------------------------
+
+    @classmethod
+    def read(cls, filename, **kwargs):
+        """
+        Read (and reconstruct) an ApertureMegaTable object from file.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file to read.
+        **kwargs
+            Keyword arguments to be passed to `~astropy.table.read`
+
+        Return
+        ------
+        table : ApertureMegaTable
+        """
+        t = QTable.read(filename, **kwargs)
+
+        # input file should be a valid ApertureMegaTable output
+        if 'TLBTYPE' not in t.meta:
+            raise ValueError("Input file not recognized")
+        if t.meta['TBLTYPE'] != 'ApertureMegaTable':
+            raise ValueError(
+                "Cannot reconstruct an ApertureMegaTable object from "
+                f"the input {t.meta['TBLTYPE']} file")
+
+        # initiate ApertureMegaTable w/ recorded data in file
+        mt = cls(
+            t['RA'].to('deg').value, t['DEC'].to('deg').value,
+            t.meta['APER_DEG']*3600, aperture_names=t['REGION'])
 
         # overwrite the underlying data table
         mt.table = QTable()

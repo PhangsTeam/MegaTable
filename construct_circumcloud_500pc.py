@@ -42,7 +42,7 @@ class PhangsApertureMegaTable(PhangsMegaTable, ApertureMegaTable):
 def gen_aperture_mega_table(
         config, gal_params={}, phys_params={},
         aperture_ra_deg=None, aperture_dec_deg=None,
-        aperture_size_pc=None,
+        aperture_size_pc=None, aperture_names=None,
         verbose=True, note='', version=0.0, writefile=''):
 
     aperture_size_arcsec = np.rad2deg(
@@ -59,8 +59,6 @@ def gen_aperture_mega_table(
     # initialize table
     if verbose:
         print("  Initializing mega table")
-    aperture_names = [
-        f"GMC#{igmc}" for igmc in range(len(aperture_ra_deg))]
     t = PhangsApertureMegaTable(
         aperture_ra_deg, aperture_dec_deg, aperture_size_arcsec,
         aperture_names=aperture_names)
@@ -623,6 +621,8 @@ if __name__ == '__main__':
                 aperture_ra_deg=t_cprops['XCTR_DEG'],
                 aperture_dec_deg=t_cprops['YCTR_DEG'],
                 aperture_size_pc=aperture_size.to('pc').value,
+                aperture_names=[
+                    f"GMC#{igmc}" for igmc in t_cprops['CLOUDNUM']],
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'CPROPS catalogs v3.4; '

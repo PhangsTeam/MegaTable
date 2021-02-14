@@ -192,6 +192,8 @@ class StatsTable(BaseTable):
                 flagarr = findarr[:, ind]
             else:  # 1D index array
                 flagarr = (findarr == ind)
+            if flagarr.sum() == 0:
+                continue
             if weight is None:
                 arr[ind] = stat_func(
                     entry.astype('float')[flagarr],
@@ -545,7 +547,8 @@ class VoronoiTessTable(StatsTable):
 
         # for all coordinates outside the FoV, overwrite
         # their matched indices with "fill_value"
-        mask = np.sqrt(np.sum(offset_loc**2, axis=-1)) > self._fov
+        mask = (
+            np.sqrt(np.sum(offset_loc**2, axis=-1)) > self._fov.value)
         indices[mask] = fill_value
 
         return indices

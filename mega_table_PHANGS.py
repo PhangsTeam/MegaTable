@@ -735,7 +735,6 @@ def add_columns_to_mega_table(
                 else:
                     raise ValueError(
                         f"Unrecognized column name: {row['colname']}")
-
         elif type(t) in (
                 PhangsApertureMegaTable, PhangsTessellMegaTable):
             # galactic radius and projected angle
@@ -768,7 +767,6 @@ def add_columns_to_mega_table(
                 else:
                     raise ValueError(
                         f"Unrecognized column name: {row['colname']}")
-
         else:
             raise ValueError(f"Unknown mega-table type: {type(t)}")
 
@@ -784,11 +782,16 @@ def add_columns_to_mega_table(
                 if not modelfile.is_file():
                     t[row['colname']] = np.nan * u.Unit(row['unit'])
                     continue
-                if 'r_gal_min' not in t.colnames:
+                if ('r_gal_min' in t.colnames and
+                        'r_gal_max' in t.colnames):
+                    r_gal_angle = (
+                        (t['r_gal_min'] + t['r_gal_max']) / 2 /
+                        gal_dist * u.rad).to('arcsec')
+                elif 'r_gal' in t.colnames:
+                    r_gal_angle = (
+                        t['r_gal'] / gal_dist * u.rad).to('arcsec')
+                else:
                     raise ValueError("No coordinate info found")
-                r_gal_angle = (
-                    (t['r_gal_min'] + t['r_gal_max']) / 2 /
-                    gal_dist * u.rad).to('arcsec')
                 t.add_rotcurve(
                     modelfile=modelfile, modelcol=modelcol,
                     r_gal_angle=r_gal_angle,
@@ -886,14 +889,22 @@ def add_columns_to_mega_table(
             if row['colname'] == 'Zprime':
                 continue
             elif row['colname'] == 'Zprime_MZR+GRD':
-                if 'r_gal_min' not in t.colnames:
+                if ('r_gal_min' in t.colnames and
+                        'r_gal_max' in t.colnames):
+                    t.add_metallicity(
+                        Mstar=gal_params['Mstar_Msun'] * u.Msun,
+                        r_gal=(t['r_gal_min']+t['r_gal_max'])/2,
+                        Rdisk=gal_Rstar,
+                        logOH_solar=phys_params['abundance_solar'],
+                        colname=row['colname'], unit=row['unit'])
+                elif 'r_gal' in t.colnames:
+                    t.add_metallicity(
+                        Mstar=gal_params['Mstar_Msun'] * u.Msun,
+                        r_gal=t['r_gal'], Rdisk=gal_Rstar,
+                        logOH_solar=phys_params['abundance_solar'],
+                        colname=row['colname'], unit=row['unit'])
+                else:
                     raise ValueError("No coordinate info found")
-                t.add_metallicity(
-                    Mstar=gal_params['Mstar_Msun']*u.Msun,
-                    r_gal=(t['r_gal_min']+t['r_gal_max'])/2,
-                    Rdisk=gal_Rstar,
-                    logOH_solar=phys_params['abundance_solar'],
-                    colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
                     f"Unrecognized column name: {row['colname']}")

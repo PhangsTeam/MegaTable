@@ -17,16 +17,15 @@ logging = False
 
 def gen_radial_mega_table(
         config, gal_params={}, phys_params={},
-        rgal_bin_kpc=None, rgal_max_kpc=None,
+        rgal_bin_kpc=None, rgal_max_R25=None,
         verbose=True, note='', version=0.0, writefile=''):
 
     rgal_bin_arcsec = np.rad2deg(
         rgal_bin_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
-    if rgal_max_kpc is None:
+    if rgal_max_R25 is None:
         rgal_max_arcsec = None
     else:
-        rgal_max_arcsec = np.rad2deg(
-            rgal_max_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
+        rgal_max_arcsec = rgal_max_R25 * gal_params['R25_arcsec']
 
     # initialize table
     if verbose:
@@ -67,6 +66,9 @@ def gen_radial_mega_table(
     t.meta['INCL_DEG'] = gal_params['incl_deg']
     t.meta['PA_DEG'] = gal_params['posang_deg']
     t.meta['LOGMSTAR'] = np.log10(gal_params['Mstar_Msun'])
+    t.meta['R25_KPC'] = (
+        (gal_params['R25_arcsec'] * u.arcsec).to('rad').value *
+        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
     t.meta['RDISKKPC'] = (
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
@@ -93,8 +95,8 @@ if __name__ == '__main__':
     # ring (deprojected) width
     rgal_bin = 0.5 * u.kpc
 
-    # maximal (deprojected) galactic radius
-    rgal_max = 25 * u.kpc
+    # maximum galactocentric radius (relative to R25)
+    rgal_max_R25 = 1.5
 
     # ----------------------------------------------------------------
 
@@ -135,6 +137,7 @@ if __name__ == '__main__':
             'posang_deg': row['orient_posang'],
             'Mstar_Msun': row['props_mstar'],
             'Rstar_arcsec': row['size_scalelength'],
+            'R25_arcsec': row['size_r25'],
         }
 
         # skip targets with bad distance
@@ -164,7 +167,7 @@ if __name__ == '__main__':
             gen_radial_mega_table(
                 config, gal_params=gal_params, phys_params=phys_params,
                 rgal_bin_kpc=rgal_bin.to('kpc').value,
-                rgal_max_kpc=rgal_max.to('kpc').value,
+                rgal_max_R25=rgal_max_R25,
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'CPROPS catalogs v3.4; '

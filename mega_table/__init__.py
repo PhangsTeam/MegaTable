@@ -1,1 +1,1 @@
-from .table import RadialMegaTable, TessellMegaTable
+from .table import RadialMegaTable, ApertureMegaTable, TessellMegaTable

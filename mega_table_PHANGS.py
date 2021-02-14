@@ -647,8 +647,6 @@ class PhangsRadialMegaTable(PhangsMegaTable, RadialMegaTable):
     RadialMegaTable enhanced with PHANGS-specific tools.
     """
 
-    __name__ = "PhangsRadialMegaTable"
-
     def add_coord(
             self, colname=None, unit=None, gal_dist=None,
             r_gal_angl_min=None, r_gal_angl_max=None):

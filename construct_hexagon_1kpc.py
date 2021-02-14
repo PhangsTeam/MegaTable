@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
-from astropy.io import fits
 from mega_table_PHANGS import (
     PhangsTessellMegaTable, get_data_path, add_columns_to_mega_table)
 
@@ -18,30 +17,20 @@ logging = False
 
 def gen_tessell_mega_table(
         config, gal_params={}, phys_params={},
-        tile_shape=None, tile_size_kpc=None,
+        tile_shape=None, tile_size_kpc=None, fov_radius_R25=None,
         verbose=True, note='', version=0.0, writefile=''):
 
     tile_size_arcsec = np.rad2deg(
         tile_size_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
+    fov_radius_arcsec = fov_radius_R25 * gal_params['R25_arcsec']
 
     # initialize table
     if verbose:
         print("  Initializing mega table")
-    infile = get_data_path(
-        'ALMA:CO:tpeak', gal_params['name'], tile_size_kpc*u.kpc)
-    if not infile.is_file():
-        if verbose:
-            print(f"No CO low resolution data found for "
-                  f"{gal_params['name']}")
-            print("")
-        return
-    with fits.open(infile) as hdul:
-        t = PhangsTessellMegaTable(
-            hdul[0].header,
-            tile_shape=tile_shape,
-            tile_size_arcsec=tile_size_arcsec,
-            gal_ra_deg=gal_params['ra_deg'],
-            gal_dec_deg=gal_params['dec_deg'])
+    t = PhangsTessellMegaTable(
+        gal_params['ra_deg'], gal_params['dec_deg'],
+        fov_radius_arcsec, tile_size_arcsec,
+        tile_shape=tile_shape)
 
     # add measurements to table
     add_columns_to_mega_table(
@@ -73,6 +62,9 @@ def gen_tessell_mega_table(
     t.meta['INCL_DEG'] = gal_params['incl_deg']
     t.meta['PA_DEG'] = gal_params['posang_deg']
     t.meta['LOGMSTAR'] = np.log10(gal_params['Mstar_Msun'])
+    t.meta['R25_KPC'] = (
+        (gal_params['R25_arcsec'] * u.arcsec).to('rad').value *
+        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
     t.meta['RDISKKPC'] = (
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
@@ -101,6 +93,9 @@ if __name__ == '__main__':
 
     # tile shape
     tile_shape = 'hexagon'
+
+    # FoV radius (relative to R25)
+    fov_radius_R25 = 1.5
 
     # ----------------------------------------------------------------
 
@@ -142,6 +137,7 @@ if __name__ == '__main__':
             'posang_deg': row['orient_posang'],
             'Mstar_Msun': row['props_mstar'],
             'Rstar_arcsec': row['size_scalelength'],
+            'R25_arcsec': row['size_r25'],
         }
 
         # skip targets with bad distance
@@ -172,6 +168,7 @@ if __name__ == '__main__':
                 config, gal_params=gal_params, phys_params=phys_params,
                 tile_shape=tile_shape,
                 tile_size_kpc=tile_size.to('kpc').value,
+                fov_radius_R25=fov_radius_R25,
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'CPROPS catalogs v3.4; '

@@ -22,10 +22,7 @@ def gen_radial_mega_table(
 
     rgal_bin_arcsec = np.rad2deg(
         rgal_bin_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
-    if rgal_max_R25 is None:
-        rgal_max_arcsec = None
-    else:
-        rgal_max_arcsec = rgal_max_R25 * gal_params['R25_arcsec']
+    rgal_max_arcsec = rgal_max_R25 * gal_params['R25_arcsec']
 
     # initialize table
     if verbose:

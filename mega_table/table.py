@@ -29,9 +29,9 @@ class RadialMegaTable(GeneralRegionTable):
     Parameters
     ----------
     gal_ra_deg : float, optional
-        Right Ascension coordinate of the galaxy center (in degrees).
+        Right Ascension of the galaxy center (in degrees).
     gal_dec_deg : float, optional
-        Declination coordinate of the galaxy center (in degrees).
+        Declination of the galaxy center (in degrees).
     rgal_bin_arcsec : float
         The (deprojected) width of each ring (in arcseconds).
     gal_incl_deg : float, optional
@@ -277,26 +277,21 @@ class TessellMegaTable(VoronoiTessTable):
 
     Parameters
     ----------
-    header : astropy.fits.Header
-        FITS header that defines the sky footprint of a galaxy.
+    center_ra_deg : float
+        Right Ascension of the FoV center (in degrees).
+        This also determines the location of the central tile.
+    center_dec_deg : float
+        Declination of the FoV center (in degrees).
+        This also determines the location of the central tile.
+    fov_radius_arcsec : float
+        Radius of the FoV covered by the tessellation (in arcsecs).
+        This determines the overall extent of the tessellation.
+    tile_size_arcsec : float
+        The angular size of the tiles (defined as the spacing between
+        adjacent tile centers; in arcseconds).
     tile_shape : {'hexagon', 'square'}, optional
         The shape of the tiles that form the tessellation.
         Default: 'hexagon', in which case hexagonal tiles are used.
-    tile_size_arcsec : float, optional
-        The angular size of the tiles (defined as the spacing between
-        adjacent tile centers; in arcseconds).
-        If None, the minimum absolute value of the 'CDELT' entry
-        in the input header will be used.
-    gal_ra_deg : float, optional
-        Right Ascension coordinate of the galaxy center (in degrees).
-        This is only used as a reference coordinate for calculating
-        angular separation coordinates.
-        If None, the 'CRVAL' entry in the input header will be used.
-    gal_dec_deg : float, optional
-        Declination coordinate of the galaxy center (in degrees).
-        This is only used as a reference coordinate for calculating
-        angular separation coordinates.
-        If None, the 'CRVAL' entry in the input header will be used.
     """
 
     __name__ = "TessellMegaTable"
@@ -304,24 +299,21 @@ class TessellMegaTable(VoronoiTessTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, header,
-            tile_shape='hexagon', tile_size_arcsec=None,
-            gal_ra_deg=None, gal_dec_deg=None):
+            self, center_ra_deg, center_dec_deg, fov_radius_arcsec,
+            tile_size_arcsec, tile_shape='hexagon'):
         VoronoiTessTable.__init__(
-            self, header,
-            tile_shape=tile_shape,
+            self,
+            center_ra=center_ra_deg, center_dec=center_dec_deg,
+            fov_radius=fov_radius_arcsec/3600,
             seed_spacing=tile_size_arcsec/3600,
-            ref_radec=(gal_ra_deg, gal_dec_deg))
+            tile_shape=tile_shape)
 
         # record metadata
-        self.meta['APER_DEF'] = tile_shape
-        self.meta['APER_DEG'] = tile_size_arcsec / 3600
-        self.meta['RA_DEG'] = self._ref_coord.ra.value
-        self.meta['DEC_DEG'] = self._ref_coord.dec.value
-        self.meta['NAXIS1'] = self._wcs._naxis[0]
-        self.meta['NAXIS2'] = self._wcs._naxis[1]
-        for key in self._wcs.to_header():
-            self.meta[key] = self._wcs.to_header()[key]
+        self.meta['RA_DEG'] = self._center.ra.to('deg').value
+        self.meta['DEC_DEG'] = self._center.dec.to('deg').value
+        self.meta['FOV_DEG'] = self._fov.to('deg').value
+        self.meta['TILE_DEG'] = tile_size_arcsec / 3600
+        self.meta['TILE_DEF'] = tile_shape
 
     # ----------------------------------------------------------------
 
@@ -351,19 +343,11 @@ class TessellMegaTable(VoronoiTessTable):
                 "Cannot reconstruct a TessellMegaTable object from "
                 f"the input {t.meta['TBLTYPE']} file")
 
-        # initiate TessellMegaTable w/ recorded meta data in file
-        hdr = fits.Header()
-        for key in t.meta:
-            if key[0] == '_':
-                hdr[key[1:]] = t.meta[key]
-            else:
-                hdr[key] = t.meta[key]
+        # initiate TessellMegaTable
         mt = cls(
-            hdr,
-            tile_shape=t.meta['APER_DEF'],
-            tile_size_arcsec=t.meta['APER_DEG']*3600,
-            gal_ra_deg=t.meta['RA_DEG'],
-            gal_dec_deg=t.meta['DEC_DEG'])
+            t.meta['RA_DEG'], t.meta['RA_DEG'],
+            t.meta['FOV_DEG']*3600, t.meta['TILE_DEG']*3600,
+            tile_shape=t.meta['TILE_DEF'])
 
         # overwrite the underlying data table
         mt.table = QTable()
@@ -407,15 +391,6 @@ class TessellMegaTable(VoronoiTessTable):
                     hdr[key] = t.meta[key]
                 except ValueError:
                     t.meta.pop(key)
-            # special treatment for WCS keywords
-            for key in ('NAXIS1', 'NAXIS2'):
-                t.meta['_'+key] = t.meta[key]
-                t.meta.pop(key)
-            for key in WCS(t.meta).to_header():
-                if key not in t.meta:
-                    continue
-                t.meta['_'+key] = t.meta[key]
-                t.meta.pop(key)
         if 'TIMESTMP' in t.meta:
             # remove previous time stamp
             t.meta.pop('TIMESTMP')
@@ -426,7 +401,7 @@ class TessellMegaTable(VoronoiTessTable):
 
     # ----------------------------------------------------------------
 
-    def create_maps_from_columns(self, colnames, header=None):
+    def create_maps_from_columns(self, colnames, header):
         """
         Create 2D maps from data in columns based on a FITS header.
 
@@ -436,18 +411,12 @@ class TessellMegaTable(VoronoiTessTable):
             Name of the columns to create 2D maps for.
         header : `~astropy.fits.Header`, optional
             FITS header defining the WCS of the output 2D maps.
-            If None (default), use the header based on which the
-            TessellMegaTable object was initialized.
 
         Return
         ------
         arrays : list of ~numpy.ndarray
         """
-        if header is None:
-            wcs = WCS(fits.Header(self.meta)).celestial
-        else:
-            wcs = WCS(header).celestial
-
+        wcs = WCS(header).celestial
         # find pixels in tiles
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
@@ -455,14 +424,12 @@ class TessellMegaTable(VoronoiTessTable):
             iax0, iax1, 0, ra_dec_order=True)
         indmap = self.find_coords_in_regions(
             ramap, decmap).reshape(ramap.shape)
-
         # create 2D maps
         arrays = []
         for colname in colnames:
             array = self[colname][indmap]
             array[indmap == -1] = np.nan
             arrays += [array]
-
         return arrays
 
     # ----------------------------------------------------------------

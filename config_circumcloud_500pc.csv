@@ -1,5 +1,7 @@
 group,source,res_pc,colname,unit,format,description
 
+label,,0,REGION,,"s","Region name"
+
 coord,,0,RA,"deg",".5f","Right Ascension of the aperture center"
 coord,,0,DEC,"deg",".5f","Declination of the aperture center"
 coord,,0,r_gal,"kpc",".2f","Deprojected galactocentric radius"

@@ -6,7 +6,7 @@ import numpy as np
 from astropy import units as u
 from astropy.table import Table
 from mega_table_PHANGS import (
-    PhangsRadialMegaTable, get_data_path, add_columns_to_mega_table)
+    PhangsApertureMegaTable, get_data_path, add_columns_to_mega_table)
 
 warnings.filterwarnings('ignore')
 
@@ -15,23 +15,21 @@ logging = False
 # --------------------------------------------------------------------
 
 
-def gen_radial_mega_table(
+def gen_aperture_mega_table(
         config, gal_params={}, phys_params={},
-        rgal_bin_kpc=None, rgal_max_R25=None,
+        aperture_ra_deg=None, aperture_dec_deg=None,
+        aperture_size_pc=None, aperture_names=None,
         verbose=True, note='', version=0.0, writefile=''):
 
-    rgal_bin_arcsec = np.rad2deg(
-        rgal_bin_kpc / gal_params['dist_Mpc'] / 1e3) * 3600
-    rgal_max_arcsec = rgal_max_R25 * gal_params['R25_arcsec']
+    aperture_size_arcsec = np.rad2deg(
+        aperture_size_pc / gal_params['dist_Mpc'] / 1e6) * 3600
 
     # initialize table
     if verbose:
         print("  Initializing mega table")
-    t = PhangsRadialMegaTable(
-        gal_params['ra_deg'], gal_params['dec_deg'], rgal_bin_arcsec,
-        rgal_max_arcsec=rgal_max_arcsec,
-        gal_incl_deg=gal_params['incl_deg'],
-        gal_posang_deg=gal_params['posang_deg'])
+    t = PhangsApertureMegaTable(
+        aperture_ra_deg, aperture_dec_deg, aperture_size_arcsec,
+        aperture_names=aperture_names)
 
     # add measurements to table
     add_columns_to_mega_table(
@@ -63,9 +61,6 @@ def gen_radial_mega_table(
     t.meta['INCL_DEG'] = gal_params['incl_deg']
     t.meta['PA_DEG'] = gal_params['posang_deg']
     t.meta['LOGMSTAR'] = np.log10(gal_params['Mstar_Msun'])
-    t.meta['R25_KPC'] = (
-        (gal_params['R25_arcsec'] * u.arcsec).to('rad').value *
-        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
     t.meta['RDISKKPC'] = (
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
@@ -89,11 +84,8 @@ def gen_radial_mega_table(
 
 if __name__ == '__main__':
 
-    # ring (deprojected) width
-    rgal_bin = 0.5 * u.kpc
-
-    # maximum galactocentric radius (relative to R25)
-    rgal_max_R25 = 1.5
+    # aperture (linear) size
+    aperture_size = 500 * u.pc
 
     # ----------------------------------------------------------------
 
@@ -112,7 +104,8 @@ if __name__ == '__main__':
     # read configuration file
     config = Table.read(
         workdir /
-        f"config_annulus_{rgal_bin.to('pc').value:.0f}pc.csv")
+        f"config_circumcloud_"
+        f"{aperture_size.to('pc').value:.0f}pc.csv")
 
     # read physical parameter file
     with open(workdir / "config_params.json") as f:
@@ -134,8 +127,11 @@ if __name__ == '__main__':
             'posang_deg': row['orient_posang'],
             'Mstar_Msun': row['props_mstar'],
             'Rstar_arcsec': row['size_scalelength'],
-            'R25_arcsec': row['size_r25'],
         }
+
+        # CPROPS catalog file
+        cprops_file = get_data_path(
+            'ALMA:CPROPS', gal_params['name'], 150*u.pc)
 
         # skip targets with bad distance
         if not gal_params['dist_Mpc'] > 0:
@@ -152,19 +148,30 @@ if __name__ == '__main__':
                 f"{gal_params['name']}")
             print("")
             continue
+        # skip targets without CPROPS catalog
+        if not cprops_file.is_file():
+            print(
+                f"No CPROPS catalog found - skipping "
+                f"{gal_params['name']}")
+            print("")
+            continue
 
         print(f"Processing data for {gal_params['name']}")
 
         mtfile = (
             workdir /
-            f"{gal_params['name']}_annulus_stats_"
-            f"{rgal_bin.to('pc').value:.0f}pc.fits")
+            f"{gal_params['name']}_circumcloud_stats_"
+            f"{aperture_size.to('pc').value:.0f}pc.fits")
         if not mtfile.is_file():
             print(f"Constructing mega-table for {gal_params['name']}")
-            gen_radial_mega_table(
+            t_cprops = Table.read(cprops_file)
+            gen_aperture_mega_table(
                 config, gal_params=gal_params, phys_params=phys_params,
-                rgal_bin_kpc=rgal_bin.to('kpc').value,
-                rgal_max_R25=rgal_max_R25,
+                aperture_ra_deg=t_cprops['XCTR_DEG'],
+                aperture_dec_deg=t_cprops['YCTR_DEG'],
+                aperture_size_pc=aperture_size.to('pc').value,
+                aperture_names=[
+                    f"GMC#{igmc}" for igmc in t_cprops['CLOUDNUM']],
                 note=(
                     'PHANGS-ALMA v3.4; '
                     'CPROPS catalogs v3.4; '
@@ -177,8 +184,8 @@ if __name__ == '__main__':
 
         # mtfile_new = (
         #     workdir /
-        #     f"{gal_params['name']}_annulus_stats_"
-        #     f"{rgal_bin.to('pc').value:.0f}pc.ecsv")
+        #     f"{gal_params['name']}_circumcloud_stats_"
+        #     f"{aperture_size.to('pc').value:.0f}pc.ecsv")
         # if mtfile.is_file() and not mtfile_new.is_file():
         #     print("Converting FITS table to ECSV format")
         #     t = Table.read(mtfile)

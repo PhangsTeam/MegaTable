@@ -15,7 +15,7 @@
     "HI_alpha21cm_comment": "Heavy elements included",
     "CO_R21": 0.65,
     "CO_R21_comment": "Leroy+13; den Brok+21",
-    "CO_los_depth": 100,
-    "CO_los_depth_unit": "pc",
-    "CO_los_depth_comment": "Heyer&Dame15"
+    "CO_full_height": 100,
+    "CO_full_height_unit": "pc",
+    "CO_full_height_comment": "Heyer&Dame15"
 }

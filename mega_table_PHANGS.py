@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import numpy as np
 from scipy import interpolate
+from scipy.special import erf, erfinv
 from astropy import units as u, constants as const
 from astropy.io import fits
 from astropy.table import Table
@@ -284,7 +285,7 @@ class PhangsMegaTable(StatsTable):
                 np.pi / 2 * const.G / const.k_B *
                 Sigma_cloud * Sigma_mol +
                 3 / 4 * np.pi * const.G / const.k_B *
-                Sigma_cloud * rho_star_mp * 2 * R_cloud)
+                Sigma_cloud * rho_star_mp * R_cloud*2)
             P_DE_atom = (  # Sun+20a Eq.18
                 np.pi / 2 * const.G * Sigma_atom**2 +
                 np.pi * const.G * Sigma_atom * Sigma_mol +
@@ -299,29 +300,39 @@ class PhangsMegaTable(StatsTable):
     def add_CO_stats(
             self, header=None,
             tpkmap=None, bm0map=None, sm0map=None, sewmap=None,
-            alpha_CO=None, R_cloud=None, H_los=None,
+            alpha_CO=None, FWHM_beam=None, H_los=None,
             colname=None, unit=None):
 
         if not (tpkmap.shape == bm0map.shape ==
                 sm0map.shape == sewmap.shape):
             raise ValueError(
                 "Input maps have inconsistent shape")
-        tpkmap[~np.isfinite(tpkmap)] = np.nan
-        bm0map[~np.isfinite(bm0map)] = np.nan
-        wtmap = sm0map.copy().astype('float')
-        wtmap[~np.isfinite(sm0map) | (sm0map <= 0) |
-              ~np.isfinite(sewmap) | (sewmap <= 0)] = 0
-        sm0map[wtmap == 0] = np.nan
-        sewmap[wtmap == 0] = np.nan
+
+        tpeak = tpkmap * u.K
+        tpeak[~np.isfinite(tpeak)] = np.nan
+        bmom0 = bm0map * u.Unit('K km s-1')
+        bmom0[~np.isfinite(bmom0)] = np.nan
+        wt = sm0map.copy().astype('float')
+        wt[~np.isfinite(sewmap) | (sewmap <= 0) |
+           ~np.isfinite(sm0map) | (sm0map <= 0)] = 0
+        vdisp = sewmap * u.Unit('km s-1')
+        vdisp[wt == 0] = np.nan
+        smom0 = sm0map * u.Unit('K km s-1')
+        smom0[wt == 0] = np.nan
+        surfdens = (smom0 * alpha_CO).to('Msun pc-2')
+        mass = (
+            np.pi/np.log(2) * surfdens * (FWHM_beam/2)**2).to('Msun')
+        radius = FWHM_beam / 2
+        radius3d = np.min(np.cbrt(radius**2 * H_los/2), radius)
 
         # area coverage fraction of the strict CO map
         if colname[:5] == 'fracA':
             self.calc_image_stats(
-                (sm0map > 0).astype('float'),
+                np.isfinite(smom0).astype('float'),
                 header=header, stat_func=np.nansum,
                 colname='_A_strict', unit='')
             self.calc_image_stats(
-                np.ones_like(sm0map).astype('float'),
+                np.isfinite(sm0map).astype('float'),
                 header=header, stat_func=np.nansum,
                 colname='_A_total', unit='')
             self[colname] = (
@@ -331,11 +342,11 @@ class PhangsMegaTable(StatsTable):
         # flux recovery fraction of the strict CO map
         elif colname[:5] == 'fracF':
             self.calc_image_stats(
-                sm0map.astype('float'),
+                smom0.value,
                 header=header, stat_func=np.nansum,
                 colname='_F_strict', unit='')
             self.calc_image_stats(
-                bm0map.astype('float'),
+                bmom0.value,
                 header=header, stat_func=np.nansum,
                 colname='_F_broad', unit='')
             self[colname] = (
@@ -371,133 +382,120 @@ class PhangsMegaTable(StatsTable):
         # clumping factor of the strict CO map
         elif colname[:8] == 'clumping':
             self.calc_image_stats(
-                sm0map.astype('float'), weight=wtmap,
+                wt, weight=wt,
                 header=header, stat_func=nanaverage,
                 colname='_F<ICO>', unit='')
             self.calc_image_stats(
-                wtmap, weight=None,
+                wt, weight=None,
                 header=header, stat_func=nanaverage,
                 colname='_A<ICO>', unit='')
             self[colname] = (
                 self['_F<ICO>'] / self['_A<ICO>']).to(unit)
             self.table.remove_columns(['_F<ICO>', '_A<ICO>'])
 
+        # weighted average cloud-scale gas properties
         else:
             quantity = colname[2:-1].split('_pix_')[0]
             if colname[0] == 'F':
-                weight = wtmap
+                weight = wt
             else:
                 weight = None
 
             # CO line peak temperature
             if quantity == 'T_peak':
                 self.calc_image_stats(
-                    tpkmap.astype('float'), weight=weight,
-                    header=header, stat_func=nanaverage,
+                    tpeak.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
             # CO line integrated intensity
             elif quantity == 'I_CO21':
                 self.calc_image_stats(
-                    sm0map.astype('float'), weight=weight,
-                    header=header, stat_func=nanaverage,
+                    smom0.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
-            # molecular gas surface density
+            # surface density
             elif quantity == 'Sigma_mol':
-                colname_ICO = colname.replace('Sigma_mol', 'I_CO21')
-                if colname_ICO in self.colnames:
-                    self[colname] = (
-                        self[colname_ICO] * alpha_CO).to(unit)
-                else:
-                    self.calc_image_stats(
-                        sm0map.astype('float'), weight=weight,
-                        header=header, stat_func=nanaverage,
-                        colname='_<ICO>', unit='K km s-1')
-                    self[colname] = (
-                        self['_<ICO>'] * alpha_CO).to(unit)
-                    self.table.remove_column('_<ICO>')
+                self.calc_image_stats(
+                    surfdens.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
-            # velocity dispersion = CO line width
+            # velocity dispersion
             elif quantity == 'vdisp_mol':
                 self.calc_image_stats(
-                    sewmap.astype('float'), weight=weight,
-                    header=header, stat_func=nanaverage,
+                    vdisp.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
             # turbulent pressure
             elif quantity == 'P_turb_sph':
+                pturb = (
+                    3 / (4 * np.pi) / const.k_B *
+                    mass * vdisp**2 / radius**3)
                 self.calc_image_stats(
-                    (sm0map.astype('float') *
-                     sewmap.astype('float')**2),
-                    header=header,
+                    pturb.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<I*sigv^2>', unit='K km3 s-3')
-                self[colname] = (  # Sun+20a Eq.10
-                    3/2 * self['_<I*sigv^2>'] / (2*R_cloud) *
-                    alpha_CO / const.k_B).to(unit)
-                self.table.remove_column('_<I*sigv^2>')
-            elif quantity == 'P_turb_cyl':
-                colname_sph = colname.replace('cyl', 'sph')
-                if colname_sph not in self.colnames:
-                    raise ValueError(
-                        f"No column in table named {colname_sph}")
-                self[colname] = (  # Sun+18 Eq.14
-                    self[colname_sph] * 2/3).to(unit)
+                    colname=colname, unit=unit)
+            elif quantity == 'P_turb_r3d':
+                pturb = (
+                    3 / (4 * np.pi) / const.k_B *
+                    mass * vdisp**2 / radius3d**3)
+                self.calc_image_stats(
+                    pturb.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             # cloud weight due to self-gravity
             elif quantity == 'P_selfg_sph':
+                pself = (
+                    3/8 / np.pi * const.G / const.k_B *
+                    (mass / radius**2)**2)
                 self.calc_image_stats(
-                    sm0map.astype('float')**2,
-                    header=header,
+                    pself.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<I^2>', unit='K2 km2 s-2')
-                self[colname] = (  # Sun+20a Eq.16
-                    3/8 * np.pi * const.G * self['_<I^2>'] *
-                    alpha_CO**2 / const.k_B).to(unit)
-                self.table.remove_column('_<I^2>')
-            elif quantity == 'P_selfg_cyl':
-                colname_sph = colname.replace('cyl', 'sph')
-                if colname_sph not in self.colnames:
-                    raise ValueError(
-                        f"No column in table named {colname_sph}")
-                self[colname] = (
-                    self[colname_sph] * 4/3).to(unit)
+                    colname=colname, unit=unit)
+            elif quantity == 'P_selfg_r3d':
+                pself = (
+                    3/8 / np.pi * const.G / const.k_B *
+                    (mass / radius3d**2)**2)
+                self.calc_image_stats(
+                    pself.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             # virial parameter
             elif quantity == 'alpha_vir_sph':
+                avir = (
+                    5 * vdisp**2 * radius / (const.G * mass))
                 self.calc_image_stats(
-                    (sewmap.astype('float')**2 /
-                     sm0map.astype('float')),
-                    header=header,
+                    avir.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<sigv^2/I>', unit='K-1 km s-1')
-                self[colname] = (  # Sun+18 Eq.13
-                    5 * np.log(2) / (10/9 * np.pi * const.G) *
-                    self['_<sigv^2/I>'] /
-                    R_cloud / alpha_CO).to(unit)
-                self.table.remove_column('_<sigv^2/I>')
+                    colname=colname, unit=unit)
+            elif quantity == 'alpha_vir_r3d':
+                avir = (
+                    5 * vdisp**2 * radius3d / (const.G * mass))
+                self.calc_image_stats(
+                    avir.to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             # free-fall time
             elif quantity == 'tau_ff_sph^-1':
+                tauff = np.sqrt(
+                    np.pi**2 * radius**3 / (8 * const.G * mass))
                 self.calc_image_stats(
-                    np.sqrt(sm0map.astype('float')),
-                    header=header,
+                    (tauff**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<I^0.5>',
-                    unit='K(1/2) km(1/2) s(-1/2)')
-                self[colname] = (  # not the same as Utomo+18 Eq.6
-                    np.sqrt(
-                        16/np.pi * const.G * alpha_CO / H_los) *
-                    self['_<I^0.5>']).to(unit)
-                self.table.remove_column('_<I^0.5>')
-            elif quantity == 'tau_ff_cyl^-1':
-                colname_sph = colname.replace('cyl', 'sph')
-                if colname_sph not in self.colnames:
-                    raise ValueError(
-                        f"No column in table named {colname_sph}")
-                self[colname] = (
-                    self[colname_sph] * np.sqrt(2/3)).to(unit)
+                    colname=colname, unit=unit)
+            elif quantity == 'tau_ff_r3d^-1':
+                tauff = np.sqrt(
+                    np.pi**2 * radius3d**3 / (8 * const.G * mass))
+                self.calc_image_stats(
+                    (tauff**-1).to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             else:
                 raise ValueError(
@@ -510,132 +508,121 @@ class PhangsMegaTable(StatsTable):
             alpha_CO=None, H_los=None, gal_dist=None,
             colname=None, unit=None):
 
-        raarr = np.array(cpropscat['XCTR_DEG'])
-        decarr = np.array(cpropscat['YCTR_DEG'])
-        fluxarr = (
-            cpropscat['FLUX_KKMS_PC2'] / cpropscat['DISTANCE_PC']**2 *
-            u.Unit('K km s-1 sr')).to('K km s-1 arcsec2').value
-        sigvarr = np.array(cpropscat['SIGV_KMS'])
-        radarr = (
-            cpropscat['RAD_PC'] / cpropscat['DISTANCE_PC'] *
-            u.rad).to('arcsec').value
-        wtarr = fluxarr.copy()
-        wtarr[~np.isfinite(radarr)] = 0
-        fluxarr[~np.isfinite(radarr)] = np.nan
-        sigvarr[~np.isfinite(radarr)] = np.nan
-        radarr[~np.isfinite(radarr)] = np.nan
+        ra = np.array(cpropscat['XCTR_DEG'])
+        dec = np.array(cpropscat['YCTR_DEG'])
+        radius = (
+            np.array(cpropscat['RAD_PC']) /
+            np.array(cpropscat['DISTANCE_PC']) *
+            gal_dist).to('pc')
+        flux = (
+            np.array(cpropscat['FLUX_KKMS_PC2']) /
+            np.array(cpropscat['DISTANCE_PC'])**2 *
+            u.Unit('K km s-1') * gal_dist**2).to('K km s-1 pc2')
+        mass = (flux * alpha_CO).to('Msun')
+        vdisp = np.array(cpropscat['SIGV_KMS']) * u.Unit('km s-1')
+        wt = flux.value.copy()
+        wt[~np.isfinite(radius)] = 0
+        flux[~np.isfinite(radius)] = np.nan
+        mass[~np.isfinite(radius)] = np.nan
+        vdisp[~np.isfinite(radius)] = np.nan
+        radius[~np.isfinite(radius)] = np.nan
+
+        radius3d = np.min(  # Rosolowsky+21, Eq.10
+            np.cbrt(radius**2 * H_los/2), radius)
 
         # number of clouds in the CPROPS catalog
         if colname[:4] == 'Nobj':
             self.calc_catalog_stats(
-                np.isfinite(fluxarr).astype('int'),
-                raarr, decarr, stat_func=np.nansum,
-                colname=colname, unit=unit)
+                np.isfinite(flux).astype('int'), ra, dec,
+                stat_func=np.nansum, colname=colname, unit=unit)
 
+        # weighted average cloud properties
         else:
             quantity = colname[2:-1].split('_CPROPS_')[0]
             if colname[0] == 'F':
-                weight = wtarr
+                weight = wt
             else:
                 weight = None
 
-            # cloud mass
-            if quantity == 'M_mol':
+            # radius
+            if quantity == 'R':
                 self.calc_catalog_stats(
-                    fluxarr.astype('float'), raarr, decarr,
+                    radius.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<FCO>', unit='K km s-1 arcsec2')
-                self[colname] = (
-                    self['_<FCO>'] * alpha_CO * gal_dist**2 /
-                    u.sr).to(unit)
-                self.table.remove_column('_<FCO>')
+                    colname=colname, unit=unit)
 
-            # cloud radius
-            elif quantity == 'R':
+            # mass
+            elif quantity == 'M_mol':
                 self.calc_catalog_stats(
-                    radarr, raarr, decarr,
+                    mass.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<R>', unit='arcsec')
-                self[colname] = (
-                    self['_<R>'] * gal_dist / u.rad).to(unit)
-                self.table.remove_column('_<R>')
+                    colname=colname, unit=unit)
 
-            # cloud surface density
-            elif quantity == 'Sigma_mol':
-                self.calc_catalog_stats(
-                    fluxarr / radarr**2, raarr, decarr,
-                    weight=weight, stat_func=nanaverage,
-                    colname='_<F/R^2>', unit='K km s-1')
-                self[colname] = (  # Rosolowsky+21, right after Eq.12
-                    self['_<F/R^2>'] * alpha_CO / (2*np.pi)).to(unit)
-                self.table.remove_column('_<F/R^2>')
-
-            # cloud velocity dispersion
+            # velocity dispersion
             elif quantity == 'vdisp_mol':
                 self.calc_catalog_stats(
-                    sigvarr, raarr, decarr,
+                    vdisp.to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
+
+            # surface density
+            elif quantity == 'Sigma_mol':
+                surfdens = (  # Rosolowsky+21, text following Eq.12
+                    mass / radius**2 / (2*np.pi))
+                self.calc_catalog_stats(
+                    surfdens.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
             # turbulent pressure
             elif quantity == 'P_turb_sph':
+                pturb = (  # Rosolowsky+21, Eq.16
+                    3 / (8*np.pi) / const.k_B *
+                    mass * vdisp**2 / radius**3)
                 self.calc_catalog_stats(
-                    fluxarr * sigvarr**2 / radarr**3, raarr, decarr,
+                    pturb.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<F*sigv^2/R^3>',
-                    unit='K km3 s-3 arcsec-1')
-                self[colname] = (  # Rosolowsky+21, Eq.16
-                    3 / (8 * np.pi) * self['_<F*sigv^2/R^3>'] *
-                    alpha_CO / (gal_dist/u.rad) / const.k_B).to(unit)
-                self.table.remove_column('_<F*sigv^2/R^3>')
-            elif quantity == 'P_turb_cyl':
+                    colname=colname, unit=unit)
+            elif quantity == 'P_turb_r3d':
+                pturb = (  # Rosolowsky+21, Eq.16
+                    3 / (8*np.pi) / const.k_B *
+                    mass * vdisp**2 / radius3d**3)
                 self.calc_catalog_stats(
-                    fluxarr * sigvarr**2 / radarr**2, raarr, decarr,
+                    pturb.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<F*sigv^2/R^2>',
-                    unit='K km3 s-3')
-                self[colname] = (  # Rosolowsky+21, Eq.16
-                    3 / (4 * np.pi) * self['_<F*sigv^2/R^2>'] *
-                    alpha_CO / H_los / const.k_B).to(unit)
-                self.table.remove_column('_<F*sigv^2/R^2>')
+                    colname=colname, unit=unit)
 
             # virial parameter
             elif quantity == 'alpha_vir_sph':
+                avir = (  # Rosolowsky+21, text following Eq.10
+                    10 * vdisp**2 * radius / (const.G * mass))
                 self.calc_catalog_stats(
-                    radarr * sigvarr**2 / fluxarr, raarr, decarr,
+                    avir.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<R*sigv^2/F>',
-                    unit='km s-1 K-1 arcsec-1')
-                self[colname] = (  # Rosolowsky+21, right above Eq.11
-                    10 / const.G * self['_<R*sigv^2/F>'] /
-                    alpha_CO / (gal_dist/u.rad)).to(unit)
-                self.table.remove_column('_<R*sigv^2/F>')
+                    colname=colname, unit=unit)
+            elif quantity == 'alpha_vir_r3d':
+                avir = (  # Rosolowsky+21, text following Eq.10
+                    10 * vdisp**2 * radius3d / (const.G * mass))
+                self.calc_catalog_stats(
+                    avir.to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             # free-fall time
             elif quantity == 'tau_ff_sph^-1':
+                tauff = np.sqrt(  # Rosolowsky+21, Eq.17
+                    np.pi**2 * radius**3 / (4 * const.G * mass))
                 self.calc_catalog_stats(
-                    np.sqrt(fluxarr / radarr**3), raarr, decarr,
+                    (tauff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<F^0.5/R^1.5>',
-                    unit='K(1/2) km(1/2) s(-1/2) arcsec(-1/2)')
-                self[colname] = (  # Rosolowsky+21, Eq.17
-                    np.sqrt(
-                        4 * const.G / np.pi**2 *
-                        alpha_CO / (gal_dist/u.rad)) *
-                    self['_<F^0.5/R^1.5>']).to(unit)
-                self.table.remove_column('_<F^0.5/R^1.5>')
-            elif quantity == 'tau_ff_cyl^-1':
+                    colname=colname, unit=unit)
+            elif quantity == 'tau_ff_r3d^-1':
+                tauff = np.sqrt(  # Rosolowsky+21, Eq.17
+                    np.pi**2 * radius3d**2 / (4 * const.G * mass))
                 self.calc_catalog_stats(
-                    np.sqrt(fluxarr / radarr**2), raarr, decarr,
+                    (tauff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
-                    colname='_<F^0.5/R>',
-                    unit='K(1/2) km(1/2) s(-1/2)')
-                self[colname] = (  # Rosolowsky+21, Eq.17
-                    np.sqrt(
-                        8 * const.G / np.pi ** 2 *
-                        alpha_CO / H_los) *
-                    self['_<F^0.5/R>']).to(unit)
-                self.table.remove_column('_<F^0.5/R>')
+                    colname=colname, unit=unit)
 
             else:
                 raise ValueError(
@@ -1031,8 +1018,8 @@ def add_columns_to_mega_table(
         if 'alphaCO21' not in t.colnames:
             raise ValueError("No alphaCO column found")
         H_los = (
-            phys_params['CO_los_depth'] *
-            u.Unit(phys_params['CO_los_depth_unit']))
+            phys_params['CO_full_height'] *
+            u.Unit(phys_params['CO_full_height_unit']))
         rows = config[config['group'] == 'CPROPS_stats']
         for res_pc in np.unique(rows['res_pc']):
             res = res_pc * u.pc
@@ -1061,8 +1048,8 @@ def add_columns_to_mega_table(
         if 'alphaCO21' not in t.colnames:
             raise ValueError("No alphaCO column found")
         H_los = (
-            phys_params['CO_los_depth'] *
-            u.Unit(phys_params['CO_los_depth_unit']))
+            phys_params['CO_full_height'] *
+            u.Unit(phys_params['CO_full_height_unit']))
         rows = config[config['group'] == 'CO_stats']
         for res_pc in np.unique(rows['res_pc']):
             res = res_pc * u.pc
@@ -1096,7 +1083,7 @@ def add_columns_to_mega_table(
                         header=hdr, tpkmap=tpkmap, bm0map=bm0map,
                         sm0map=sm0map, sewmap=sewmap,
                         alpha_CO=t['alphaCO21'],
-                        R_cloud=res/2, H_los=H_los)
+                        FWHM_beam=res, H_los=H_los)
             del hdr, tpkmap, bm0map, sm0map, sewmap
 
     if 'env_frac' in config['group']:
@@ -1160,7 +1147,7 @@ def add_columns_to_mega_table(
                         vdisp_mol_z=vdisp_mol_z,
                         colname=row['colname'], unit=row['unit'])
             elif re.fullmatch(
-                    r'F<P_DE_pix_\d+pc>', row['colname']):
+                    r'F<P_DE_sph_pix_\d+pc>', row['colname']):
                 vdisp_col = f"F<vdisp_mol_pix_{row['res_pc']}pc>"
                 Sigma_col = f"F<Sigma_mol_pix_{row['res_pc']}pc>"
                 P_selfg_col = f"F<P_selfg_sph_pix_{row['res_pc']}pc>"

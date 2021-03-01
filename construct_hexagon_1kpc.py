@@ -179,17 +179,6 @@ if __name__ == '__main__':
 
         # ------------------------------------------------------------
 
-        # mtfile_new = (
-        #     workdir /
-        #     f"{gal_params['name']}_{tile_shape}_stats_"
-        #     f"{tile_size.to('kpc').value:.0f}kpc.ecsv")
-        # if mtfile.is_file() and not mtfile_new.is_file():
-        #     print("Converting FITS table to ECSV format")
-        #     t = Table.read(mtfile)
-        #     t.write(mtfile_new, delimiter=',', overwrite=True)
-
-        # ------------------------------------------------------------
-
         print(f"Finished processing data for {gal_params['name']}!")
         print("")
 

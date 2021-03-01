@@ -342,6 +342,32 @@ class PhangsMegaTable(StatsTable):
                 self['_F_strict'] / self['_F_broad']).to(unit)
             self.table.remove_columns(['_F_strict', '_F_broad'])
 
+        # completeness correction factors
+        elif colname[:5] == 'fcorr':
+            colname_fracA = (
+                'fracA' + re.findall(r'_CO21_\d+pc$', colname)[0])
+            colname_fracF = colname_fracA.replace('fracA', 'fracF')
+            if not (colname_fracA in self.colnames and
+                    colname_fracF in self.colnames):
+                self[colname] = np.nan
+            else:
+                fA = self[colname_fracA].data.copy()
+                fF = self[colname_fracF].data.copy()
+                fF[fF < 0] = 0
+                fF[fF > 1] = 1
+                fF[fF < fA] = fA[fF < fA]
+                fICOsq = 1/2 * (
+                    1 - erf(2 * erfinv(1-2*fF) - erfinv(1-2*fA)))
+                quantity = re.match(
+                    r'^fcorr_(.+)_CO21_\d+pc$', colname).group(1)
+                if quantity == 'I':
+                    self[colname] = fF / fICOsq
+                elif quantity == 'clumping':
+                    self[colname] = fF**2 / fICOsq
+                else:
+                    raise ValueError(
+                        f"Unrecognized column name: {colname}")
+
         # clumping factor of the strict CO map
         elif colname[:8] == 'clumping':
             self.calc_image_stats(

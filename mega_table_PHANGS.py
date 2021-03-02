@@ -319,11 +319,16 @@ class PhangsMegaTable(StatsTable):
         vdisp[wt == 0] = np.nan
         smom0 = sm0map * u.Unit('K km s-1')
         smom0[wt == 0] = np.nan
-        surfdens = (smom0 * alpha_CO).to('Msun pc-2')
-        mass = (
-            np.pi/np.log(2) * surfdens * (FWHM_beam/2)**2).to('Msun')
+        alpha_CO_fid = alphaCO.alphaCO10_Galactic
+        surfdens_fid = (smom0 * alpha_CO_fid).to('Msun pc-2')
+        mass_fid = (
+            np.pi / (4 * np.log(2)) *
+            surfdens_fid * FWHM_beam**2).to('Msun')
         radius = FWHM_beam / 2
-        radius3d = np.min(np.cbrt(radius**2 * H_los/2), radius)
+        if radius > H_los/2:
+            radius3d = np.cbrt(radius**2 * H_los/2)
+        else:
+            radius3d = radius
 
         # area coverage fraction of the strict CO map
         if colname[:5] == 'fracA':
@@ -362,8 +367,8 @@ class PhangsMegaTable(StatsTable):
                     colname_fracF in self.colnames):
                 self[colname] = np.nan
             else:
-                fA = self[colname_fracA].data.copy()
-                fF = self[colname_fracF].data.copy()
+                fA = self[colname_fracA].value.copy()
+                fF = self[colname_fracF].value.copy()
                 fF[fF < 0] = 0
                 fF[fF > 1] = 1
                 fF[fF < fA] = fA[fF < fA]
@@ -418,9 +423,10 @@ class PhangsMegaTable(StatsTable):
             # surface density
             elif quantity == 'Sigma_mol':
                 self.calc_image_stats(
-                    surfdens.to(unit).value, header=header,
+                    surfdens_fid.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
 
             # velocity dispersion
             elif quantity == 'vdisp_mol':
@@ -433,69 +439,77 @@ class PhangsMegaTable(StatsTable):
             elif quantity == 'P_turb_sph':
                 pturb = (
                     3 / (4 * np.pi) / const.k_B *
-                    mass * vdisp**2 / radius**3)
+                    mass_fid * vdisp**2 / radius**3)
                 self.calc_image_stats(
                     pturb.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
             elif quantity == 'P_turb_r3d':
                 pturb = (
                     3 / (4 * np.pi) / const.k_B *
-                    mass * vdisp**2 / radius3d**3)
+                    mass_fid * vdisp**2 / radius3d**3)
                 self.calc_image_stats(
                     pturb.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
 
             # cloud weight due to self-gravity
             elif quantity == 'P_selfg_sph':
                 pself = (
                     3/8 / np.pi * const.G / const.k_B *
-                    (mass / radius**2)**2)
+                    mass_fid**2 / radius**4)
                 self.calc_image_stats(
                     pself.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**2
             elif quantity == 'P_selfg_r3d':
                 pself = (
                     3/8 / np.pi * const.G / const.k_B *
-                    (mass / radius3d**2)**2)
+                    mass_fid**2 / radius3d**4)
                 self.calc_image_stats(
                     pself.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**2
 
             # virial parameter
             elif quantity == 'alpha_vir_sph':
                 avir = (
-                    5 * vdisp**2 * radius / (const.G * mass))
+                    5 * vdisp**2 * radius / (const.G * mass_fid))
                 self.calc_image_stats(
                     avir.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
             elif quantity == 'alpha_vir_r3d':
                 avir = (
-                    5 * vdisp**2 * radius3d / (const.G * mass))
+                    5 * vdisp**2 * radius3d / (const.G * mass_fid))
                 self.calc_image_stats(
                     avir.to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
 
             # free-fall time
             elif quantity == 'tau_ff_sph^-1':
                 tauff = np.sqrt(
-                    np.pi**2 * radius**3 / (8 * const.G * mass))
+                    np.pi**2 * radius**3 / (8 * const.G * mass_fid))
                 self.calc_image_stats(
                     (tauff**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
             elif quantity == 'tau_ff_r3d^-1':
                 tauff = np.sqrt(
-                    np.pi**2 * radius3d**3 / (8 * const.G * mass))
+                    np.pi**2 * radius3d**3 / (8 * const.G * mass_fid))
                 self.calc_image_stats(
                     (tauff**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
 
             else:
                 raise ValueError(
@@ -518,17 +532,18 @@ class PhangsMegaTable(StatsTable):
             np.array(cpropscat['FLUX_KKMS_PC2']) /
             np.array(cpropscat['DISTANCE_PC'])**2 *
             u.Unit('K km s-1') * gal_dist**2).to('K km s-1 pc2')
-        mass = (flux * alpha_CO).to('Msun')
+        alpha_CO_fid = alphaCO.alphaCO10_Galactic
+        mass_fid = (flux * alpha_CO_fid).to('Msun')
         vdisp = np.array(cpropscat['SIGV_KMS']) * u.Unit('km s-1')
         wt = flux.value.copy()
         wt[~np.isfinite(radius)] = 0
         flux[~np.isfinite(radius)] = np.nan
-        mass[~np.isfinite(radius)] = np.nan
+        mass_fid[~np.isfinite(radius)] = np.nan
         vdisp[~np.isfinite(radius)] = np.nan
         radius[~np.isfinite(radius)] = np.nan
-
-        radius3d = np.min(  # Rosolowsky+21, Eq.10
-            np.cbrt(radius**2 * H_los/2), radius)
+        radius3d = radius.copy()
+        radius3d[radius > H_los/2] = np.cbrt(
+            radius**2 * H_los/2)[radius > H_los/2]
 
         # number of clouds in the CPROPS catalog
         if colname[:4] == 'Nobj':
@@ -554,9 +569,10 @@ class PhangsMegaTable(StatsTable):
             # mass
             elif quantity == 'M_mol':
                 self.calc_catalog_stats(
-                    mass.to(unit).value, ra, dec,
+                    mass_fid.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
 
             # velocity dispersion
             elif quantity == 'vdisp_mol':
@@ -567,62 +583,69 @@ class PhangsMegaTable(StatsTable):
 
             # surface density
             elif quantity == 'Sigma_mol':
-                surfdens = (  # Rosolowsky+21, text following Eq.12
-                    mass / radius**2 / (2*np.pi))
+                surfdens_fid = (  # Rosolowsky+21, text following Eq.12
+                    mass_fid / radius**2 / (2*np.pi))
                 self.calc_catalog_stats(
-                    surfdens.to(unit).value, ra, dec,
+                    surfdens_fid.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
 
             # turbulent pressure
             elif quantity == 'P_turb_sph':
                 pturb = (  # Rosolowsky+21, Eq.16
                     3 / (8*np.pi) / const.k_B *
-                    mass * vdisp**2 / radius**3)
+                    mass_fid * vdisp**2 / radius**3)
                 self.calc_catalog_stats(
                     pturb.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
             elif quantity == 'P_turb_r3d':
                 pturb = (  # Rosolowsky+21, Eq.16
                     3 / (8*np.pi) / const.k_B *
-                    mass * vdisp**2 / radius3d**3)
+                    mass_fid * vdisp**2 / radius3d**3)
                 self.calc_catalog_stats(
                     pturb.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')
 
             # virial parameter
             elif quantity == 'alpha_vir_sph':
                 avir = (  # Rosolowsky+21, text following Eq.10
-                    10 * vdisp**2 * radius / (const.G * mass))
+                    10 * vdisp**2 * radius / (const.G * mass_fid))
                 self.calc_catalog_stats(
                     avir.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
             elif quantity == 'alpha_vir_r3d':
                 avir = (  # Rosolowsky+21, text following Eq.10
-                    10 * vdisp**2 * radius3d / (const.G * mass))
+                    10 * vdisp**2 * radius3d / (const.G * mass_fid))
                 self.calc_catalog_stats(
                     avir.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
 
             # free-fall time
             elif quantity == 'tau_ff_sph^-1':
                 tauff = np.sqrt(  # Rosolowsky+21, Eq.17
-                    np.pi**2 * radius**3 / (4 * const.G * mass))
+                    np.pi**2 * radius**3 / (4 * const.G * mass_fid))
                 self.calc_catalog_stats(
                     (tauff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
             elif quantity == 'tau_ff_r3d^-1':
                 tauff = np.sqrt(  # Rosolowsky+21, Eq.17
-                    np.pi**2 * radius3d**2 / (4 * const.G * mass))
+                    np.pi**2 * radius3d**3 / (4 * const.G * mass_fid))
                 self.calc_catalog_stats(
                     (tauff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
+                self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
 
             else:
                 raise ValueError(

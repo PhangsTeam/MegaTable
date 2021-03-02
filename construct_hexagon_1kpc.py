@@ -69,7 +69,7 @@ def gen_tessell_mega_table(
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
     t.meta['CO_R21'] = phys_params['CO_R21']
-    t.meta['H_MOL_PC'] = phys_params['CO_los_depth']
+    t.meta['H_MOL_PC'] = phys_params['CO_full_height']
     t.meta['ABUN_SUN'] = phys_params['abundance_solar']
     t.meta['TBLNOTE'] = str(note)
     t.meta['VERSION'] = float(version)

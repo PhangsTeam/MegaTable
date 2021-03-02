@@ -143,7 +143,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_alphaCO(
+    def add_co_conversion(
             self, method=None, Zprime=None,
             COsm0file=None, CObm0file=None, Sigmaelse=None,
             colname=None, unit=None):
@@ -186,7 +186,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_Sigma_mol(
+    def add_surf_dens_mol(
             self, COm0file=None, alpha_CO=None, cosi=1.,
             colname=None, unit=None):
         self.calc_image_stats(
@@ -197,7 +197,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_Sigma_atom(
+    def add_surf_dens_atom(
             self, HIm0file=None, alpha_21cm=None, cosi=1.,
             colname=None, unit=None):
         self.calc_image_stats(
@@ -208,7 +208,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_Sigma_SFR(
+    def add_surf_dens_sfr(
             self, SFRfile=None, cosi=1.,
             colname=None, unit=None):
         self.calc_image_stats(
@@ -219,7 +219,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_Sigma_star(
+    def add_surf_dens_star(
             self, IRfile,
             MtoL=None, band='3p4um', Lsun_IR=None, cosi=1.,
             colname=None, unit=None):
@@ -241,7 +241,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_rho_star(
+    def add_vol_dens_star(
             self, Sigma_star=None, r_gal=None,
             Rstar=None, diskshape='flat',
             colname=None, unit=None):
@@ -257,7 +257,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_P_DE(
+    def add_dyn_eq_pressure(
             self, scale='kpc', rho_star_mp=None,
             Sigma_atom=None, vdisp_atom_z=None,
             Sigma_mol=None, vdisp_mol_z=None,
@@ -297,7 +297,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_CO_stats(
+    def add_pix_stats(
             self, header=None,
             tpkmap=None, bm0map=None, sm0map=None, sewmap=None,
             alpha_CO=None, FWHM_beam=None, H_los=None,
@@ -503,7 +503,7 @@ class PhangsMegaTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def add_CPROPS_stats(
+    def add_cprops_stats(
             self, cpropscat=None,
             alpha_CO=None, H_los=None, gal_dist=None,
             colname=None, unit=None):
@@ -856,7 +856,7 @@ def add_columns_to_mega_table(
                     raise ValueError(
                         "No stellar M/L ratio info found")
                 MtoL = t['MtoL_3p4um'].to('Msun Lsun-1')
-            t.add_Sigma_star(
+            t.add_surf_dens_star(
                 IRfile,
                 MtoL=MtoL, band=band, Lsun_IR=Lsun, cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
@@ -885,7 +885,7 @@ def add_columns_to_mega_table(
                 alpha_21cm = (
                     phys_params['HI_alpha21cm'] *
                     u.Unit(phys_params['HI_alpha21cm_unit']))
-                t.add_Sigma_atom(
+                t.add_surf_dens_atom(
                     HIm0file=HIm0file,
                     alpha_21cm=alpha_21cm, cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
@@ -968,7 +968,7 @@ def add_columns_to_mega_table(
                     Sigmaelse = t['Sigma_star'] + t['Sigma_atom']
                 else:
                     Sigmaelse = None
-                t.add_alphaCO(
+                t.add_co_conversion(
                     method=method, Zprime=Zprime, Sigmaelse=Sigmaelse,
                     COsm0file=COsm0file, CObm0file=CObm0file,
                     colname=row['colname'], unit=row['unit'])
@@ -1003,7 +1003,7 @@ def add_columns_to_mega_table(
                 if not COm0file.is_file():
                     t[row['colname']] = np.nan * u.Unit(row['unit'])
                     continue
-                t.add_Sigma_mol(
+                t.add_surf_dens_mol(
                     COm0file=COm0file,
                     alpha_CO=t['alphaCO21'], cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
@@ -1035,7 +1035,7 @@ def add_columns_to_mega_table(
                 if cpropscat is None:
                     t[row['colname']] = np.nan * u.Unit(row['unit'])
                 else:
-                    t.add_CPROPS_stats(
+                    t.add_cprops_stats(
                         colname=row['colname'], unit=row['unit'],
                         cpropscat=cpropscat, alpha_CO=t['alphaCO21'],
                         H_los=H_los, gal_dist=gal_dist)
@@ -1078,7 +1078,7 @@ def add_columns_to_mega_table(
                 if hdr is None:
                     t[row['colname']] = np.nan * u.Unit(row['unit'])
                 else:
-                    t.add_CO_stats(
+                    t.add_pix_stats(
                         colname=row['colname'], unit=row['unit'],
                         header=hdr, tpkmap=tpkmap, bm0map=bm0map,
                         sm0map=sm0map, sewmap=sewmap,
@@ -1113,7 +1113,7 @@ def add_columns_to_mega_table(
             if row['colname'] == 'rho_star_mp':
                 if 'Sigma_star' not in t.colnames:
                     raise ValueError("No Sigma_star column found")
-                t.add_rho_star(
+                t.add_vol_dens_star(
                     Sigma_star=t['Sigma_star'],
                     Rstar=gal_Rstar, diskshape='flat',
                     colname=row['colname'], unit=row['unit'])
@@ -1124,7 +1124,7 @@ def add_columns_to_mega_table(
                         raise ValueError(
                             f"No `{colname}` column found")
                 if row['colname'] == 'P_DE_L08':
-                    t.add_P_DE(
+                    t.add_dyn_eq_pressure(
                         scale='kpc', rho_star_mp=t['rho_star_mp'],
                         Sigma_mol=t['Sigma_mol'],
                         Sigma_atom=t['Sigma_atom'],
@@ -1140,7 +1140,7 @@ def add_columns_to_mega_table(
                         vdisp_mol_z = t[vdisp_col]
                     else:
                         vdisp_mol_z = np.nan * u.Unit('km s-1')
-                    t.add_P_DE(
+                    t.add_dyn_eq_pressure(
                         scale='kpc', rho_star_mp=t['rho_star_mp'],
                         Sigma_mol=t['Sigma_mol'],
                         Sigma_atom=t['Sigma_atom'],
@@ -1158,7 +1158,7 @@ def add_columns_to_mega_table(
                         raise ValueError(
                             f"No `{colname}` column found")
                 R_cloud = row['res_pc'] * u.pc
-                t.add_P_DE(
+                t.add_dyn_eq_pressure(
                     scale='cloud', rho_star_mp=t['rho_star_mp'],
                     Sigma_atom=t['Sigma_atom'],
                     Sigma_mol=t['Sigma_mol'],
@@ -1186,7 +1186,7 @@ def add_columns_to_mega_table(
             if not SFRfile.is_file():
                 t[row['colname']] = np.nan * u.Unit(row['unit'])
                 continue
-            t.add_Sigma_SFR(
+            t.add_surf_dens_sfr(
                 SFRfile=SFRfile, cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
             if np.isfinite(t['Sigma_SFR']).sum() == 0:

@@ -70,7 +70,7 @@ def gen_radial_mega_table(
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
         gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
     t.meta['CO_R21'] = phys_params['CO_R21']
-    t.meta['H_MOL_PC'] = phys_params['CO_los_depth']
+    t.meta['H_MOL_PC'] = phys_params['CO_full_height']
     t.meta['ABUN_SUN'] = phys_params['abundance_solar']
     t.meta['TBLNOTE'] = str(note)
     t.meta['VERSION'] = float(version)
@@ -172,17 +172,6 @@ if __name__ == '__main__':
                     'PHANGS-Halpha v0.1&0.3; '
                     'sample table v1.6 (dist=v1.2)'),
                 version=1.4, writefile=mtfile)
-
-        # ------------------------------------------------------------
-
-        # mtfile_new = (
-        #     workdir /
-        #     f"{gal_params['name']}_annulus_stats_"
-        #     f"{rgal_bin.to('pc').value:.0f}pc.ecsv")
-        # if mtfile.is_file() and not mtfile_new.is_file():
-        #     print("Converting FITS table to ECSV format")
-        #     t = Table.read(mtfile)
-        #     t.write(mtfile_new, delimiter=',', overwrite=True)
 
         # ------------------------------------------------------------
 

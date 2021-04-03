@@ -513,13 +513,13 @@ class PhangsMegaTable(StatsTable):
 
             # crossing time
             elif quantity == 't_cross_sph^-1':
-                tcross = np.sqrt(3) * vdisp / radius
+                tcross = radius / vdisp / np.sqrt(3)
                 self.calc_image_stats(
                     (tcross**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
             elif quantity == 't_cross_r3d^-1':
-                tcross = np.sqrt(3) * vdisp / radius3d
+                tcross = radius3d / vdisp / np.sqrt(3)
                 self.calc_image_stats(
                     (tcross**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
@@ -587,9 +587,9 @@ class PhangsMegaTable(StatsTable):
 
             # area
             elif quantity == 'Area_2d':
-                area_2d = np.pi / (2 * np.log(2)) * radius**2
+                area = np.pi / (2 * np.log(2)) * radius**2
                 self.calc_catalog_stats(
-                    area_2d.to(unit).value, ra, dec,
+                    area.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
@@ -676,13 +676,13 @@ class PhangsMegaTable(StatsTable):
 
             # crossing time
             elif quantity == 't_cross_sph^-1':
-                tcross = np.sqrt(3) * vdisp / radius
+                tcross = radius / vdisp / np.sqrt(3)
                 self.calc_catalog_stats(
                     (tcross**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
             elif quantity == 't_cross_r3d^-1':
-                tcross = np.sqrt(3) * vdisp / radius3d
+                tcross = radius3d / vdisp / np.sqrt(3)
                 self.calc_catalog_stats(
                     (tcross**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,

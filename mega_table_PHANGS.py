@@ -494,22 +494,36 @@ class PhangsMegaTable(StatsTable):
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
 
             # free-fall time
-            elif quantity == 'tau_ff_sph^-1':
-                tauff = np.sqrt(
+            elif quantity == 't_ff_sph^-1':
+                tff = np.sqrt(
                     np.pi**2 * radius**3 / (8 * const.G * mass_fid))
                 self.calc_image_stats(
-                    (tauff**-1).to(unit).value, header=header,
+                    (tff**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
-            elif quantity == 'tau_ff_r3d^-1':
-                tauff = np.sqrt(
+            elif quantity == 't_ff_r3d^-1':
+                tff = np.sqrt(
                     np.pi**2 * radius3d**3 / (8 * const.G * mass_fid))
                 self.calc_image_stats(
-                    (tauff**-1).to(unit).value, header=header,
+                    (tff**-1).to(unit).value, header=header,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
+
+            # crossing time
+            elif quantity == 't_cross_sph^-1':
+                tcross = np.sqrt(3) * vdisp / radius
+                self.calc_image_stats(
+                    (tcross**-1).to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
+            elif quantity == 't_cross_r3d^-1':
+                tcross = np.sqrt(3) * vdisp / radius3d
+                self.calc_image_stats(
+                    (tcross**-1).to(unit).value, header=header,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             else:
                 raise ValueError(
@@ -546,7 +560,7 @@ class PhangsMegaTable(StatsTable):
             radius**2 * H_los/2)[radius > H_los/2]
 
         # number of clouds in the CPROPS catalog
-        if colname[:4] == 'Nobj':
+        if colname[:5] == 'N_obj':
             self.calc_catalog_stats(
                 np.isfinite(flux).astype('int'), ra, dec,
                 stat_func=np.nansum, colname=colname, unit=unit)
@@ -560,9 +574,22 @@ class PhangsMegaTable(StatsTable):
                 weight = None
 
             # radius
-            if quantity == 'R':
+            if quantity == 'R_2d':
                 self.calc_catalog_stats(
                     radius.to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
+            elif quantity == 'R_3d':
+                self.calc_catalog_stats(
+                    radius3d.to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
+
+            # area
+            elif quantity == 'Area_2d':
+                area_2d = np.pi / (2 * np.log(2)) * radius**2
+                self.calc_catalog_stats(
+                    area_2d.to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
 
@@ -630,22 +657,36 @@ class PhangsMegaTable(StatsTable):
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**-1
 
             # free-fall time
-            elif quantity == 'tau_ff_sph^-1':
-                tauff = np.sqrt(  # Rosolowsky+21, Eq.17
+            elif quantity == 't_ff_sph^-1':
+                tff = np.sqrt(  # Rosolowsky+21, Eq.17
                     np.pi**2 * radius**3 / (4 * const.G * mass_fid))
                 self.calc_catalog_stats(
-                    (tauff**-1).to(unit).value, ra, dec,
+                    (tff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
-            elif quantity == 'tau_ff_r3d^-1':
-                tauff = np.sqrt(  # Rosolowsky+21, Eq.17
+            elif quantity == 't_ff_r3d^-1':
+                tff = np.sqrt(  # Rosolowsky+21, Eq.17
                     np.pi**2 * radius3d**3 / (4 * const.G * mass_fid))
                 self.calc_catalog_stats(
-                    (tauff**-1).to(unit).value, ra, dec,
+                    (tff**-1).to(unit).value, ra, dec,
                     weight=weight, stat_func=nanaverage,
                     colname=colname, unit=unit)
                 self[colname] *= (alpha_CO / alpha_CO_fid).to('')**0.5
+
+            # crossing time
+            elif quantity == 't_cross_sph^-1':
+                tcross = np.sqrt(3) * vdisp / radius
+                self.calc_catalog_stats(
+                    (tcross**-1).to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
+            elif quantity == 't_cross_r3d^-1':
+                tcross = np.sqrt(3) * vdisp / radius3d
+                self.calc_catalog_stats(
+                    (tcross**-1).to(unit).value, ra, dec,
+                    weight=weight, stat_func=nanaverage,
+                    colname=colname, unit=unit)
 
             else:
                 raise ValueError(

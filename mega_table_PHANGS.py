@@ -27,8 +27,10 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
 
     if lin_res is None or lin_res == 0:
         res = None
+        res_str = None
     else:
         res = lin_res
+        res_str = f"{res.to('pc').value:.0f}pc"
 
     # PHANGS data parent directory
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
@@ -47,34 +49,45 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
             if res is None:
                 fname_seq += ['native']
             else:
-                fname_seq += [f"{res.to('pc').value:.0f}pc"]
-            else:
-                fname_seq += ['native']
+                fname_seq += [res_str]
         elif datatypes[1] == 'CPROPS':
             # PHANGS-ALMA CPROPS catalog
-            basedir = basedir / 'v4-CPROPS' / 'native'
-            fname_seq = [
-                galname.lower(),
-                '12m+7m+tp', 'co21', 'native', 'props']
-            if res is not None:
-                basedir = (
-                    basedir / '..' /
-                    f"{res.to('pc').value:.0f}pc_matched")
-                fname_seq[-2] = f"{res.to('pc').value:.0f}pc"
+            basedir = basedir / 'v4-CPROPS'
+            if datatypes[2] == 'originoise':
+                if res is None:
+                    basedir /= 'native'
+                else:
+                    basedir /= f"matched_{res_str}"
+            elif datatypes[2] == 'homogenoise':
+                if res is None:
+                    raise ValueError(
+                        "No CPROPS catalog available w/ homogenized "
+                        "noise at native resolution")
+                else:
+                    basedir /= f"homogen_{res_str}_{datatypes[3]}"
+            else:
+                raise ValueError(
+                    f"Unknown CPROPS catalog type: {datatypes[2]}")
+            f_glob = [
+                f for f in basedir.glob(galname.lower()+"*")]
+            if len(f_glob) == 0:
+                fname_seq = [galname.lower()]
+            else:
+                fname_seq = f_glob[0].stem.split('_')
 
     elif datatypes[0] == 'HI':
         # HI data
         basedir = PHANGSdir / 'HI'
         fname_seq = [galname, '21cm'] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'z0MGS':
         # z0MGS data
         basedir = PHANGSdir / 'z0MGS'
         fname_seq = [galname] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'IRAC':
         # IRAC data
@@ -86,14 +99,14 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         else:
             fname_seq = [galname, 'IRAC'] + datatypes[1:]
             if res is not None:
-                fname_seq += [f"{res.to('pc').value:.0f}pc"]
+                fname_seq += [res_str]
 
     elif datatypes[0] == 'Halpha':
         # narrow band Halpha data
         basedir = PHANGSdir / 'Halpha'
         fname_seq = [galname] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'rotcurve':
         # rotation curve

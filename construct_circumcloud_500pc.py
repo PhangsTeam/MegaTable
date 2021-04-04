@@ -2,6 +2,7 @@ import sys
 import json
 import warnings
 from pathlib import Path
+from itertools import product
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
@@ -88,9 +89,7 @@ if __name__ == '__main__':
     aperture_size = 500 * u.pc
 
     # Seed catalog type
-    # catalog_type = 'originoise'
-    # catalog_type = 'homogenoise:all'
-    catalog_type = 'homogenoise:sub'
+    catalog_types = ['originoise', 'homogenoise:hi', 'homogenoise:lo']
 
     # Seed catalog resolution
     catalog_res_pc = [60, 90, 120, 150]
@@ -155,11 +154,11 @@ if __name__ == '__main__':
 
         print(f"Processing data for {gal_params['name']}")
 
-        for res_pc in catalog_res_pc:
+        for ctype, res_pc in product(catalog_types, catalog_res_pc):
 
             # CPROPS catalog file
             cprops_file = get_data_path(
-                f"ALMA:CPROPS:{catalog_type}",
+                f"ALMA:CPROPS:{ctype}",
                 gal_params['name'], res_pc*u.pc)
             if not cprops_file.is_file():
                 continue
@@ -173,8 +172,7 @@ if __name__ == '__main__':
                 f"{noise_level}_{res_pc}pc.fits")
             if not mtfile.is_file():
                 print(
-                    f"Constructing mega-table "
-                    f"({catalog_type} @ {res_pc}pc)")
+                    f"Constructing mega-table ({ctype} @ {res_pc}pc)")
                 t_cprops = Table.read(cprops_file)
                 gen_aperture_mega_table(
                     config,

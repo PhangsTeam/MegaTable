@@ -1151,7 +1151,7 @@ def add_columns_to_mega_table(
             del hdr, tpkmap, bm0map, sm0map, sewmap
 
     if 'env_frac' in config['group']:
-        # CO fractional contribution by environments
+        # CO/Ha fractional contribution by environments
         if verbose:
             print("  Calculating environmental fractions")
         for row in config[config['group'] == 'env_frac']:

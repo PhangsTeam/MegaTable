@@ -48,6 +48,9 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
             fname_seq = [galname, 'CO21'] + datatypes[2:]
             if res is None:
                 fname_seq += ['native']
+            elif res >= 1*u.kpc:
+                fname_seq += [
+                    f"{res.to('kpc').value:.2g}kpc".replace('.', 'p')]
             else:
                 fname_seq += [res_str]
         elif datatypes[1] == 'CPROPS':

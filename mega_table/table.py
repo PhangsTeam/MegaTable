@@ -345,7 +345,7 @@ class TessellMegaTable(VoronoiTessTable):
 
         # initiate TessellMegaTable
         mt = cls(
-            t.meta['RA_DEG'], t.meta['RA_DEG'],
+            t.meta['RA_DEG'], t.meta['DEC_DEG'],
             t.meta['FOV_DEG']*3600, t.meta['TILE_DEG']*3600,
             tile_shape=t.meta['TILE_DEF'])
 

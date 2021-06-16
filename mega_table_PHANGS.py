@@ -164,7 +164,7 @@ class PhangsMegaTable(StatsTable):
     def add_co_conversion(
             self, method=None, Zprime=None,
             COsm0file=None, CObm0file=None, Sigmaelse=None,
-            colname=None, unit=None):
+            line_ratio=None, cosi=None, colname=None, unit=None):
         if method == 'Galactic':
             self[colname] = alphaCO.alphaCO10_Galactic.to(unit)
         elif method == 'PHANGS':
@@ -179,6 +179,7 @@ class PhangsMegaTable(StatsTable):
                     COsm0map, header=COhdr, weight=COsm0map,
                     stat_func=nanaverage,
                     colname='_WCO_GMC', unit=COm0unit)
+            self['_WCO_GMC'] /= line_ratio
             self[colname] = alphaCO.predict_alphaCO10_N12(
                 Zprime=Zprime, WCO10GMC=self['_WCO_GMC']).to(unit)
             self.table.remove_column('_WCO_GMC')
@@ -191,9 +192,11 @@ class PhangsMegaTable(StatsTable):
                     COsm0map, header=COhdr, weight=COsm0map,
                     stat_func=nanaverage,
                     colname='_WCO_GMC', unit=COm0unit)
+            self['_WCO_GMC'] /= line_ratio
             self.calc_image_stats(
                 CObm0file, stat_func=nanaverage,
                 colname='_WCO_kpc', unit=COm0unit)
+            self['_WCO_kpc'] *= cosi / line_ratio
             self[colname] = alphaCO.predict_alphaCO10_B13(
                 Zprime=Zprime, WCO10GMC=self['_WCO_GMC'],
                 WCO10kpc=self['_WCO_kpc'], Sigmaelsekpc=Sigmaelse,
@@ -1053,6 +1056,7 @@ def add_columns_to_mega_table(
                 t.add_co_conversion(
                     method=method, Zprime=Zprime, Sigmaelse=Sigmaelse,
                     COsm0file=COsm0file, CObm0file=CObm0file,
+                    line_ratio=phys_params['CO_R21'], cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(

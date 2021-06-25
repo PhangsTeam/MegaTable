@@ -43,4 +43,3 @@ alphaCO,,0,alphaCO21,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor fo
 
 P_DE,,0,rho_star_mp,"Msun pc-3",".3e","Region-average stellar mass volume density near disk mid-plane"
 P_DE,,0,P_DE_L08,"K cm-3",".3e","Region-average ISM dynamical equilibrium pressure (Leroy+08 prescription)"
-P_DE,,0,P_DE_S20,"K cm-3",".3e","Region-average ISM dynamical equilibrium pressure (Sun+20 prescription)"

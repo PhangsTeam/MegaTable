@@ -23,18 +23,33 @@ SFR,z0MGS:SFR:W3ONLY:gauss7p5,0,Sigma_SFR_W3ONLY,"Msun yr-1 kpc-2",".3e","Region
 SFR,Halpha:SFR:HaW4,0,Sigma_SFR_HaW4,"Msun yr-1 kpc-2",".3e","[Preliminary] Region-average SFR surface density (duPont/WFI Halpha + WISE 22um; Calzetti+07, Murphy+11)"
 SFR,Halpha:SFR:HaONLY,0,Sigma_SFR_HaONLY,"Msun yr-1 kpc-2",".3e","[Preliminary] Region-average SFR surface density (duPont/WFI Halpha; Murphy+11)"
 
+SFR,,0,Sigma_SFR_gauss1p5kpc,"Msun yr-1 kpc-2",".3e","Kernel-average SFR surface density"
+SFR,z0MGS:SFR:FUVW4,1500,Sigma_SFR_FUVW4_gauss1p5kpc,"Msun yr-1 kpc-2",".3e","Kernel-average SFR surface density (GALEX FUV + WISE 22um; Leroy+19)"
+SFR,z0MGS:SFR:NUVW4,1500,Sigma_SFR_NUVW4_gauss1p5kpc,"Msun yr-1 kpc-2",".3e","Kernel-average SFR surface density (GALEX NUV + WISE 22um; Leroy+19)"
+SFR,z0MGS:SFR:W4ONLY,1500,Sigma_SFR_W4ONLY_gauss1p5kpc,"Msun yr-1 kpc-2",".3e","Kernel-average SFR surface density (WISE 22um; Leroy+19)"
+
 star,,0,Sigma_star,"Msun pc-2",".3e","Region-average stellar mass surface density"
 star,IRAC:3p6um:gauss7p5,0,Sigma_star_3p6um,"Msun pc-2",".3e","Region-average stellar mass surface density (IRAC 3.6um + varying M/L; Leroy+21)"
 star,z0MGS:W1:gauss7p5,0,Sigma_star_3p4um,"Msun pc-2",".3e","Region-average stellar mass surface density (WISE 3.4um + varying M/L; Leroy+21)"
 star,IRAC:S4G:ICA,0,Sigma_star_3p6umICA,"Msun pc-2",".3e","Region-average stellar mass surface density (S4G ICA + fixed M/L; Leroy+21)"
+
+star,,0,Sigma_star_gauss1p5kpc,"Msun pc-2",".3e","Kernel-average stellar mass surface density"
+star,IRAC:3p6um,1500,Sigma_star_3p6um_gauss1p5kpc,"Msun pc-2",".3e","Kernel-average stellar mass surface density (IRAC 3.6um + varying M/L; Leroy+21)"
+star,z0MGS:W1,1500,Sigma_star_3p4um_gauss1p5kpc,"Msun pc-2",".3e","Kernel-average stellar mass surface density (WISE 3.4um + varying M/L; Leroy+21)"
 
 MtoL,z0MGS:MtoL:3p4um:gauss7p5,0,MtoL_3p4um,"Msun Lsun-1",".3e","Mass-to-light ratio at 3.4um (Leroy+21)"
 
 HI,HI:mom0,0,I_21cm,"K km s-1",".3e","Region-average HI 21cm line integrated intensity"
 HI,HI:mom0,0,Sigma_atom,"Msun pc-2",".3e","Region-average atomic gas surface density"
 
+HI,HI:mom0,1500,I_21cm_gauss1p5kpc,"K km s-1",".3e","Kernel-average HI 21cm line integrated intensity"
+HI,HI:mom0,1500,Sigma_atom_gauss1p5kpc,"Msun pc-2",".3e","Kernel-average atomic gas surface density"
+
 H2,ALMA:CO:mom0:broad,0,I_CO21,"K km s-1",".3e","Region-average CO(2-1) line integrated intensity"
 H2,ALMA:CO:mom0:broad,0,Sigma_mol,"Msun pc-2",".3e","Region-average molecular gas surface density"
+
+H2,ALMA:CO:mom0:broad,1500,I_CO21_gauss1p5kpc,"K km s-1",".3e","Kernel-average CO(2-1) line integrated intensity"
+H2,ALMA:CO:mom0:broad,1500,Sigma_mol_gauss1p5kpc,"Msun pc-2",".3e","Kernel-average molecular gas surface density"
 
 alphaCO,,0,alphaCO10,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor for CO(1-0) line"
 alphaCO,,0,alphaCO10_PHANGS,"Msun pc-2 K-1 km-1 s",".3e","CO-to-H2 conversion factor (PHANGS prescription)"

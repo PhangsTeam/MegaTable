@@ -171,7 +171,7 @@ if __name__ == '__main__':
                 fov_radius_R25=fov_radius_R25,
                 note=(
                     'PHANGS-ALMA v4; '
-                    'PHANGS-VLA v1.0; '
+                    'PHANGS-VLA v1.1; '
                     'PHANGS-Halpha v0.1&0.3; '
                     'sample table v1.6'),
                 version=2.0, writefile=mtfile)

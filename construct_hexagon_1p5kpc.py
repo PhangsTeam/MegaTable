@@ -89,7 +89,9 @@ def gen_tessell_mega_table(
 if __name__ == '__main__':
 
     # tile (linear) size
-    tile_size = 1 * u.kpc
+    tile_size = 1.5 * u.kpc
+    tile_size_str = (
+        f"{tile_size.to('kpc').value:.2g}kpc".replace('.', 'p'))
 
     # tile shape
     tile_shape = 'hexagon'
@@ -113,9 +115,7 @@ if __name__ == '__main__':
 
     # read configuration file
     config = Table.read(
-        workdir /
-        f"config_{tile_shape}_"
-        f"{tile_size.to('kpc').value:.0f}kpc.csv")
+        workdir / f"config_{tile_shape}_{tile_size_str}.csv")
 
     # read physical parameter file
     with open(workdir / "config_params.json") as f:
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         mtfile = (
             workdir /
             f"{gal_params['name']}_{tile_shape}_stats_"
-            f"{tile_size.to('kpc').value:.0f}kpc.fits")
+            f"{tile_size_str}.fits")
         if not mtfile.is_file():
             print(f"Constructing mega-table for {gal_params['name']}")
             gen_tessell_mega_table(

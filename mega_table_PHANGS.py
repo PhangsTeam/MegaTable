@@ -377,11 +377,9 @@ class PhangsMegaTable(StatsTable):
                 fF[fF < 0] = 0
                 fF[fF > 1] = 1
                 fF[fF < fA] = fA[fF < fA]
-                if fA == 1:
-                    fICOsq = 1
-                else:
-                    fICOsq = 1/2 * (
-                        1 - erf(2 * erfinv(1-2*fF) - erfinv(1-2*fA)))
+                fICOsq = 1/2 * (
+                    1 - erf(2 * erfinv(1-2*fF) - erfinv(1-2*fA)))
+                fICOsq[fA == 1] = 1
                 quantity = re.match(
                     r'^fcorr_(.+)_CO21_\d+pc$', colname).group(1)
                 if quantity == 'I':

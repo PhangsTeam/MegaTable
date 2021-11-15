@@ -385,7 +385,7 @@ class PhangsMegaTable(StatsTable):
                 if quantity == 'I':
                     self[colname] = fF / fICOsq
                 elif quantity == 'clumping':
-                    self[colname] = fF**2 / fICOsq
+                    self[colname] = fF**2 / fICOsq / fA
                 else:
                     raise ValueError(
                         f"Unrecognized column name: {colname}")

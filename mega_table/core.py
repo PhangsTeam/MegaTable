@@ -60,6 +60,54 @@ class BaseTable(object):
     def meta(self):
         return self.table.meta
 
+    def format(
+            self, colnames=None, units=None, formats=None,
+            descriptions=None, ignore_missing=False):
+        """
+        Format table content.
+
+        Parameters
+        ----------
+        colnames : array-like, optional
+            Names of the columns to keep. Columns in the new table
+            will be ordered according to this parameter.
+        units : array-like, optional
+            Units to which each kept column should be converted.
+            Items can be either `~astropy.units.Unit` objects or
+            their string representations.
+        formats : array-like, optional
+            Format specifiers for each kept column.
+        descriptions : array-like, optional
+            Descriptions of each kept column.
+        ignore_missing : bool, optional
+            Whether to ignore the error when any key in ``colnames``
+            is missing from the original table (default: False).
+            If ``True``, a column will be added with all NaNs.
+        """
+        t = QTable()
+        if colnames is None:
+            colnames = self.colnames
+        if units is not None:
+            for colname, unit in zip(colnames, units):
+                if colname not in self.colnames and ignore_missing:
+                    t[colname] = (
+                        np.full(len(self), np.nan) * u.Unit(unit))
+                else:
+                    t[colname] = self[colname].to(unit)
+        else:
+            for colname in colnames:
+                if colname not in self.colnames and ignore_missing:
+                    t[colname] = np.full(len(self), np.nan)
+                else:
+                    t[colname] = self[colname]
+        if formats is not None:
+            for colname, form in zip(colnames, formats):
+                t[colname].info.format = form
+        if descriptions is not None:
+            for colname, desc in zip(colnames, descriptions):
+                t[colname].info.description = desc
+        self.table = t
+
     def write(
             self, filename, keep_metadata=True, add_timestamp=True,
             **kwargs):
@@ -81,8 +129,7 @@ class BaseTable(object):
         t = self.table.copy()
         if not keep_metadata:
             # remove all metadata
-            for key in self.meta:
-                t.meta.pop(key)
+            t.meta = type(t.meta)()
         else:
             # remove metadata not allowed in FITS headers
             hdr = fits.Header()

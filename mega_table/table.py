@@ -1,9 +1,7 @@
-import time
 import numpy as np
 from functools import partial
 from astropy import units as u
 from astropy.table import QTable
-from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from .core import GeneralRegionTable, VoronoiTessTable

@@ -56,23 +56,23 @@ def gen_tessell_mega_table(
 
     # record metadata
     t.meta['GALAXY'] = str(gal_params['name'])
-    t.meta['DIST_MPC'] = gal_params['dist_Mpc']
-    t.meta['RA_DEG'] = gal_params['ra_deg']
-    t.meta['DEC_DEG'] = gal_params['dec_deg']
-    t.meta['INCL_DEG'] = gal_params['incl_deg']
-    t.meta['PA_DEG'] = gal_params['posang_deg']
-    t.meta['LOGMSTAR'] = np.log10(gal_params['Mstar_Msun'])
-    t.meta['R25_KPC'] = (
+    t.meta['DIST_MPC'] = np.float(gal_params['dist_Mpc'])
+    t.meta['RA_DEG'] = np.float(gal_params['ra_deg'])
+    t.meta['DEC_DEG'] = np.float(gal_params['dec_deg'])
+    t.meta['INCL_DEG'] = np.float(gal_params['incl_deg'])
+    t.meta['PA_DEG'] = np.float(gal_params['posang_deg'])
+    t.meta['LOGMSTAR'] = np.float(np.log10(gal_params['Mstar_Msun']))
+    t.meta['R25_KPC'] = np.float((
         (gal_params['R25_arcsec'] * u.arcsec).to('rad').value *
-        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
-    t.meta['RDISKKPC'] = (
+        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value)
+    t.meta['RDISKKPC'] = np.float((
         (gal_params['Rstar_arcsec'] * u.arcsec).to('rad').value *
-        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value
-    t.meta['CO_R21'] = phys_params['CO_R21']
-    t.meta['H_MOL_PC'] = phys_params['CO_full_height']
-    t.meta['ABUN_SUN'] = phys_params['abundance_solar']
+        gal_params['dist_Mpc'] * u.Mpc).to('kpc').value)
+    t.meta['CO_R21'] = np.float(phys_params['CO_R21'])
+    t.meta['H_MOL_PC'] = np.float(phys_params['CO_full_height'])
+    t.meta['ABUN_SUN'] = np.float(phys_params['abundance_solar'])
     t.meta['TBLNOTE'] = str(note)
-    t.meta['VERSION'] = float(version)
+    t.meta['VERSION'] = np.float(version)
 
     # output
     if writefile:
@@ -89,7 +89,9 @@ def gen_tessell_mega_table(
 if __name__ == '__main__':
 
     # tile (linear) size
-    tile_size = 1 * u.kpc
+    tile_size = 1.5 * u.kpc
+    tile_size_str = (
+        f"{tile_size.to('kpc').value:.2g}kpc".replace('.', 'p'))
 
     # tile shape
     tile_shape = 'hexagon'
@@ -113,9 +115,7 @@ if __name__ == '__main__':
 
     # read configuration file
     config = Table.read(
-        workdir /
-        f"config_{tile_shape}_"
-        f"{tile_size.to('kpc').value:.0f}kpc.csv")
+        workdir / f"config_{tile_shape}_{tile_size_str}.csv")
 
     # read physical parameter file
     with open(workdir / "config_params.json") as f:
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         mtfile = (
             workdir /
             f"{gal_params['name']}_{tile_shape}_stats_"
-            f"{tile_size.to('kpc').value:.0f}kpc.fits")
+            f"{tile_size_str}.fits")
         if not mtfile.is_file():
             print(f"Constructing mega-table for {gal_params['name']}")
             gen_tessell_mega_table(
@@ -170,12 +170,11 @@ if __name__ == '__main__':
                 tile_size_kpc=tile_size.to('kpc').value,
                 fov_radius_R25=fov_radius_R25,
                 note=(
-                    'PHANGS-ALMA v3.4; '
-                    'CPROPS catalogs v3.4; '
-                    'PHANGS-VLA v1.0; '
+                    'PHANGS-ALMA v4; '
+                    'PHANGS-VLA v1.1; '
                     'PHANGS-Halpha v0.1&0.3; '
-                    'sample table v1.6 (dist=v1.2)'),
-                version=1.4, writefile=mtfile)
+                    'sample table v1.6'),
+                version=2.0, writefile=mtfile)
 
         # ------------------------------------------------------------
 

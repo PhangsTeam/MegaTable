@@ -27,8 +27,10 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
 
     if lin_res is None or lin_res == 0:
         res = None
+        res_str = None
     else:
         res = lin_res
+        res_str = f"{res.to('pc').value:.0f}pc"
 
     # PHANGS data parent directory
     PHANGSdir = Path(os.getenv('PHANGSWORKDIR'))
@@ -42,37 +44,53 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         basedir = PHANGSdir / 'ALMA'
         if datatypes[1] == 'CO':
             # PHANGS-ALMA CO map
-            basedir /= 'v3p4-processed'
+            basedir /= 'v4-temp-processed'
             fname_seq = [galname, 'CO21'] + datatypes[2:]
             if res is None:
                 fname_seq += ['native']
+            elif res >= 1*u.kpc:
+                fname_seq += [
+                    f"{res.to('kpc').value:.2g}kpc".replace('.', 'p')]
             else:
-                fname_seq += [f"{res.to('pc').value:.0f}pc"]
+                fname_seq += [res_str]
         elif datatypes[1] == 'CPROPS':
             # PHANGS-ALMA CPROPS catalog
-            basedir = basedir / 'v3p4-CPROPS' / 'STv1p2' / 'native'
-            fname_seq = [
-                galname.lower(),
-                '12m+7m+tp', 'co21', 'native', 'props']
-            if res is not None:
-                basedir = (
-                    basedir / '..' /
-                    f"{res.to('pc').value:.0f}pc_matched")
-                fname_seq[-2] = f"{res.to('pc').value:.0f}pc"
+            basedir = basedir / 'v4-CPROPS'
+            if datatypes[2] == 'originoise':
+                if res is None:
+                    basedir /= 'native'
+                else:
+                    basedir /= f"matched_{res_str}"
+            elif datatypes[2] == 'homogenoise':
+                if res is None:
+                    raise ValueError(
+                        "No CPROPS catalog available w/ homogenized "
+                        "noise at native resolution")
+                else:
+                    basedir /= f"homogen_{res_str}_{datatypes[3]}"
+            else:
+                raise ValueError(
+                    f"Unknown CPROPS catalog type: {datatypes[2]}")
+            f_glob = [
+                f for f in basedir.glob(galname.lower()+"*")]
+            if len(f_glob) == 0:
+                fname_seq = [galname.lower()]
+            else:
+                fname_seq = f_glob[0].stem.split('_')
 
     elif datatypes[0] == 'HI':
         # HI data
         basedir = PHANGSdir / 'HI'
         fname_seq = [galname, '21cm'] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'z0MGS':
         # z0MGS data
         basedir = PHANGSdir / 'z0MGS'
         fname_seq = [galname] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'IRAC':
         # IRAC data
@@ -84,14 +102,14 @@ def get_data_path(datatype, galname=None, lin_res=None, ext='fits'):
         else:
             fname_seq = [galname, 'IRAC'] + datatypes[1:]
             if res is not None:
-                fname_seq += [f"{res.to('pc').value:.0f}pc"]
+                fname_seq += [res_str]
 
     elif datatypes[0] == 'Halpha':
         # narrow band Halpha data
         basedir = PHANGSdir / 'Halpha'
         fname_seq = [galname] + datatypes[1:]
         if res is not None:
-            fname_seq += [f"{res.to('pc').value:.0f}pc"]
+            fname_seq += [res_str]
 
     elif datatypes[0] == 'rotcurve':
         # rotation curve
@@ -146,7 +164,7 @@ class PhangsMegaTable(StatsTable):
     def add_co_conversion(
             self, method=None, Zprime=None,
             COsm0file=None, CObm0file=None, Sigmaelse=None,
-            colname=None, unit=None):
+            line_ratio=None, cosi=None, colname=None, unit=None):
         if method == 'Galactic':
             self[colname] = alphaCO.alphaCO10_Galactic.to(unit)
         elif method == 'PHANGS':
@@ -161,6 +179,7 @@ class PhangsMegaTable(StatsTable):
                     COsm0map, header=COhdr, weight=COsm0map,
                     stat_func=nanaverage,
                     colname='_WCO_GMC', unit=COm0unit)
+            self['_WCO_GMC'] /= line_ratio
             self[colname] = alphaCO.predict_alphaCO10_N12(
                 Zprime=Zprime, WCO10GMC=self['_WCO_GMC']).to(unit)
             self.table.remove_column('_WCO_GMC')
@@ -173,9 +192,11 @@ class PhangsMegaTable(StatsTable):
                     COsm0map, header=COhdr, weight=COsm0map,
                     stat_func=nanaverage,
                     colname='_WCO_GMC', unit=COm0unit)
+            self['_WCO_GMC'] /= line_ratio
             self.calc_image_stats(
                 CObm0file, stat_func=nanaverage,
                 colname='_WCO_kpc', unit=COm0unit)
+            self['_WCO_kpc'] *= cosi / line_ratio
             self[colname] = alphaCO.predict_alphaCO10_B13(
                 Zprime=Zprime, WCO10GMC=self['_WCO_GMC'],
                 WCO10kpc=self['_WCO_kpc'], Sigmaelsekpc=Sigmaelse,
@@ -187,45 +208,30 @@ class PhangsMegaTable(StatsTable):
     # ----------------------------------------------------------------
 
     def add_surf_dens_mol(
-            self, COm0file=None, alpha_CO=None, cosi=1.,
+            self, I_CO=None, alpha_CO=None, cosi=1.,
             colname=None, unit=None):
-        self.calc_image_stats(
-            COm0file, stat_func=nanaverage,
-            colname='_I_CO', unit='header')
-        self[colname] = (self['_I_CO'] * alpha_CO * cosi).to(unit)
-        self.table.remove_column('_I_CO')
+        self[colname] = (I_CO * alpha_CO * cosi).to(unit)
 
     # ----------------------------------------------------------------
 
     def add_surf_dens_atom(
-            self, HIm0file=None, alpha_21cm=None, cosi=1.,
+            self, I_21cm=None, alpha_21cm=None, cosi=1.,
             colname=None, unit=None):
-        self.calc_image_stats(
-            HIm0file, stat_func=nanaverage,
-            colname='_I_21cm', unit='header')
-        self[colname] = (self['_I_21cm'] * alpha_21cm * cosi).to(unit)
-        self.table.remove_column('_I_21cm')
+        self[colname] = (I_21cm * alpha_21cm * cosi).to(unit)
 
     # ----------------------------------------------------------------
 
     def add_surf_dens_sfr(
-            self, SFRfile=None, cosi=1.,
+            self, I_SFR=None, alpha_SFR=None, cosi=1.,
             colname=None, unit=None):
-        self.calc_image_stats(
-            SFRfile, stat_func=nanaverage,
-            colname='_SFR', unit='header')
-        self[colname] = (self['_SFR'] * cosi).to(unit)
-        self.table.remove_column('_SFR')
+        self[colname] = (I_SFR * alpha_SFR * cosi).to(unit)
 
     # ----------------------------------------------------------------
 
     def add_surf_dens_star(
-            self, IRfile,
-            MtoL=None, band='3p4um', Lsun_IR=None, cosi=1.,
+            self, I_IR=None, MtoL=None,
+            band='3p4um', Lsun_IR=None, cosi=1.,
             colname=None, unit=None):
-        self.calc_image_stats(
-            IRfile, stat_func=nanaverage,
-            colname='_I_IR', unit='header')
         if band[-2:] == 'um':
             freq = (
                 float(band[:-2].replace('p', '.')) * u.um
@@ -236,8 +242,7 @@ class PhangsMegaTable(StatsTable):
         alpha_IR = (
             MtoL * u.Lsun / Lsun_IR * 4*np.pi*u.sr * freq
         ).to('Msun pc-2 MJy-1 sr')
-        self[colname] = (self['_I_IR'] * cosi * alpha_IR).to(unit)
-        self.table.remove_column('_I_IR')
+        self[colname] = (I_IR * alpha_IR * cosi).to(unit)
 
     # ----------------------------------------------------------------
 
@@ -374,12 +379,13 @@ class PhangsMegaTable(StatsTable):
                 fF[fF < fA] = fA[fF < fA]
                 fICOsq = 1/2 * (
                     1 - erf(2 * erfinv(1-2*fF) - erfinv(1-2*fA)))
+                fICOsq[fA == 1] = 1
                 quantity = re.match(
                     r'^fcorr_(.+)_CO21_\d+pc$', colname).group(1)
                 if quantity == 'I':
                     self[colname] = fF / fICOsq
                 elif quantity == 'clumping':
-                    self[colname] = fF**2 / fICOsq
+                    self[colname] = fF**2 / fICOsq / fA
                 else:
                     raise ValueError(
                         f"Unrecognized column name: {colname}")
@@ -896,22 +902,31 @@ def add_columns_to_mega_table(
         # stellar mass surface density
         if verbose:
             print("  Calculating stellar mass surface density")
-        t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
         for row in config[config['group'] == 'star']:
-            if row['colname'] == 'Sigma_star':
+            if row['colname'] in (
+                    'Sigma_star', 'Sigma_star_gauss1p5kpc'):
+                t[row['colname']] = np.nan * u.Unit('Msun pc-2')
                 continue
             if verbose:
                 print(f"    {row['colname']}")
-            band = row['colname'][11:16]
-            Lsun = (
-                phys_params[f"IR_Lsun{band}"] *
-                u.Unit(phys_params[f"IR_Lsun{band}_unit"]))
-            IRfile = get_data_path(
-                row['source'], gal_name, row['res_pc']*u.pc)
-            if not IRfile.is_file():
+            if row['colname'].split('_')[-1] == 'gauss1p5kpc':
+                t.resample_image(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname='_I_IR', unit='header',
+                    suppress_error=True, fill_outside=np.nan)
+            else:
+                t.calc_image_stats(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname='_I_IR', unit='header',
+                    suppress_error=True, stat_func=nanaverage)
+            if ~np.any(np.isfinite(t['_I_IR'])):
+                t.table.remove_column('_I_IR')
                 t[row['colname']] = np.nan * u.Unit(row['unit'])
                 continue
-            if row['colname'] == 'Sigma_star_3p6umICA':
+            datatype = row['colname'].split('_')[2]
+            if datatype == '3p6umICA':
                 MtoL = (
                     phys_params["IR_MtoL_S4GICA"] *
                     u.Unit(phys_params["IR_MtoL_S4GICA_unit"]))
@@ -920,42 +935,55 @@ def add_columns_to_mega_table(
                     raise ValueError(
                         "No stellar M/L ratio info found")
                 MtoL = t['MtoL_3p4um'].to('Msun Lsun-1')
+            Lsun = (
+                phys_params[f"IR_Lsun{datatype[:5]}"] *
+                u.Unit(phys_params[f"IR_Lsun{datatype[:5]}_unit"]))
             t.add_surf_dens_star(
-                IRfile,
-                MtoL=MtoL, band=band, Lsun_IR=Lsun, cosi=gal_cosi,
+                I_IR=t['_I_IR'], MtoL=MtoL, band=datatype[:5],
+                Lsun_IR=Lsun, cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
-            if np.isfinite(t['Sigma_star']).sum() == 0:
-                t['Sigma_star'] = t[row['colname']]
-                t['Sigma_star'].description = (
-                    f"({row['colname'].replace('Sigma_star_', '')})")
+            t.table.remove_column('_I_IR')
+            colname_ = '_'.join(
+                row['colname'].split('_')[:2] +
+                row['colname'].split('_')[3:])
+            if np.isfinite(t[colname_]).sum() == 0:
+                t[colname_] = t[row['colname']]
+                t[colname_].description = f"({datatype})"
 
     if 'HI' in config['group']:
         # atomic gas mass surface density
         if verbose:
             print("  Calculating HI gas surface density")
         for row in config[config['group'] == 'HI']:
+            if row['colname'][:10] == 'Sigma_atom':
+                continue
             if row['colname'] == 'I_21cm':
                 t.calc_image_stats(
                     get_data_path(
                         row['source'], gal_name, row['res_pc']*u.pc),
                     colname=row['colname'], unit=row['unit'],
                     suppress_error=True, stat_func=nanaverage)
-            elif row['colname'] == 'Sigma_atom':
-                HIm0file = get_data_path(
-                    row['source'], gal_name, row['res_pc']*u.pc)
-                if not HIm0file.is_file():
-                    t[row['colname']] = np.nan * u.Unit(row['unit'])
-                    continue
+            elif row['colname'] == 'I_21cm_gauss1p5kpc':
+                t.resample_image(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname=row['colname'], unit=row['unit'],
+                    suppress_error=True, fill_outside=np.nan)
+            else:
+                raise ValueError(
+                    f"Unrecognized column name: {row['colname']}")
+            colname_ = row['colname'].replace('I_21cm', 'Sigma_atom')
+            if colname_ in config[config['group'] == 'HI']['colname']:
+                row_ = config[
+                    (config['group'] == 'HI') &
+                    (config['colname'] == colname_)][0]
                 alpha_21cm = (
                     phys_params['HI_alpha21cm'] *
                     u.Unit(phys_params['HI_alpha21cm_unit']))
                 t.add_surf_dens_atom(
-                    HIm0file=HIm0file,
+                    I_21cm=t[row['colname']],
                     alpha_21cm=alpha_21cm, cosi=gal_cosi,
-                    colname=row['colname'], unit=row['unit'])
-            else:
-                raise ValueError(
-                    f"Unrecognized column name: {row['colname']}")
+                    colname=row_['colname'], unit=row_['unit'])
 
     if 'metal' in config['group']:
         # metallicity
@@ -1035,6 +1063,7 @@ def add_columns_to_mega_table(
                 t.add_co_conversion(
                     method=method, Zprime=Zprime, Sigmaelse=Sigmaelse,
                     COsm0file=COsm0file, CObm0file=CObm0file,
+                    line_ratio=phys_params['CO_R21'], cosi=gal_cosi,
                     colname=row['colname'], unit=row['unit'])
             else:
                 raise ValueError(
@@ -1053,27 +1082,34 @@ def add_columns_to_mega_table(
         if verbose:
             print("  Calculating H2 gas surface density")
         for row in config[config['group'] == 'H2']:
+            if row['colname'][:9] == 'Sigma_mol':
+                continue
             if row['colname'] == 'I_CO21':
                 t.calc_image_stats(
                     get_data_path(
                         row['source'], gal_name, row['res_pc']*u.pc),
                     colname=row['colname'], unit=row['unit'],
                     suppress_error=True, stat_func=nanaverage)
-            elif row['colname'] == 'Sigma_mol':
-                if 'alphaCO21' not in t.colnames:
-                    raise ValueError("No alphaCO column found")
-                COm0file = get_data_path(
-                    row['source'], gal_name, row['res_pc']*u.pc)
-                if not COm0file.is_file():
-                    t[row['colname']] = np.nan * u.Unit(row['unit'])
-                    continue
-                t.add_surf_dens_mol(
-                    COm0file=COm0file,
-                    alpha_CO=t['alphaCO21'], cosi=gal_cosi,
-                    colname=row['colname'], unit=row['unit'])
+            elif row['colname'] == 'I_CO21_gauss1p5kpc':
+                t.resample_image(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname=row['colname'], unit=row['unit'],
+                    suppress_error=True, fill_outside=np.nan)
             else:
                 raise ValueError(
                     f"Unrecognized column name: {row['colname']}")
+            colname_ = row['colname'].replace('I_CO21', 'Sigma_mol')
+            if colname_ in config[config['group'] == 'H2']['colname']:
+                row_ = config[
+                    (config['group'] == 'H2') &
+                    (config['colname'] == colname_)][0]
+                if 'alphaCO21' not in t.colnames:
+                    raise ValueError("No alphaCO column found")
+                t.add_surf_dens_mol(
+                    I_CO=t[row['colname']],
+                    alpha_CO=t['alphaCO21'], cosi=gal_cosi,
+                    colname=row_['colname'], unit=row_['unit'])
 
     if 'CPROPS_stats' in config['group']:
         # CPROPS cloud statistics
@@ -1151,7 +1187,7 @@ def add_columns_to_mega_table(
             del hdr, tpkmap, bm0map, sm0map, sewmap
 
     if 'env_frac' in config['group']:
-        # CO fractional contribution by environments
+        # CO/Ha fractional contribution by environments
         if verbose:
             print("  Calculating environmental fractions")
         for row in config[config['group'] == 'env_frac']:
@@ -1239,21 +1275,37 @@ def add_columns_to_mega_table(
         # SFR surface density
         if verbose:
             print("  Calculating SFR surface density")
-        t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
         for row in config[config['group'] == 'SFR']:
-            if row['colname'] == 'Sigma_SFR':
+            if row['colname'] in (
+                    'Sigma_SFR', 'Sigma_SFR_gauss1p5kpc'):
+                t[row['colname']] = np.nan * u.Unit('Msun yr-1 kpc-2')
                 continue
             if verbose:
                 print(f"    {row['colname']}")
-            SFRfile = get_data_path(
-                row['source'], gal_name, row['res_pc']*u.pc)
-            if not SFRfile.is_file():
+            if row['colname'].split('_')[-1] == 'gauss1p5kpc':
+                t.resample_image(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname='_I_SFR', unit='header',
+                    suppress_error=True, fill_outside=np.nan)
+            else:
+                t.calc_image_stats(
+                    get_data_path(
+                        row['source'], gal_name, row['res_pc']*u.pc),
+                    colname='_I_SFR', unit='header',
+                    suppress_error=True, stat_func=nanaverage)
+            if ~np.any(np.isfinite(t['_I_SFR'])):
+                t.table.remove_column('_I_SFR')
                 t[row['colname']] = np.nan * u.Unit(row['unit'])
                 continue
             t.add_surf_dens_sfr(
-                SFRfile=SFRfile, cosi=gal_cosi,
+                I_SFR=t['_I_SFR'], alpha_SFR=1., cosi=gal_cosi,
                 colname=row['colname'], unit=u.Unit(row['unit']))
-            if np.isfinite(t['Sigma_SFR']).sum() == 0:
-                t['Sigma_SFR'] = t[row['colname']]
-                t['Sigma_SFR'].description = (
-                    f"({row['colname'].replace('Sigma_SFR_', '')})")
+            t.table.remove_column('_I_SFR')
+            colname_ = '_'.join(
+                row['colname'].split('_')[:2] +
+                row['colname'].split('_')[3:])
+            if np.isfinite(t[colname_]).sum() == 0:
+                t[colname_] = t[row['colname']]
+                t[colname_].description = (
+                    f"({row['colname'].split('_')[2]})")

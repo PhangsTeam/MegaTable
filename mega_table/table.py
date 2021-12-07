@@ -345,7 +345,7 @@ class TessellMegaTable(VoronoiTessTable):
 
         # initiate TessellMegaTable
         mt = cls(
-            t.meta['RA_DEG'], t.meta['RA_DEG'],
+            t.meta['RA_DEG'], t.meta['DEC_DEG'],
             t.meta['FOV_DEG']*3600, t.meta['TILE_DEG']*3600,
             tile_shape=t.meta['TILE_DEF'])
 
@@ -357,47 +357,6 @@ class TessellMegaTable(VoronoiTessTable):
             mt.meta[key] = t.meta[key]
 
         return mt
-
-    # ----------------------------------------------------------------
-
-    def write(
-            self, filename, keep_metadata=True, add_timestamp=True,
-            **kwargs):
-        """
-        Write the TessellMegaTable object to a file.
-
-        Parameters
-        ----------
-        filename : string
-            Name of the file to write to.
-        keep_metadata : bool, optional
-            Whether to keep existing metadata (Default: True)
-        add_timestamp : bool, optional
-            Whether to add a time stamp in the metadata
-            (Default: True)
-        **kwargs
-            Keyword arguments to be passed to `~astropy.table.write`
-        """
-        t = self.table.copy()
-        if not keep_metadata:
-            # remove all metadata
-            for key in self.meta:
-                t.meta.pop(key)
-        else:
-            # remove metadata not allowed in FITS headers
-            hdr = fits.Header()
-            for key in t.meta.copy():
-                try:
-                    hdr[key] = t.meta[key]
-                except ValueError:
-                    t.meta.pop(key)
-        if 'TIMESTMP' in t.meta:
-            # remove previous time stamp
-            t.meta.pop('TIMESTMP')
-        if add_timestamp:
-            # add current time stamp
-            t.meta['TIMESTMP'] = time.strftime('%c', time.gmtime())
-        t.write(filename, **kwargs)
 
     # ----------------------------------------------------------------
 

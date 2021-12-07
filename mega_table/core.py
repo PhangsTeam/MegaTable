@@ -602,7 +602,7 @@ class VoronoiTessTable(StatsTable):
                 self[colname] = np.full(len(self), np.nan)
             return
 
-        # find nearest the nearest pixel for each seed location
+        # find the nearest pixel for each seed location
         iax0, iax1 = wcs.all_world2pix(
             self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
         iax0 = np.round(iax0).astype('int')
@@ -614,7 +614,7 @@ class VoronoiTessTable(StatsTable):
         iax1[iax1 < 0] = 0
         iax1[iax1 > wcs._naxis[1]-1] = wcs._naxis[1]-1
 
-        # get nearest pixel value
+        # get data from the nearest pixels
         sub_data = data[iax1, iax0]
 
         # assign values for seed locations outside the image footprint

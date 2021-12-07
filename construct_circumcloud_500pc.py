@@ -2,6 +2,7 @@ import sys
 import json
 import warnings
 from pathlib import Path
+from itertools import product
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
@@ -87,6 +88,12 @@ if __name__ == '__main__':
     # aperture (linear) size
     aperture_size = 500 * u.pc
 
+    # Seed catalog type
+    catalog_types = ['originoise', 'homogenoise:hi', 'homogenoise:lo']
+
+    # Seed catalog resolution
+    catalog_res_pc = [60, 90, 120, 150]
+
     # ----------------------------------------------------------------
 
     # working directory
@@ -129,10 +136,6 @@ if __name__ == '__main__':
             'Rstar_arcsec': row['size_scalelength'],
         }
 
-        # CPROPS catalog file
-        cprops_file = get_data_path(
-            'ALMA:CPROPS', gal_params['name'], 150*u.pc)
-
         # skip targets with bad distance
         if not gal_params['dist_Mpc'] > 0:
             print(
@@ -148,37 +151,43 @@ if __name__ == '__main__':
                 f"{gal_params['name']}")
             print("")
             continue
-        # skip targets without CPROPS catalog
-        if not cprops_file.is_file():
-            print(
-                f"No CPROPS catalog found - skipping "
-                f"{gal_params['name']}")
-            print("")
-            continue
 
         print(f"Processing data for {gal_params['name']}")
 
-        mtfile = (
-            workdir /
-            f"{gal_params['name']}_circumcloud_stats_"
-            f"{aperture_size.to('pc').value:.0f}pc.fits")
-        if not mtfile.is_file():
-            print(f"Constructing mega-table for {gal_params['name']}")
-            t_cprops = Table.read(cprops_file)
-            gen_aperture_mega_table(
-                config, gal_params=gal_params, phys_params=phys_params,
-                aperture_ra_deg=t_cprops['XCTR_DEG'],
-                aperture_dec_deg=t_cprops['YCTR_DEG'],
-                aperture_size_pc=aperture_size.to('pc').value,
-                aperture_names=[
-                    f"GMC#{igmc}" for igmc in t_cprops['CLOUDNUM']],
-                note=(
-                    'PHANGS-ALMA v3.4; '
-                    'CPROPS catalogs v3.4; '
-                    'PHANGS-VLA v1.0; '
-                    'PHANGS-Halpha v0.1&0.3; '
-                    'sample table v1.6 (dist=v1.2)'),
-                version=1.4, writefile=mtfile)
+        for ctype, res_pc in product(catalog_types, catalog_res_pc):
+
+            # CPROPS catalog file
+            cprops_file = get_data_path(
+                f"ALMA:CPROPS:{ctype}",
+                gal_params['name'], res_pc*u.pc)
+            if not cprops_file.is_file():
+                continue
+            else:
+                noise_level = cprops_file.stem.split('_')[-2]
+
+            mtfile = (
+                workdir /
+                f"{gal_params['name']}_circumcloud_stats_"
+                f"{aperture_size.to('pc').value:.0f}pc_"
+                f"{noise_level}_{res_pc}pc.fits")
+            if not mtfile.is_file():
+                print(
+                    f"Constructing mega-table ({ctype} @ {res_pc}pc)")
+                t_cprops = Table.read(cprops_file)
+                gen_aperture_mega_table(
+                    config,
+                    gal_params=gal_params, phys_params=phys_params,
+                    aperture_ra_deg=t_cprops['XCTR_DEG'],
+                    aperture_dec_deg=t_cprops['YCTR_DEG'],
+                    aperture_size_pc=aperture_size.to('pc').value,
+                    aperture_names=[
+                        f"CLOUD#{i}" for i in t_cprops['CLOUDNUM']],
+                    note=(
+                        'PHANGS-ALMA v4; '
+                        'PHANGS-VLA v1.1; '
+                        'PHANGS-Halpha v0.1&0.3; '
+                        'sample table v1.6'),
+                    version=2.0, writefile=mtfile)
 
         # ------------------------------------------------------------
 

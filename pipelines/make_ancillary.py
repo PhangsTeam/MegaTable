@@ -415,8 +415,8 @@ class PhangsAncillaryMegaTable(StatsTable):
         if e_sys is None:
             e_sys = 0.1 * u.dex  # Sun+20a, Section 6.2
         self[colname_e] = np.sqrt(
-            e_Sigma_gas**2 + e_Sigma_gas**2 * f_gas_grav**2 +
-            e_rho_star_mp**2 * (1 - f_gas_grav)**2 +
+            e_Sigma_gas**2 * (1 + f_gas_grav)**2 +
+            e_rho_star_mp**2 * ((1 - f_gas_grav) / 2)**2 +
             e_sys**2).to(unit_e)
 
 

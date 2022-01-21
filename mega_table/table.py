@@ -81,8 +81,7 @@ class RadialMegaTable(GeneralRegionTable):
         ]
 
         # initialize object
-        GeneralRegionTable.__init__(
-            self, ring_defs, names=ring_names)
+        super().__init__(ring_defs, names=ring_names)
         # save ring inner/outer radii in table
         self['r_gal_angl_min'] = rbounds_arcsec[:-1] * u.arcsec
         self['r_gal_angl_max'] = rbounds_arcsec[1:] * u.arcsec
@@ -204,8 +203,7 @@ class ApertureMegaTable(GeneralRegionTable):
                 for iaper in np.arange(len(aper_defs))]
 
         # initialize object
-        GeneralRegionTable.__init__(
-            self, aper_defs, names=aperture_names)
+        super().__init__(aper_defs, names=aperture_names)
         # save aperture parameters in the table
         self['RA'] = aperture_ra_deg * u.deg
         self['DEC'] = aperture_dec_deg * u.deg
@@ -299,8 +297,7 @@ class TessellMegaTable(VoronoiTessTable):
     def __init__(
             self, center_ra_deg, center_dec_deg, fov_radius_arcsec,
             tile_size_arcsec, tile_shape='hexagon'):
-        VoronoiTessTable.__init__(
-            self,
+        super().__init__(
             center_ra=center_ra_deg, center_dec=center_dec_deg,
             fov_radius=fov_radius_arcsec/3600,
             seed_spacing=tile_size_arcsec/3600,
@@ -355,39 +352,6 @@ class TessellMegaTable(VoronoiTessTable):
             mt.meta[key] = t.meta[key]
 
         return mt
-
-    # ----------------------------------------------------------------
-
-    def create_maps_from_columns(self, colnames, header):
-        """
-        Create 2D maps from data in columns based on a FITS header.
-
-        Parameters
-        ----------
-        colnames : iterable
-            Name of the columns to create 2D maps for.
-        header : `~astropy.fits.Header`, optional
-            FITS header defining the WCS of the output 2D maps.
-
-        Return
-        ------
-        arrays : list of ~numpy.ndarray
-        """
-        wcs = WCS(header).celestial
-        # find pixels in tiles
-        iax0 = np.arange(wcs._naxis[0])
-        iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
-        ramap, decmap = wcs.all_pix2world(
-            iax0, iax1, 0, ra_dec_order=True)
-        indmap = self.find_coords_in_regions(
-            ramap, decmap).reshape(ramap.shape)
-        # create 2D maps
-        arrays = []
-        for colname in colnames:
-            array = self[colname][indmap]
-            array[indmap == -1] = np.nan
-            arrays += [array]
-        return arrays
 
     # ----------------------------------------------------------------
 

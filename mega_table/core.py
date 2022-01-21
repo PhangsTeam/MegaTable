@@ -84,7 +84,7 @@ class BaseTable(object):
             is missing from the original table (default: False).
             If ``True``, a column will be added with all NaNs.
         """
-        t = QTable()
+        t = QTable(meta=self.meta)
         if colnames is None:
             colnames = self.colnames
         if units is not None:
@@ -338,7 +338,8 @@ class StatsTable(BaseTable):
 
     # ----------------------------------------------------------------
 
-    def create_maps_from_columns(self, colnames, header):
+    def create_maps_from_columns(
+            self, colnames, header, allow_region_overlap=False):
         """
         Create 2D maps from data in columns based on a FITS header.
 
@@ -346,26 +347,45 @@ class StatsTable(BaseTable):
         ----------
         colnames : iterable
             Name of the columns to create 2D maps for.
-        header : `~astropy.fits.Header`, optional
+        header : `~astropy.fits.Header`
             FITS header defining the WCS of the output 2D maps.
+        allow_region_overlap : bool, optional
+            If False (default), an error will be raised when regions
+            overlap (i.e., if any pixel belongs in multiple regions).
+            If True, overlapping regions will be allowed, in which
+            case later rows (regions) will overwrite earlier rows.
 
         Return
         ------
         arrays : list of ~numpy.ndarray
         """
         wcs = WCS(header).celestial
-        # find pixels in tiles
+        # find pixels in regions
         iax0 = np.arange(wcs._naxis[0])
         iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
         ramap, decmap = wcs.all_pix2world(
             iax0, iax1, 0, ra_dec_order=True)
-        indmap = self.find_coords_in_regions(
-            ramap, decmap).reshape(ramap.shape)
+        findarr = self.find_coords_in_regions(
+            ramap.ravel(), decmap.ravel())
         # create 2D maps
         arrays = []
         for colname in colnames:
-            array = self[colname][indmap]
-            array[indmap == -1] = np.nan
+            if findarr.ndim == 2:  # 2D boolean flag
+                if (findarr.astype('int').sum(axis=-1) > 1).any():
+                    if not allow_region_overlap:
+                        raise ValueError(
+                            "Overlapping region detected!")
+                    else:
+                        warnings.warn(
+                            "Overlapping region detected!")
+                array = (
+                    np.full(ramap.shape, np.nan) * self[colname].unit)
+                for ireg in np.arange(len(self)):
+                    array[findarr[:, ireg].reshape(ramap.shape)] = \
+                        self[colname][ireg]
+            else:  # 1D index array
+                array = self[colname][findarr.reshape(ramap.shape)]
+                array[(findarr == -1).reshape(ramap.shape)] = np.nan
             arrays += [array]
         return arrays
 

@@ -1,5 +1,6 @@
 import sys
 import json
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -25,7 +26,7 @@ logging = False
 ###############################################################################
 
 
-class PhangsAncMegaTable(StatsTable):
+class PhangsAncillaryMegaTable(StatsTable):
 
     """
     MegaTable for PHANGS ancillary data.
@@ -75,13 +76,13 @@ class PhangsAncMegaTable(StatsTable):
         self.table.remove_column('_N_beam')
 
     def add_environ_fraction(
-            self, colname_env_frac='env_frac', unit_env_frac='',
+            self, colname='env_frac', unit='',
             env_file=None, weight_file=None):
 
         from reproject import reproject_interp
 
         if not Path(env_file).is_file():
-            self[colname_env_frac] = np.nan * u.Unit(unit_env_frac)
+            self[colname] = np.nan * u.Unit(unit)
             return
 
         if weight_file is None:
@@ -93,7 +94,7 @@ class PhangsAncMegaTable(StatsTable):
         else:
             # with weight
             if not Path(weight_file).is_file():
-                self[colname_env_frac] = np.nan * u.Unit(unit_env_frac)
+                self[colname] = np.nan * u.Unit(unit)
                 return
             with fits.open(weight_file) as hdul:
                 weight_map = hdul[0].data.copy()
@@ -109,11 +110,10 @@ class PhangsAncMegaTable(StatsTable):
         self.calc_image_stats(
             (env_map > 0).astype('float'), header=hdr,
             stat_func=nanaverage, weight=weight_map,
-            colname=colname_env_frac, unit=unit_env_frac)
+            colname=colname, unit=unit)
 
     def add_rotation_curve(
-            self,
-            colname_V_circ='V_circ', unit_V_circ='km s-1',
+            self, colname_V_circ='V_circ', unit_V_circ='km s-1',
             colname_e_V_circ='e_V_circ', unit_e_V_circ='km s-1',
             colname_beta='beta', unit_beta='',
             colname_e_beta='e_beta', unit_e_beta='',
@@ -176,15 +176,14 @@ class PhangsAncMegaTable(StatsTable):
 
     def calc_co_conversion(
             self, colname='alphaCO21', unit='Msun pc-2 K-1 km-1 s',
-            method='PHANGS', Zprime=None, line_ratio=None):
+            method='S20', Zprime=None, line_ratio=None):
         from CO_conversion_factor import alphaCO
         if line_ratio is None:
             line_ratio = 0.65  # Leroy+13; den Brok+21
         if method == 'Galactic':
             alphaCO10 = alphaCO.alphaCO10_Galactic.to(unit)
-        elif method == 'PHANGS':
-            alphaCO10 = alphaCO.predict_alphaCO10_PHANGS(
-                Zprime=Zprime).to(unit)
+        elif method == 'S20':
+            alphaCO10 = alphaCO.predict_alphaCO10_S20(Zprime=Zprime).to(unit)
         else:
             raise ValueError(f"Unrecognized method: '{method}'")
         self[colname] = (alphaCO10 / line_ratio).to(unit)
@@ -421,7 +420,8 @@ class PhangsAncMegaTable(StatsTable):
             e_sys**2).to(unit_e)
 
 
-class PhangsAncTessellMegaTable(TessellMegaTable, PhangsAncMegaTable):
+class PhangsAncillaryTessellMegaTable(
+        TessellMegaTable, PhangsAncillaryMegaTable):
 
     """
     TessellMegaTable for PHANGS ancillary data.
@@ -438,7 +438,8 @@ class PhangsAncTessellMegaTable(TessellMegaTable, PhangsAncMegaTable):
         self[colname_phi_gal] = (phi_gal * u.deg).to(unit_phi_gal)
 
 
-class PhangsAncRadialMegaTable(RadialMegaTable, PhangsAncMegaTable):
+class PhangsAncillaryRadialMegaTable(
+        RadialMegaTable, PhangsAncillaryMegaTable):
 
     """
     RadialMegaTable for PHANGS ancillary data.
@@ -573,7 +574,7 @@ def add_raw_measurements_to_table(
         w_file = None
         t.add_environ_fraction(
             # column to save the output
-            colname_env_frac=f"frac_area_{env}",
+            colname=f"frac_area_{env}",
             # input parameters
             env_file=in_file, weight_file=w_file)
         # fraction of CO(2-1) flux
@@ -582,7 +583,7 @@ def add_raw_measurements_to_table(
             postfix_masking='_broad', postfix_resolution='')
         t.add_environ_fraction(
             # column to save the output
-            colname_env_frac=f"frac_CO21_{env}",
+            colname=f"frac_CO21_{env}",
             # input parameters
             env_file=in_file, weight_file=w_file)
         # fraction of Halpha flux
@@ -591,7 +592,7 @@ def add_raw_measurements_to_table(
             postfix_resolution='')
         t.add_environ_fraction(
             # column to save the output
-            colname_env_frac=f"frac_Halpha_{env}",
+            colname=f"frac_Halpha_{env}",
             # input parameters
             env_file=in_file, weight_file=w_file)
 
@@ -778,9 +779,9 @@ def calc_high_level_params_in_table(
     # PHANGS prescription
     t.calc_co_conversion(
         # columns to save the output
-        colname="alpha_CO21_scaling", unit='Msun pc-2 K-1 km-1 s',
+        colname="alpha_CO21_S20", unit='Msun pc-2 K-1 km-1 s',
         # input parameters
-        method='PHANGS', Zprime=t['Zprime'])
+        method='S20', Zprime=t['Zprime'])
     # Galactic value
     t.calc_co_conversion(
         # columns to save the output
@@ -789,7 +790,7 @@ def calc_high_level_params_in_table(
         method='Galactic')
     # find the best solution given a priority list
     t['alpha_CO21'] = np.nan * u.Unit('Msun pc-2 K-1 km-1 s')
-    for colname in ('alpha_CO21_scaling', 'alpha_CO21_Galactic'):
+    for colname in ('alpha_CO21_S20', 'alpha_CO21_Galactic'):
         if np.isfinite(t[colname]).any():
             t['alpha_CO21'] = t[colname]
             break
@@ -829,7 +830,7 @@ def calc_high_level_params_in_table(
         e_sys=0.1*u.dex)
 
 
-def build_tessell_mega_table(
+def build_tessell_ancillary_table(
         tile_shape=None, tile_size_kpc=None, fov_radius_R25=None,
         data_paths=None, gal_params=None,
         notes='', version=0.0, output_format=None, writefile=None,
@@ -837,17 +838,18 @@ def build_tessell_mega_table(
 
     # paraphrase galaxy parameters
     gal_name = gal_params['name']
-    gal_ra = gal_params['ra_deg'] * u.deg
-    gal_dec = gal_params['dec_deg'] * u.deg
-    gal_pa = gal_params['pa_deg'] * u.deg
-    gal_incl = gal_params['incl_deg'] * u.deg
-    gal_dist = gal_params['dist_Mpc'] * u.Mpc
+    gal_ra = np.round(gal_params['ra_deg'], 6) * u.deg
+    gal_dec = np.round(gal_params['dec_deg'], 6) * u.deg
+    gal_pa = np.round(gal_params['pa_deg'], 1) * u.deg
+    gal_incl = np.round(gal_params['incl_deg'], 1) * u.deg
+    gal_dist = np.round(gal_params['dist_Mpc'], 2) * u.Mpc
     gal_ang2lin = gal_dist / u.rad
-    gal_R25 = (
-        gal_params['R25_arcsec'] * u.arcsec * gal_ang2lin).to('kpc')
-    gal_Rstar = (
-        gal_params['Rstar_arcsec'] * u.arcsec * gal_ang2lin).to('kpc')
-    gal_Mstar = gal_params['Mstar_Msun'] * u.Msun
+    gal_R25 = np.round((
+        gal_params['R25_arcsec'] * u.arcsec * gal_ang2lin).to('kpc'), 2)
+    gal_Rstar = np.round((
+        gal_params['Rstar_arcsec'] * u.arcsec * gal_ang2lin).to('kpc'), 2)
+    gal_Mstar = 10**np.round(
+        np.log10(gal_params['Mstar_Msun']), 2) * u.Msun
 
     # ------------------------------------------------
     # initialize table
@@ -859,7 +861,7 @@ def build_tessell_mega_table(
         fov_radius_R25 * (gal_R25 / gal_ang2lin).to('arcsec').value)
     tile_size_arcsec = (
         (tile_size_kpc * u.kpc / gal_ang2lin).to('arcsec').value)
-    t = PhangsAncTessellMegaTable(
+    t = PhangsAncillaryTessellMegaTable(
         # galaxy center coordinates
         gal_ra.to('deg').value, gal_dec.to('deg').value,
         # full field-of-view radius in arcsec
@@ -929,14 +931,15 @@ def build_tessell_mega_table(
     # ------------------------------------------------
 
     t.meta['GALAXY'] = str(gal_name)
-    t.meta['RA_DEG'] = float(round(gal_ra.to('deg').value, 5))
-    t.meta['DEC_DEG'] = float(round(gal_dec.to('deg').value, 5))
-    t.meta['INCL_DEG'] = float(round(gal_incl.to('deg').value, 1))
-    t.meta['PA_DEG'] = float(round(gal_pa.to('deg').value, 1))
-    t.meta['DIST_MPC'] = float(round(gal_dist.to('Mpc').value, 2))
-    t.meta['R25_KPC'] = float(round(gal_R25.to('kpc').value, 2))
-    t.meta['RSCL_KPC'] = float(round(gal_Rstar.to('kpc').value, 2))
-    t.meta['LOGMSTAR'] = float(round(np.log10(gal_Mstar.to('Msun').value), 2))
+    t.meta['RA_DEG'] = float(np.round(gal_ra.to('deg').value, 6))
+    t.meta['DEC_DEG'] = float(np.round(gal_dec.to('deg').value, 6))
+    t.meta['INCL_DEG'] = float(np.round(gal_incl.to('deg').value, 1))
+    t.meta['PA_DEG'] = float(np.round(gal_pa.to('deg').value, 1))
+    t.meta['DIST_MPC'] = float(np.round(gal_dist.to('Mpc').value, 2))
+    t.meta['R25_KPC'] = float(np.round(gal_R25.to('kpc').value, 2))
+    t.meta['RSCL_KPC'] = float(np.round(gal_Rstar.to('kpc').value, 2))
+    t.meta['LOGMSTAR'] = float(
+        np.round(np.log10(gal_Mstar.to('Msun').value), 2))
     t.meta['TBLNOTE'] = str(notes)
     t.meta['VERSION'] = float(version)
 
@@ -947,13 +950,18 @@ def build_tessell_mega_table(
     if writefile is not None:
         if verbose:
             print("  Write table")
-        t.write(writefile, add_timestamp=True, overwrite=True)
+        if Path(writefile).suffix == '.ecsv':
+            t.write(
+                writefile, add_timestamp=True,
+                delimiter=',', overwrite=True)
+        else:
+            t.write(writefile, add_timestamp=True, overwrite=True)
         return writefile
     else:
         return t
 
 
-def build_radial_mega_table(
+def build_radial_ancillary_table(
         annulus_width_kpc=None, fov_radius_R25=None,
         data_paths=None, gal_params=None,
         notes='', version=0.0, output_format=None, writefile=None,
@@ -961,17 +969,18 @@ def build_radial_mega_table(
 
     # paraphrase galaxy parameters
     gal_name = gal_params['name']
-    gal_ra = gal_params['ra_deg'] * u.deg
-    gal_dec = gal_params['dec_deg'] * u.deg
-    gal_pa = gal_params['pa_deg'] * u.deg
-    gal_incl = gal_params['incl_deg'] * u.deg
-    gal_dist = gal_params['dist_Mpc'] * u.Mpc
+    gal_ra = np.round(gal_params['ra_deg'], 6) * u.deg
+    gal_dec = np.round(gal_params['dec_deg'], 6) * u.deg
+    gal_pa = np.round(gal_params['pa_deg'], 1) * u.deg
+    gal_incl = np.round(gal_params['incl_deg'], 1) * u.deg
+    gal_dist = np.round(gal_params['dist_Mpc'], 2) * u.Mpc
     gal_ang2lin = gal_dist / u.rad
-    gal_R25 = (
-        gal_params['R25_arcsec'] * u.arcsec * gal_ang2lin).to('kpc')
-    gal_Rstar = (
-        gal_params['Rstar_arcsec'] * u.arcsec * gal_ang2lin).to('kpc')
-    gal_Mstar = gal_params['Mstar_Msun'] * u.Msun
+    gal_R25 = np.round((
+        gal_params['R25_arcsec'] * u.arcsec * gal_ang2lin).to('kpc'), 2)
+    gal_Rstar = np.round((
+        gal_params['Rstar_arcsec'] * u.arcsec * gal_ang2lin).to('kpc'), 2)
+    gal_Mstar = 10**np.round(
+        np.log10(gal_params['Mstar_Msun']), 2) * u.Msun
 
     # ------------------------------------------------
     # initialize table
@@ -983,7 +992,7 @@ def build_radial_mega_table(
         (annulus_width_kpc * u.kpc / gal_ang2lin).to('arcsec').value)
     rgal_max_arcsec = (
         fov_radius_R25 * (gal_R25 / gal_ang2lin).to('arcsec').value)
-    t = PhangsAncRadialMegaTable(
+    t = PhangsAncillaryRadialMegaTable(
         # galaxy center coordinates
         gal_ra.to('deg').value, gal_dec.to('deg').value,
         # radial bin width in arcsec
@@ -1050,14 +1059,15 @@ def build_radial_mega_table(
     # ------------------------------------------------
 
     t.meta['GALAXY'] = str(gal_name)
-    t.meta['RA_DEG'] = float(gal_ra.to('deg').value)
-    t.meta['DEC_DEG'] = float(gal_dec.to('deg').value)
-    t.meta['INCL_DEG'] = float(gal_incl.to('deg').value)
-    t.meta['PA_DEG'] = float(gal_pa.to('deg').value)
-    t.meta['DIST_MPC'] = float(gal_dist.to('Mpc').value)
-    t.meta['R25_KPC'] = float(gal_R25.to('kpc').value)
-    t.meta['RSCL_KPC'] = float(gal_Rstar.to('kpc').value)
-    t.meta['LOGMSTAR'] = float(np.log10(gal_Mstar.to('Msun').value))
+    t.meta['RA_DEG'] = float(np.round(gal_ra.to('deg').value, 6))
+    t.meta['DEC_DEG'] = float(np.round(gal_dec.to('deg').value, 6))
+    t.meta['INCL_DEG'] = float(np.round(gal_incl.to('deg').value, 1))
+    t.meta['PA_DEG'] = float(np.round(gal_pa.to('deg').value, 1))
+    t.meta['DIST_MPC'] = float(np.round(gal_dist.to('Mpc').value, 2))
+    t.meta['R25_KPC'] = float(np.round(gal_R25.to('kpc').value, 2))
+    t.meta['RSCL_KPC'] = float(np.round(gal_Rstar.to('kpc').value, 2))
+    t.meta['LOGMSTAR'] = float(
+        np.round(np.log10(gal_Mstar.to('Msun').value), 2))
     t.meta['TBLNOTE'] = str(notes)
     t.meta['VERSION'] = float(version)
 
@@ -1068,7 +1078,12 @@ def build_radial_mega_table(
     if writefile is not None:
         if verbose:
             print("  Write table")
-        t.write(writefile, add_timestamp=True, overwrite=True)
+        if Path(writefile).suffix == '.ecsv':
+            t.write(
+                writefile, add_timestamp=True,
+                delimiter=',', overwrite=True)
+        else:
+            t.write(writefile, add_timestamp=True, overwrite=True)
         return writefile
     else:
         return t
@@ -1080,6 +1095,7 @@ def build_radial_mega_table(
 if __name__ == '__main__':
 
     # warning and logging settings
+    warnings.simplefilter('ignore', RuntimeWarning)
     if logging:
         # output log to a file
         orig_stdout = sys.stdout
@@ -1131,13 +1147,13 @@ if __name__ == '__main__':
             table_configs['tessell_tile_size_unit'])
         fov_radius_R25 = table_configs['tessell_FoV_radius']
 
-        tessell_table_file = (
+        tessell_ancillary_table_file = (
             work_dir / table_configs['tessell_table_name'].format(
                 galaxy=gal_params['name'], content='ancillary',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
-        if not tessell_table_file.is_file():
+        if not tessell_ancillary_table_file.is_file():
             print("Building tessellation statistics table...")
-            build_tessell_mega_table(
+            build_tessell_ancillary_table(
                 tile_shape=tile_shape,
                 tile_size_kpc=tile_size.to('kpc').value,
                 fov_radius_R25=fov_radius_R25,
@@ -1146,7 +1162,7 @@ if __name__ == '__main__':
                 version=table_configs['table_version'],
                 notes=table_configs['table_notes'],
                 output_format=t_format,
-                writefile=tessell_table_file)
+                writefile=tessell_ancillary_table_file)
             print("Done\n")
 
         # RadialMegaTable
@@ -1158,13 +1174,13 @@ if __name__ == '__main__':
             table_configs['radial_annulus_width_unit'])
         fov_radius_R25 = table_configs['radial_FoV_radius']
 
-        radial_table_file = (
+        radial_ancillary_table_file = (
             work_dir / table_configs['radial_table_name'].format(
                 galaxy=gal_params['name'], content='ancillary',
                 annulus_width_str=annulus_width_str))
-        if not radial_table_file.is_file():
+        if not radial_ancillary_table_file.is_file():
             print("Building radial statistics table...")
-            build_radial_mega_table(
+            build_radial_ancillary_table(
                 annulus_width_kpc=annulus_width.to('kpc').value,
                 fov_radius_R25=fov_radius_R25,
                 data_paths=data_paths,
@@ -1172,7 +1188,7 @@ if __name__ == '__main__':
                 version=table_configs['table_version'],
                 notes=table_configs['table_notes'],
                 output_format=t_format,
-                writefile=radial_table_file)
+                writefile=radial_ancillary_table_file)
             print("Done\n")
 
     # logging settings

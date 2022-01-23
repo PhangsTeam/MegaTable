@@ -22,6 +22,15 @@ def identical_units(u1, u2):
 # --------------------------------------------------------------------
 
 
+def calc_pixel_area(header):
+    from astropy.wcs import WCS
+    wcs = WCS(header)
+    return wcs.proj_plane_pixel_area()
+
+
+# --------------------------------------------------------------------
+
+
 def calc_pixel_per_beam(header, suppress_no_beam_error=True):
     from astropy.wcs import WCS
     from radio_beam import Beam

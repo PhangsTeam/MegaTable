@@ -2,7 +2,7 @@
     "PHANGS_sample_table": "/data/kant/0/sun.1608/PHANGS/mega-tables/sample.ecsv",
     "PHANGS_ALMA_CO21": "/data/kant/0/sun.1608/PHANGS/ALMA/v4-processed/{galaxy}_CO21_{product}{postfix_masking}{postfix_resolution}.fits",
     "PHANGS_ALMA_CPROPS":
-    "/data/kant/0/sun.1608/PHANGS/ALMA/v4-CPROPS/{galaxy}_CO21_CPROPS{postfix_sensitivity}{postfix_resolution}.fits",
+    "/data/kant/0/sun.1608/PHANGS/ALMA/v4-CPROPS/{galaxy}_CO21_CPROPS{postfix_resolution}{postfix_sensitivity}.fits",
     "PHANGS_ALMA_rotcurve":
     "/data/kant/0/sun.1608/PHANGS/rotcurve/{galaxy}_{product}.ecsv",
     "PHANGS_HI":

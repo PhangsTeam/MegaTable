@@ -1131,7 +1131,7 @@ if __name__ == '__main__':
         data_paths = json.load(f)
     with open(config_dir / "config_tables.json") as f:
         table_configs = json.load(f)
-    t_format = Table.read(config_dir / "format_phangs-alma.csv")
+    t_format = Table.read(config_dir / "format_phangsalma.csv")
 
     # read sample table
     t_sample = Table.read(data_paths['PHANGS_sample_table'])
@@ -1161,7 +1161,7 @@ if __name__ == '__main__':
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
         tessell_alma_table_file = (
             work_dir / table_configs['tessell_table_name'].format(
-                galaxy=gal_name, content='phangs-alma',
+                galaxy=gal_name, content='phangsalma',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
         if (tessell_ancillary_table_file.is_file() and not
                 tessell_alma_table_file.is_file()):
@@ -1182,7 +1182,7 @@ if __name__ == '__main__':
                 annulus_width_str=annulus_width_str))
         radial_alma_table_file = (
             work_dir / table_configs['radial_table_name'].format(
-                galaxy=gal_name, content='phangs-alma',
+                galaxy=gal_name, content='phangsalma',
                 annulus_width_str=annulus_width_str))
         if (radial_ancillary_table_file.is_file() and not
                 radial_alma_table_file.is_file()):

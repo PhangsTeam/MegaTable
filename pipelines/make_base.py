@@ -26,10 +26,10 @@ logging = False
 ###############################################################################
 
 
-class PhangsAncillaryMegaTable(StatsTable):
+class PhangsBaseMegaTable(StatsTable):
 
     """
-    MegaTable for PHANGS ancillary data.
+    MegaTable for PHANGS base data.
     """
 
     def add_area_average_for_image(
@@ -420,11 +420,11 @@ class PhangsAncillaryMegaTable(StatsTable):
             e_sys**2).to(unit_e)
 
 
-class PhangsAncillaryTessellMegaTable(
-        TessellMegaTable, PhangsAncillaryMegaTable):
+class PhangsBaseTessellMegaTable(
+        TessellMegaTable, PhangsBaseMegaTable):
 
     """
-    TessellMegaTable for PHANGS ancillary data.
+    TessellMegaTable for PHANGS base data.
     """
 
     def add_deprojected_coords(
@@ -438,11 +438,11 @@ class PhangsAncillaryTessellMegaTable(
         self[colname_phi_gal] = (phi_gal * u.deg).to(unit_phi_gal)
 
 
-class PhangsAncillaryRadialMegaTable(
-        RadialMegaTable, PhangsAncillaryMegaTable):
+class PhangsBaseRadialMegaTable(
+        RadialMegaTable, PhangsBaseMegaTable):
 
     """
-    RadialMegaTable for PHANGS ancillary data.
+    RadialMegaTable for PHANGS base data.
     """
 
     def add_linear_r_gal(
@@ -500,7 +500,7 @@ def add_raw_measurements_to_table(
     t.add_area_average_for_image(
         # column to save the output
         colname='I_3p6um', unit='MJy sr-1',
-        colname_e=f"e_I_3p6um", unit_e='MJy sr-1',
+        colname_e="e_I_3p6um", unit_e='MJy sr-1',
         # input parameters
         img_file=in_file, err_file=err_file)
     in_file = data_paths['PHANGS_IRAC'].format(
@@ -512,7 +512,7 @@ def add_raw_measurements_to_table(
     t.add_area_average_for_image(
         # column to save the output
         colname='I_3p6umICA', unit='MJy sr-1',
-        colname_e=f"e_I_3p6umICA", unit_e='MJy sr-1',
+        colname_e="e_I_3p6umICA", unit_e='MJy sr-1',
         # input parameters
         img_file=in_file, err_file=err_file)
 
@@ -528,7 +528,7 @@ def add_raw_measurements_to_table(
         t.add_area_average_for_image(
             # column to save the output
             colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
-            colname_e=f"e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
+            colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
             # input parameters
             img_file=in_file, err_file=err_file)
 
@@ -544,7 +544,7 @@ def add_raw_measurements_to_table(
         t.add_area_average_for_image(
             # column to save the output
             colname='I_HI', unit='K km s-1',
-            colname_e=f"e_I_HI", unit_e='K km s-1',
+            colname_e="e_I_HI", unit_e='K km s-1',
             # input parameters
             img_file=in_file, err_file=err_file)
 
@@ -560,7 +560,7 @@ def add_raw_measurements_to_table(
         t.add_area_average_for_image(
             # column to save the output
             colname='I_CO21', unit='K km s-1',
-            colname_e=f"e_I_CO21", unit_e='K km s-1',
+            colname_e="e_I_CO21", unit_e='K km s-1',
             # input parameters
             img_file=in_file, err_file=err_file)
 
@@ -732,24 +732,24 @@ def calc_high_level_params_in_table(
     # IRAC1-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname=f"Sigma_star_3p6um", unit='Msun pc-2',
-        colname_e=f"e_Sigma_star_3p6um", unit_e='dex',
+        colname="Sigma_star_3p6um", unit='Msun pc-2',
+        colname_e="e_Sigma_star_3p6um", unit_e='dex',
         # input parameters
         method='3p6um', I_IR=t['I_3p6um'], e_I_IR=t['e_I_3p6um'],
         MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
     # WISE1-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname=f"Sigma_star_3p4um", unit='Msun pc-2',
-        colname_e=f"e_Sigma_star_3p4um", unit_e='dex',
+        colname="Sigma_star_3p4um", unit='Msun pc-2',
+        colname_e="e_Sigma_star_3p4um", unit_e='dex',
         # input parameters
         method='3p4um', I_IR=t['I_3p4um'], e_I_IR=t['e_I_3p4um'],
         MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
     # ICA-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname=f"Sigma_star_3p6umICA", unit='Msun pc-2',
-        colname_e=f"e_Sigma_star_3p6umICA", unit_e='dex',
+        colname="Sigma_star_3p6umICA", unit='Msun pc-2',
+        colname_e="e_Sigma_star_3p6umICA", unit_e='dex',
         # input parameters
         method='3p6umICA', I_IR=t['I_3p6umICA'], e_I_IR=t['e_I_3p6umICA'],
         MtoL=0.5*u.Msun/u.Lsun, cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
@@ -830,7 +830,7 @@ def calc_high_level_params_in_table(
         e_sys=0.1*u.dex)
 
 
-def build_tessell_ancillary_table(
+def build_tessell_base_table(
         tile_shape=None, tile_size_kpc=None, fov_radius_R25=None,
         data_paths=None, gal_params=None,
         notes='', version=0.0, output_format=None, writefile=None,
@@ -861,7 +861,7 @@ def build_tessell_ancillary_table(
         fov_radius_R25 * (gal_R25 / gal_ang2lin).to('arcsec').value)
     tile_size_arcsec = (
         (tile_size_kpc * u.kpc / gal_ang2lin).to('arcsec').value)
-    t = PhangsAncillaryTessellMegaTable(
+    t = PhangsBaseTessellMegaTable(
         # galaxy center coordinates
         gal_ra.to('deg').value, gal_dec.to('deg').value,
         # full field-of-view radius in arcsec
@@ -961,7 +961,7 @@ def build_tessell_ancillary_table(
         return t
 
 
-def build_radial_ancillary_table(
+def build_radial_base_table(
         annulus_width_kpc=None, fov_radius_R25=None,
         data_paths=None, gal_params=None,
         notes='', version=0.0, output_format=None, writefile=None,
@@ -992,7 +992,7 @@ def build_radial_ancillary_table(
         (annulus_width_kpc * u.kpc / gal_ang2lin).to('arcsec').value)
     rgal_max_arcsec = (
         fov_radius_R25 * (gal_R25 / gal_ang2lin).to('arcsec').value)
-    t = PhangsAncillaryRadialMegaTable(
+    t = PhangsBaseRadialMegaTable(
         # galaxy center coordinates
         gal_ra.to('deg').value, gal_dec.to('deg').value,
         # radial bin width in arcsec
@@ -1109,7 +1109,7 @@ if __name__ == '__main__':
         data_paths = json.load(f)
     with open(config_dir / "config_tables.json") as f:
         table_configs = json.load(f)
-    t_format = Table.read(config_dir / "format_ancillary.csv")
+    t_format = Table.read(config_dir / "format_base.csv")
 
     # read sample table
     t_sample = Table.read(data_paths['PHANGS_sample_table'])
@@ -1147,13 +1147,13 @@ if __name__ == '__main__':
             table_configs['tessell_tile_size_unit'])
         fov_radius_R25 = table_configs['tessell_FoV_radius']
 
-        tessell_ancillary_table_file = (
+        tessell_base_table_file = (
             work_dir / table_configs['tessell_table_name'].format(
-                galaxy=gal_params['name'], content='ancillary',
+                galaxy=gal_params['name'], content='base',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
-        if not tessell_ancillary_table_file.is_file():
+        if not tessell_base_table_file.is_file():
             print("Building tessellation statistics table...")
-            build_tessell_ancillary_table(
+            build_tessell_base_table(
                 tile_shape=tile_shape,
                 tile_size_kpc=tile_size.to('kpc').value,
                 fov_radius_R25=fov_radius_R25,
@@ -1162,7 +1162,7 @@ if __name__ == '__main__':
                 version=table_configs['table_version'],
                 notes=table_configs['table_notes'],
                 output_format=t_format,
-                writefile=tessell_ancillary_table_file)
+                writefile=tessell_base_table_file)
             print("Done\n")
 
         # RadialMegaTable
@@ -1174,13 +1174,13 @@ if __name__ == '__main__':
             table_configs['radial_annulus_width_unit'])
         fov_radius_R25 = table_configs['radial_FoV_radius']
 
-        radial_ancillary_table_file = (
+        radial_base_table_file = (
             work_dir / table_configs['radial_table_name'].format(
-                galaxy=gal_params['name'], content='ancillary',
+                galaxy=gal_params['name'], content='base',
                 annulus_width_str=annulus_width_str))
-        if not radial_ancillary_table_file.is_file():
+        if not radial_base_table_file.is_file():
             print("Building radial statistics table...")
-            build_radial_ancillary_table(
+            build_radial_base_table(
                 annulus_width_kpc=annulus_width.to('kpc').value,
                 fov_radius_R25=fov_radius_R25,
                 data_paths=data_paths,
@@ -1188,7 +1188,7 @@ if __name__ == '__main__':
                 version=table_configs['table_version'],
                 notes=table_configs['table_notes'],
                 output_format=t_format,
-                writefile=radial_ancillary_table_file)
+                writefile=radial_base_table_file)
             print("Done\n")
 
     # logging settings

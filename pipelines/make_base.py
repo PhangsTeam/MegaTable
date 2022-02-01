@@ -257,8 +257,8 @@ class PhangsBaseMegaTable(StatsTable):
             self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
             low_snr_flag = (
                 np.isfinite(I_UV) & np.isfinite(I_IR) &
-                (I_UV / e_I_UV < snr_thresh) |
-                (I_IR / e_I_IR < snr_thresh))
+                ((I_UV / e_I_UV < snr_thresh) |
+                 (I_IR / e_I_IR < snr_thresh)))
             self[colname][low_snr_flag] = 0
             self[colname_e][low_snr_flag] = np.nan
         elif method in cal_IR:
@@ -289,8 +289,8 @@ class PhangsBaseMegaTable(StatsTable):
             self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
             low_snr_flag = (
                 np.isfinite(I_Halpha) & np.isfinite(I_IR) &
-                (I_Halpha / e_I_Halpha < snr_thresh) |
-                (I_IR / e_I_IR < snr_thresh))
+                ((I_Halpha / e_I_Halpha < snr_thresh) |
+                 (I_IR / e_I_IR < snr_thresh)))
             self[colname][low_snr_flag] = 0
             self[colname_e][low_snr_flag] = np.nan
         else:

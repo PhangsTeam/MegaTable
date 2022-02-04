@@ -88,23 +88,6 @@ class PhangsAlmaMegaTable(StatsTable):
             y.value, ra, dec, weight=wt,
             stat_func=nanaverage, colname=colname, unit=y.unit)
 
-    def add_obj_radius(
-            self, colname='<R_obj>', unit='pc',
-            ra=None, dec=None, flux=None, radius=None):
-        self.add_obj_stat_generic(
-            colname=colname, unit=unit,
-            ra=ra, dec=dec, prefactor=1.,
-            flux=flux, radius=radius, radius_power=1)
-
-    def add_obj_area(
-            self, colname='<Area_obj>', unit='pc2',
-            ra=None, dec=None, flux=None, radius=None):
-        prefactor = np.pi / (2 * np.log(2))
-        self.add_obj_stat_generic(
-            colname=colname, unit=unit,
-            ra=ra, dec=dec, prefactor=prefactor,
-            flux=flux, radius=radius, radius_power=2)
-
     def add_obj_co_flux(
             self, colname='<F_CO21_obj>', unit='K km s-1 pc2',
             ra=None, dec=None, flux=None):
@@ -112,14 +95,6 @@ class PhangsAlmaMegaTable(StatsTable):
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=1.,
             flux=flux, flux_power=1)
-
-    def add_obj_vel_disp(
-            self, colname='<vdisp_mol_obj>', unit='km s-1',
-            ra=None, dec=None, flux=None, vdisp=None):
-        self.add_obj_stat_generic(
-            colname=colname, unit=unit,
-            ra=ra, dec=dec, prefactor=1.,
-            flux=flux, vdisp=vdisp, vdisp_power=1)
 
     def add_obj_mass(
             self, colname='<M_mol_obj>', unit='Msun',
@@ -132,11 +107,45 @@ class PhangsAlmaMegaTable(StatsTable):
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
 
+    def add_obj_co_linewidth(
+            self, colname='<sigmav_CO21_obj>', unit='km s-1',
+            ra=None, dec=None, flux=None, vdisp=None):
+        self.add_obj_stat_generic(
+            colname=colname, unit=unit,
+            ra=ra, dec=dec, prefactor=1.,
+            flux=flux, vdisp=vdisp, vdisp_power=1)
+
+    def add_obj_vel_disp(
+            self, colname='<vdisp_mol_obj>', unit='km s-1',
+            ra=None, dec=None, flux=None, vdisp=None, cosi=None):
+        self.add_obj_stat_generic(
+            colname=colname, unit=unit,
+            ra=ra, dec=dec, prefactor=cosi**0.5,
+            flux=flux, vdisp=vdisp, vdisp_power=1)
+
+    def add_obj_radius(
+            self, colname='<R_obj>', unit='pc',
+            ra=None, dec=None, flux=None, radius=None):
+        self.add_obj_stat_generic(
+            colname=colname, unit=unit,
+            ra=ra, dec=dec, prefactor=1.,
+            flux=flux, radius=radius, radius_power=1)
+
+    def add_obj_area(
+            self, colname='<Area_obj>', unit='pc2',
+            ra=None, dec=None, flux=None, radius=None, cosi=None):
+        prefactor = np.pi / (2 * np.log(2)) / cosi
+        self.add_obj_stat_generic(
+            colname=colname, unit=unit,
+            ra=ra, dec=dec, prefactor=prefactor,
+            flux=flux, radius=radius, radius_power=2)
+
     def add_obj_surf_density(
             self, colname='<Sigma_mol_obj>', unit='Msun pc-2',
-            ra=None, dec=None, flux=None, radius=None, alpha_CO=None):
+            ra=None, dec=None, flux=None, radius=None,
+            alpha_CO=None, cosi=None):
         # Rosolowsky+21, text following Eq.12
-        prefactor = alpha_CO.unit / (2 * np.pi)
+        prefactor = alpha_CO.unit * cosi / (2 * np.pi)
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
@@ -158,8 +167,8 @@ class PhangsAlmaMegaTable(StatsTable):
 
     def add_obj_crossing_time(
             self, colname='<t_cross^-1_obj>', unit='Myr-1',
-            ra=None, dec=None, flux=None, vdisp=None, radius=None):
-        prefactor = np.sqrt(3) / 2
+            ra=None, dec=None, flux=None, vdisp=None, radius=None, cosi=None):
+        prefactor = np.sqrt(3) * cosi**0.5 / 2
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
@@ -169,9 +178,9 @@ class PhangsAlmaMegaTable(StatsTable):
     def add_obj_virial_param(
             self, colname='<alpha_vir_obj>', unit='',
             ra=None, dec=None, flux=None, vdisp=None, radius=None,
-            alpha_CO=None):
+            alpha_CO=None, cosi=None):
         # Rosolowsky+21, text following Eq.10
-        prefactor = 10 / (const.G * alpha_CO.unit)
+        prefactor = 10 * cosi / (const.G * alpha_CO.unit)
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
@@ -183,9 +192,9 @@ class PhangsAlmaMegaTable(StatsTable):
     def add_obj_turb_pressure(
             self, colname='<P_turb_obj>', unit='K cm-3',
             ra=None, dec=None, flux=None, vdisp=None, radius=None,
-            alpha_CO=None):
+            alpha_CO=None, cosi=None):
         # Rosolowsky+21, Eq.16
-        prefactor = 3/8 / np.pi * alpha_CO.unit / const.k_B
+        prefactor = 3/8 / np.pi * alpha_CO.unit * cosi / const.k_B
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
@@ -350,31 +359,14 @@ class PhangsAlmaMegaTable(StatsTable):
         else:
             self[colname_e] = self[colname_e].to(unit_e)
 
-    def add_pix_vel_disp(
-            self, colname='<vdisp_mol_pix>', unit='km s-1',
-            colname_e='e_<vdisp_mol_pix>', unit_e='dex',
-            header=None, masked_ew=None, masked_eew=None,
-            masked_mom0=None, masked_emom0=None):
-        self.add_pix_stat_generic(
-            colname=colname, colname_e=colname_e, unit=unit,
-            header=header, prefactor=1.,
-            m0=masked_mom0, em0=masked_emom0, m0_power=0,
-            ew=masked_ew, eew=masked_eew, ew_power=1)
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
-
     def add_pix_surf_density(
             self, colname='<Sigma_mol_pix>', unit='Msun pc-2',
             colname_e='e_<Sigma_mol_pix>', unit_e='dex',
             header=None, masked_mom0=None, masked_emom0=None,
-            alpha_CO=None, e_sys=None):
+            alpha_CO=None, cosi=None, e_sys=None):
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
-            header=header, prefactor=alpha_CO.unit,
+            header=header, prefactor=alpha_CO.unit * cosi,
             m0=masked_mom0, em0=masked_emom0, m0_power=1)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
@@ -390,11 +382,49 @@ class PhangsAlmaMegaTable(StatsTable):
             e_sys = 0.1 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
+    def add_pix_co_linewidth(
+            self, colname='<sigmav_CO21_pix>', unit='km s-1',
+            colname_e='e_<sigmav_CO21_pix>', unit_e='dex',
+            header=None, masked_ew=None, masked_eew=None,
+            masked_mom0=None, masked_emom0=None):
+        self.add_pix_stat_generic(
+            colname=colname, colname_e=colname_e, unit=unit,
+            header=header, prefactor=1.,
+            m0=masked_mom0, em0=masked_emom0, m0_power=0,
+            ew=masked_ew, eew=masked_eew, ew_power=1)
+        # convert uncertainty unit
+        if unit_e == 'dex':
+            self[colname_e] = \
+                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
+        else:
+            self[colname_e] = self[colname_e].to(unit_e)
+
+    def add_pix_vel_disp(
+            self, colname='<vdisp_mol_pix>', unit='km s-1',
+            colname_e='e_<vdisp_mol_pix>', unit_e='dex',
+            header=None, masked_ew=None, masked_eew=None,
+            masked_mom0=None, masked_emom0=None, cosi=None, e_sys=None):
+        self.add_pix_stat_generic(
+            colname=colname, colname_e=colname_e, unit=unit,
+            header=header, prefactor=cosi**0.5,
+            m0=masked_mom0, em0=masked_emom0, m0_power=0,
+            ew=masked_ew, eew=masked_eew, ew_power=1)
+        # convert uncertainty unit
+        if unit_e == 'dex':
+            self[colname_e] = \
+                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
+        else:
+            self[colname_e] = self[colname_e].to(unit_e)
+        # include statistical uncertainty
+        if e_sys is None:
+            e_sys = 0.1 * u.dex
+        self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
+
     def add_pix_freefall_time(
             self, colname='<t_ff^-1_pix>', unit='Myr-1',
             colname_e='e_<t_ff^-1_pix>', unit_e='dex',
             header=None, masked_mom0=None, masked_emom0=None,
-            alpha_CO=None, FWHM_beam=None, radius=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, e_sys=None):
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         prefactor = np.sqrt(
             8 * const.G * alpha_CO.unit * area_beam / np.pi**2 / radius**3)
@@ -421,8 +451,8 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<t_cross^-1_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            radius=None, e_sys=None):
-        prefactor = np.sqrt(3) / (2 * radius)
+            radius=None, cosi=None, e_sys=None):
+        prefactor = np.sqrt(3) * cosi**0.5 / (2 * radius)
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=prefactor,
@@ -444,17 +474,17 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<alpha_vir_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            alpha_CO=None, FWHM_beam=None, radius=None, e_sys=None):
-        area_beam = np.pi / (4 * np.log(2)) * FWHM_beam ** 2
-        prefactor = 5 * radius / (const.G * alpha_CO.unit * area_beam)
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
+        area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
+        prefactor = 5 * cosi * radius / (const.G * alpha_CO.unit * area_beam)
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=prefactor,
             m0=masked_mom0, em0=masked_emom0, m0_power=-1,
             ew=masked_ew, eew=masked_eew, ew_power=2)
         # scale results according to alpha_CO
-        self[colname] *= alpha_CO.value ** -1
-        self[colname_e] *= alpha_CO.value ** -1
+        self[colname] *= alpha_CO.value**-1
+        self[colname_e] *= alpha_CO.value**-1
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
@@ -471,10 +501,10 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<P_turb_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            alpha_CO=None, FWHM_beam=None, radius=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         volume = 4/3 * np.pi * radius**3
-        prefactor = alpha_CO.unit * area_beam / volume / const.k_B
+        prefactor = alpha_CO.unit * cosi * area_beam / volume / const.k_B
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=prefactor,
@@ -502,14 +532,14 @@ class PhangsAlmaMegaTable(StatsTable):
             Sigma_mol_kpc=None, e_Sigma_mol_kpc=None,
             Sigma_atom_kpc=None, e_Sigma_atom_kpc=None,
             vdisp_atom_z=None, rho_star_mp=None, e_rho_star_mp=None,
-            alpha_CO=None, FWHM_beam=None, radius=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
         if vdisp_atom_z is None:
             vdisp_atom_z = 10 * u.Unit('km s-1')  # Leroy+08, Sun+20a
         # calculate cloud hydrostatic pressure due to self-gravity
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         prefactor = (
             3/8 * np.pi * const.G / const.k_B *
-            (alpha_CO.unit * area_beam / (np.pi * radius**2))**2)
+            (alpha_CO.unit * cosi * area_beam / (np.pi * radius**2))**2)
         self.add_pix_stat_generic(
             colname='_<P_selfg>', colname_e='_e_<P_selfg>', unit=unit,
             header=header, prefactor=prefactor,
@@ -558,7 +588,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<alpha_CO21_G20ICO>',
             unit='Msun pc-2 K-1 km-1 s',
             header=None, masked_mom0=None, Zprime=None,
-            FWHM_beam=None, force_res_dependence=True):
+            FWHM_beam=None, cosi=None, force_res_dependence=True):
         if header is None:
             self[colname] = np.nan * u.Unit(unit)
             return
@@ -571,7 +601,8 @@ class PhangsAlmaMegaTable(StatsTable):
             power = -0.97 + 0.34 * np.log10(FWHM_beam.to('pc').value)
             prefactor = 21.1e20 * u.Unit('cm-2 K-1 km-1 s')
             prefactor *= FWHM_beam.to('pc').value**-0.41
-            unitless_mom0 = masked_mom0.to('K km s-1').value * u.Unit('')
+            unitless_mom0 = \
+                masked_mom0.to('K km s-1').value * cosi * u.Unit('')
             self.add_pix_stat_generic(
                 colname='_X_CO21', unit=prefactor.unit,
                 header=header, prefactor=prefactor,
@@ -626,12 +657,13 @@ def add_pixel_stats_to_table(
 
     gal_name = t.meta['GALAXY']
     gal_dist = t.meta['DIST_MPC'] * u.Mpc
+    gal_cosi = np.cos(np.deg2rad(t.meta['INCL_DEG']))
 
     if colname_alphaCO not in t.colnames:
         raise ValueError("No alphaCO column in table")
 
     if H_los is None:
-        H_los = 100 * u.pc  # Heyer & Dame (2015)
+        H_los = 100 * u.pc / gal_cosi  # Heyer & Dame (2015)
 
     for res_pc in res_pcs:
 
@@ -732,17 +764,6 @@ def add_pixel_stats_to_table(
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0)
 
-        # CO line width = molecular gas velocity dispersion
-        if verbose:
-            print("    Add CO line width = molecular gas velocity dispersion")
-        t.add_pix_vel_disp(
-            # column to save the output
-            colname=f"<vdisp_mol_pix_{res_str}>",
-            colname_e=f"e_<vdisp_mol_pix_{res_str}>",
-            # input parameters
-            header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew)
-
         # molecular gas surface density
         if verbose:
             print("    Add molecular gas surface density")
@@ -752,7 +773,31 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<Sigma_mol_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            alpha_CO=t[colname_alphaCO])
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            e_sys=0.1*u.dex)
+
+        # CO line width
+        if verbose:
+            print("    Add CO line width")
+        t.add_pix_co_linewidth(
+            # column to save the output
+            colname=f"<sigmav_CO21_pix_{res_str}>",
+            colname_e=f"e_<sigmav_CO21_pix_{res_str}>",
+            # input parameters
+            header=hdr, masked_mom0=sm0, masked_emom0=sem0,
+            masked_ew=sew, masked_eew=seew)
+
+        # molecular gas velocity dispersion
+        if verbose:
+            print("    Add molecular gas velocity dispersion")
+        t.add_pix_vel_disp(
+            # column to save the output
+            colname=f"<vdisp_mol_pix_{res_str}>",
+            colname_e=f"e_<vdisp_mol_pix_{res_str}>",
+            # input parameters
+            header=hdr, masked_mom0=sm0, masked_emom0=sem0,
+            masked_ew=sew, masked_eew=seew, cosi=gal_cosi,
+            e_sys=0.1*u.dex)
 
         # free-fall time
         if verbose:
@@ -763,7 +808,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_ff^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            alpha_CO=t[colname_alphaCO], FWHM_beam=res, radius=radius3d)
+            FWHM_beam=res, radius=radius3d, alpha_CO=t[colname_alphaCO],
+            e_sys=0.1*u.dex)
 
         # crossing time
         if verbose:
@@ -774,7 +820,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_cross^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew, radius=radius3d)
+            masked_ew=sew, masked_eew=seew, radius=radius3d, cosi=gal_cosi,
+            e_sys=0.1*u.dex)
 
         # virial parameter
         if verbose:
@@ -786,7 +833,9 @@ def add_pixel_stats_to_table(
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
-            alpha_CO=t[colname_alphaCO], FWHM_beam=res, radius=radius3d)
+            FWHM_beam=res, radius=radius3d,
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            e_sys=0.1*u.dex)
 
         # internal turbulent pressure
         if verbose:
@@ -798,7 +847,9 @@ def add_pixel_stats_to_table(
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
-            alpha_CO=t[colname_alphaCO], FWHM_beam=res, radius=radius3d)
+            FWHM_beam=res, radius=radius3d,
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            e_sys=0.1*u.dex)
 
         # dynamical equilibrium pressures
         if verbose:
@@ -814,7 +865,9 @@ def add_pixel_stats_to_table(
             Sigma_mol_kpc=t['Sigma_mol'], e_Sigma_mol_kpc=t['e_Sigma_mol'],
             Sigma_atom_kpc=t['Sigma_atom'], e_Sigma_atom_kpc=t['e_Sigma_atom'],
             rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'],
-            alpha_CO=t[colname_alphaCO], FWHM_beam=res, radius=radius3d)
+            FWHM_beam=res, radius=radius3d,
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            e_sys=0.1*u.dex)
 
         # Gong+20 ICO-based conversion factor
         if verbose:
@@ -824,7 +877,7 @@ def add_pixel_stats_to_table(
             colname=f"<alpha_CO21_G20ICO_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, Zprime=t['Zprime'],
-            FWHM_beam=res, force_res_dependence=True)
+            FWHM_beam=res, cosi=gal_cosi, force_res_dependence=True)
 
         # completeness corrections
         if verbose:
@@ -844,12 +897,13 @@ def add_object_stats_to_table(
 
     gal_name = t.meta['GALAXY']
     gal_dist = t.meta['DIST_MPC'] * u.Mpc
+    gal_cosi = np.cos(np.deg2rad(t.meta['INCL_DEG']))
 
     if colname_alphaCO not in t.colnames:
         raise ValueError("No alphaCO column in table")
 
     if H_los is None:
-        H_los = 100 * u.pc  # Heyer & Dame (2015)
+        H_los = 100 * u.pc / gal_cosi  # Heyer & Dame (2015)
 
     for res_pc in res_pcs:
 
@@ -872,7 +926,7 @@ def add_object_stats_to_table(
         if not (cprops_file.is_file() and bm0_file.is_file()):
             if verbose:
                 print("    Some input file not found -- will do a dry run")
-            ra = dec = vdisp = flux = orig_flux = radius2d = radius3d = None
+            ra = dec = vdisp = flux = flux_noex = radius2d = radius3d = None
             hdr = bm0 = None
         else:
             if verbose:
@@ -885,7 +939,7 @@ def add_object_stats_to_table(
                 np.array(cpropscat['FLUX_KKMS_PC2']) /
                 np.array(cpropscat['DISTANCE_PC'])**2 *
                 u.Unit('K km s-1') * gal_dist**2).to('K km s-1 pc2')
-            orig_flux = (
+            flux_noex = (
                 np.array(cpropscat['FLUX_NOEX']) /
                 np.array(cpropscat['DISTANCE_PC'])**2 *
                 u.Unit('K km s-1') * gal_dist**2).to('K km s-1 pc2')
@@ -900,7 +954,7 @@ def add_object_stats_to_table(
                 np.isfinite(vdisp) & np.isfinite(radius2d) & np.isfinite(flux)
             vdisp[~mask] = np.nan
             flux[~mask] = np.nan
-            orig_flux[~mask] = np.nan
+            flux_noex[~mask] = np.nan
             radius2d[~mask] = np.nan
             radius3d[~mask] = np.nan
             with fits.open(bm0_file) as hdul:
@@ -924,8 +978,44 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"fracF_CO21_obj_{res_str}",
             # input parameters
-            ra=ra, dec=dec, flux=orig_flux,
+            ra=ra, dec=dec, flux=flux_noex,
             header=hdr, broad_mom0=bm0, dist=gal_dist)
+
+        # CO line flux
+        if verbose:
+            print("    Add CO line flux")
+        t.add_obj_co_flux(
+            # column to save the output
+            colname=f"<F_CO21_obj_{res_str}>",
+            # input parameters
+            ra=ra, dec=dec, flux=flux)
+
+        # molecular gas mass
+        if verbose:
+            print("    Add molecular gas mass")
+        t.add_obj_mass(
+            # column to save the output
+            colname=f"<M_mol_obj_{res_str}>",
+            # input parameters
+            ra=ra, dec=dec, flux=flux, alpha_CO=t[colname_alphaCO])
+
+        # CO line width
+        if verbose:
+            print("    Add CO line width")
+        t.add_obj_co_linewidth(
+            # column to save the output
+            colname=f"<sigmav_CO21_obj_{res_str}>",
+            # input parameters
+            ra=ra, dec=dec, flux=flux, vdisp=vdisp)
+
+        # molecular gas velocity dispersion
+        if verbose:
+            print("    Add molecular gas velocity dispersion")
+        t.add_obj_vel_disp(
+            # column to save the output
+            colname=f"<vdisp_mol_obj_{res_str}>",
+            # input parameters
+            ra=ra, dec=dec, flux=flux, vdisp=vdisp, cosi=gal_cosi)
 
         # radius
         if verbose:
@@ -943,39 +1033,12 @@ def add_object_stats_to_table(
 
         # projected area
         if verbose:
-            print("    Add projected area")
+            print("    Add deprojected area")
         t.add_obj_area(
             # column to save the output
             colname=f"<Area_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, radius=radius2d)
-
-        # CO line flux
-        if verbose:
-            print("    Add CO line flux")
-        t.add_obj_co_flux(
-            # column to save the output
-            colname=f"<F_CO21_obj_{res_str}>",
-            # input parameters
-            ra=ra, dec=dec, flux=flux)
-
-        # CO line width = molecular gas velocity dispersion
-        if verbose:
-            print("    Add CO line width = molecular gas velocity dispersion")
-        t.add_obj_vel_disp(
-            # column to save the output
-            colname=f"<vdisp_mol_obj_{res_str}>",
-            # input parameters
-            ra=ra, dec=dec, flux=flux, vdisp=vdisp)
-
-        # molecular gas mass
-        if verbose:
-            print("    Add molecular gas mass")
-        t.add_obj_mass(
-            # column to save the output
-            colname=f"<M_mol_obj_{res_str}>",
-            # input parameters
-            ra=ra, dec=dec, flux=flux, alpha_CO=t[colname_alphaCO])
+            ra=ra, dec=dec, flux=flux, radius=radius2d, cosi=gal_cosi)
 
         # molecular gas surface density
         if verbose:
@@ -985,7 +1048,7 @@ def add_object_stats_to_table(
             colname=f"<Sigma_mol_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, radius=radius2d,
-            alpha_CO=t[colname_alphaCO])
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # free-fall time
         if verbose:
@@ -1004,7 +1067,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<t_cross^-1_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d)
+            ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
+            cosi=gal_cosi)
 
         # virial parameter
         if verbose:
@@ -1014,7 +1078,7 @@ def add_object_stats_to_table(
             colname=f"<alpha_vir_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
-            alpha_CO=t[colname_alphaCO])
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # internal turbulent pressure
         if verbose:
@@ -1024,7 +1088,7 @@ def add_object_stats_to_table(
             colname=f"<P_turb_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
-            alpha_CO=t[colname_alphaCO])
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
 
 def calc_high_level_params_in_table(
@@ -1049,7 +1113,7 @@ def calc_high_level_params_in_table(
         Sigma_else_kpc=t['Sigma_star']+t['Sigma_atom'])
 
 
-def build_alma_table_from_ancillary_table(
+def build_alma_table_from_base_table(
         t, data_paths=None, output_format=None, resolutions=None,
         writefile=None, verbose=True):
 
@@ -1081,15 +1145,39 @@ def build_alma_table_from_ancillary_table(
     # clean and format output table
     # ------------------------------------------------
 
-    colnames = (
-        ['ID'] + [str(entry) for entry in output_format['colname']])
-    units = (
-        [''] + [str(entry) for entry in output_format['unit']])
-    formats = (
-        ['.0f'] + [str(entry) for entry in output_format['format']])
-    descriptions = (
-        ["Aperture ID"] +
-        [str(entry) for entry in output_format['description']])
+    if isinstance(t, TessellMegaTable):
+        colnames = (
+            ['ID', 'RA', 'DEC', 'r_gal', 'phi_gal'] +
+            [str(entry) for entry in output_format['colname']])
+        units = (
+            ['', 'deg', 'deg', 'kpc', 'deg'] +
+            [str(entry) for entry in output_format['unit']])
+        formats = (
+            ['.0f', '.5f', '.5f', '.2f', '.2f'] +
+            [str(entry) for entry in output_format['format']])
+        descriptions = (
+            ["Aperture ID",
+             "Right Ascension of the aperture center",
+             "Declination of the aperture center",
+             "Deprojected galactocentric radius",
+             "Deprojected azimuthal angle (0 = receding major axis)"] +
+            [str(entry) for entry in output_format['description']])
+    elif isinstance(t, RadialMegaTable):
+        colnames = (
+            ['ID', 'r_gal'] +
+            [str(entry) for entry in output_format['colname']])
+        units = (
+            ['', 'kpc'] +
+            [str(entry) for entry in output_format['unit']])
+        formats = (
+            ['.0f', '.2f'] +
+            [str(entry) for entry in output_format['format']])
+        descriptions = (
+            ["Annulus ID",
+             "Deprojected galactocentric radius"] +
+            [str(entry) for entry in output_format['description']])
+    else:
+        raise ValueError('Unsupported mega-table type for formatting')
     t.format(
         colnames=colnames, units=units, formats=formats,
         descriptions=descriptions, ignore_missing=True)
@@ -1155,19 +1243,19 @@ if __name__ == '__main__':
             str(table_configs['tessell_tile_size']).replace('.', 'p') +
             table_configs['tessell_tile_size_unit'])
 
-        tessell_ancillary_table_file = (
+        tessell_base_table_file = (
             work_dir / table_configs['tessell_table_name'].format(
-                galaxy=gal_name, content='ancillary',
+                galaxy=gal_name, content='base',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
         tessell_alma_table_file = (
             work_dir / table_configs['tessell_table_name'].format(
                 galaxy=gal_name, content='phangsalma',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
-        if (tessell_ancillary_table_file.is_file() and not
+        if (tessell_base_table_file.is_file() and not
                 tessell_alma_table_file.is_file()):
             print("Enhancing tessellation statistics table...")
-            t = PhangsAlmaTessellMegaTable.read(tessell_ancillary_table_file)
-            build_alma_table_from_ancillary_table(
+            t = PhangsAlmaTessellMegaTable.read(tessell_base_table_file)
+            build_alma_table_from_base_table(
                 t, data_paths=data_paths, output_format=t_format,
                 writefile=tessell_alma_table_file)
             print("Done\n")
@@ -1176,19 +1264,19 @@ if __name__ == '__main__':
         annulus_width_str = (
             str(table_configs['radial_annulus_width']).replace('.', 'p') +
             table_configs['radial_annulus_width_unit'])
-        radial_ancillary_table_file = (
+        radial_base_table_file = (
             work_dir / table_configs['radial_table_name'].format(
-                galaxy=gal_name, content='ancillary',
+                galaxy=gal_name, content='base',
                 annulus_width_str=annulus_width_str))
         radial_alma_table_file = (
             work_dir / table_configs['radial_table_name'].format(
                 galaxy=gal_name, content='phangsalma',
                 annulus_width_str=annulus_width_str))
-        if (radial_ancillary_table_file.is_file() and not
+        if (radial_base_table_file.is_file() and not
                 radial_alma_table_file.is_file()):
             print("Enhancing radial statistics table...")
-            t = PhangsAlmaRadialMegaTable.read(radial_ancillary_table_file)
-            build_alma_table_from_ancillary_table(
+            t = PhangsAlmaRadialMegaTable.read(radial_base_table_file)
+            build_alma_table_from_base_table(
                 t, data_paths=data_paths, output_format=t_format,
                 writefile=radial_alma_table_file)
             print("Done\n")

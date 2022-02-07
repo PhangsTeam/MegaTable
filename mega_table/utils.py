@@ -22,6 +22,33 @@ def identical_units(u1, u2):
 # --------------------------------------------------------------------
 
 
+def calc_pixel_area(header):
+    from astropy.wcs import WCS
+    wcs = WCS(header)
+    return wcs.proj_plane_pixel_area()
+
+
+# --------------------------------------------------------------------
+
+
+def calc_pixel_per_beam(header, suppress_no_beam_error=True):
+    from astropy.wcs import WCS
+    from radio_beam import Beam
+    from radio_beam.beam import NoBeamException
+    try:
+        beam = Beam.from_fits_header(header)
+        wcs = WCS(header)
+        return (beam.sr / wcs.proj_plane_pixel_area()).to('').value
+    except NoBeamException as e:
+        if suppress_no_beam_error:
+            return None
+        else:
+            raise NoBeamException(e)
+
+
+# --------------------------------------------------------------------
+
+
 def nanaverage(a, **kwargs):
     """
     Compute weighted average along a specified axis, ignoring NaNs.
@@ -41,6 +68,31 @@ def nanaverage(a, **kwargs):
     avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
     avg = np.ma.filled(avg, np.nan)
     return avg if avg.size > 1 else avg.item()
+
+
+# --------------------------------------------------------------------
+
+
+def nanrms(a, **kwargs):
+    """
+    Compute the weighted rms along a specified axis, ignoring NaNs.
+
+    Parameters
+    ----------
+    a : array_like
+        Array containing data to be averaged.
+    **kwargs
+        Keyword arguments to be passed to `~numpy.ma.average`
+
+    Return
+    ------
+    rms : ndarray or scalar
+        Return the rms along the specified axis.
+    """
+    rms = np.sqrt(np.ma.average(
+        np.ma.array(a, mask=np.isnan(a))**2, **kwargs))
+    rms = np.ma.filled(rms, np.nan)
+    return rms if rms.size > 1 else rms.item()
 
 
 # --------------------------------------------------------------------

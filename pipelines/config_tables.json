@@ -1,0 +1,15 @@
+{
+    "table_version": 3.0,
+    "table_notes": "PHANGS sample table v1.6; PHANGS-ALMA v4; PHANGS-ALMA CPROPS v4; PHANGS-ALMA rot. curve v1.0; PHANGS-VLA v1.1; PHANGS-Halpha v2.3; PHANGS environ. mask v5.3",
+    "tessell_table_name": "{galaxy}_{content}_{tile_shape}_{tile_size_str}.ecsv",
+    "tessell_tile_shape": "hexagon",
+    "tessell_tile_size": 1.5,
+    "tessell_tile_size_unit": "kpc",
+    "tessell_FoV_radius": 1.5,
+    "tessell_FoV_radius_comment": "in units of R25",
+    "radial_table_name": "{galaxy}_{content}_annulus_{annulus_width_str}.ecsv",
+    "radial_annulus_width": 0.5,
+    "radial_annulus_width_unit": "kpc",
+    "radial_FoV_radius": 1.5,
+    "radial_FoV_radius_comment": "in units of R25"
+}

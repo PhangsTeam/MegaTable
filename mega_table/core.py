@@ -1,5 +1,7 @@
+import time
 import warnings
 import numpy as np
+from scipy.spatial import cKDTree
 from astropy import units as u
 from astropy.table import QTable
 from astropy.io import fits
@@ -15,7 +17,7 @@ from .utils import identical_units, reduce_image_input, HDU_types
 class BaseTable(object):
 
     """
-    A simple wrapper around `~astropy.tabel.QTable`.
+    A simple wrapper around `~astropy.table.QTable`.
 
     Parameters
     ----------
@@ -58,6 +60,54 @@ class BaseTable(object):
     def meta(self):
         return self.table.meta
 
+    def format(
+            self, colnames=None, units=None, formats=None,
+            descriptions=None, ignore_missing=False):
+        """
+        Format table content.
+
+        Parameters
+        ----------
+        colnames : array-like, optional
+            Names of the columns to keep. Columns in the new table
+            will be ordered according to this parameter.
+        units : array-like, optional
+            Units to which each kept column should be converted.
+            Items can be either `~astropy.units.Unit` objects or
+            their string representations.
+        formats : array-like, optional
+            Format specifiers for each kept column.
+        descriptions : array-like, optional
+            Descriptions of each kept column.
+        ignore_missing : bool, optional
+            Whether to ignore the error when any key in ``colnames``
+            is missing from the original table (default: False).
+            If ``True``, a column will be added with all NaNs.
+        """
+        t = QTable(meta=self.meta)
+        if colnames is None:
+            colnames = self.colnames
+        if units is not None:
+            for colname, unit in zip(colnames, units):
+                if colname not in self.colnames and ignore_missing:
+                    t[colname] = (
+                        np.full(len(self), np.nan) * u.Unit(unit))
+                else:
+                    t[colname] = self[colname].to(unit)
+        else:
+            for colname in colnames:
+                if colname not in self.colnames and ignore_missing:
+                    t[colname] = np.full(len(self), np.nan)
+                else:
+                    t[colname] = self[colname]
+        if formats is not None:
+            for colname, form in zip(colnames, formats):
+                t[colname].info.format = form
+        if descriptions is not None:
+            for colname, desc in zip(colnames, descriptions):
+                t[colname].info.description = desc
+        self.table = t
+
     def write(
             self, filename, keep_metadata=True, add_timestamp=True,
             **kwargs):
@@ -79,8 +129,7 @@ class BaseTable(object):
         t = self.table.copy()
         if not keep_metadata:
             # remove all metadata
-            for key in self.meta:
-                t.meta.pop(key)
+            t.meta = type(t.meta)()
         else:
             # remove metadata not allowed in FITS headers
             hdr = fits.Header()
@@ -94,7 +143,6 @@ class BaseTable(object):
             t.meta.pop('TIMESTMP')
         if add_timestamp:
             # add current time stamp
-            import time
             t.meta['TIMESTMP'] = time.strftime('%c', time.gmtime())
         t.write(filename, **kwargs)
 
@@ -120,7 +168,7 @@ class StatsTable(BaseTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
 
         Return
         ------
@@ -191,6 +239,8 @@ class StatsTable(BaseTable):
                 flagarr = findarr[:, ind]
             else:  # 1D index array
                 flagarr = (findarr == ind)
+            if flagarr.sum() == 0:
+                continue
             if weight is None:
                 arr[ind] = stat_func(
                     entry.astype('float')[flagarr],
@@ -286,6 +336,59 @@ class StatsTable(BaseTable):
             stat_func=stat_func, weight=w,
             colname=colname, unit=u_data, **kwargs)
 
+    # ----------------------------------------------------------------
+
+    def create_maps_from_columns(
+            self, colnames, header, allow_region_overlap=False):
+        """
+        Create 2D maps from data in columns based on a FITS header.
+
+        Parameters
+        ----------
+        colnames : iterable
+            Name of the columns to create 2D maps for.
+        header : `~astropy.fits.Header`
+            FITS header defining the WCS of the output 2D maps.
+        allow_region_overlap : bool, optional
+            If False (default), an error will be raised when regions
+            overlap (i.e., if any pixel belongs in multiple regions).
+            If True, overlapping regions will be allowed, in which
+            case later rows (regions) will overwrite earlier rows.
+
+        Return
+        ------
+        arrays : list of ~numpy.ndarray
+        """
+        wcs = WCS(header).celestial
+        # find pixels in regions
+        iax0 = np.arange(wcs._naxis[0])
+        iax1 = np.arange(wcs._naxis[1]).reshape(-1, 1)
+        ramap, decmap = wcs.all_pix2world(
+            iax0, iax1, 0, ra_dec_order=True)
+        findarr = self.find_coords_in_regions(
+            ramap.ravel(), decmap.ravel())
+        # create 2D maps
+        arrays = []
+        for colname in colnames:
+            if findarr.ndim == 2:  # 2D boolean flag
+                if (findarr.astype('int').sum(axis=-1) > 1).any():
+                    if not allow_region_overlap:
+                        raise ValueError(
+                            "Overlapping region detected!")
+                    else:
+                        warnings.warn(
+                            "Overlapping region detected!")
+                array = (
+                    np.full(ramap.shape, np.nan) * self[colname].unit)
+                for ireg in np.arange(len(self)):
+                    array[findarr[:, ireg].reshape(ramap.shape)] = \
+                        self[colname][ireg]
+            else:  # 1D index array
+                array = self[colname][findarr.reshape(ramap.shape)]
+                array[(findarr == -1).reshape(ramap.shape)] = np.nan
+            arrays += [array]
+        return arrays
+
 
 ######################################################################
 ######################################################################
@@ -309,7 +412,7 @@ class GeneralRegionTable(StatsTable):
         table, with each element in the list corresponds to a region.
         - If that element is an HDU object, it should contain a bitmap
         that defines the corresponding region (1=in, 0=out).
-        - If that element is a function oject, it should take an
+        - If that element is a function object, it should take an
         RA array and a DEC array as the only input parameters, and
         return a boolean array specifying whether these coordinates
         are in the region.
@@ -348,7 +451,7 @@ class GeneralRegionTable(StatsTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
 
         Return
         ------
@@ -402,31 +505,29 @@ class VoronoiTessTable(StatsTable):
     by calculating statistics of images within each Voronoi tile, or
     by resampling images at the location of each seed.
 
+    Angular separations are calculated with small angle approximation.
+
     Parameters
     ----------
-    header : astropy.fits.Header
-        FITS header that defines the footprint of the Voronoi diagram.
+    center_ra : float
+        Right Ascension of the FoV center (in degrees)
+    center_dec : float
+        Declination of the FoV center (in degrees)
+    fov_radius : float
+        Radius of the FoV to cover with the tessellation (in degrees)
     seeds_ra : array_like, optional
-        If the user would like to specify the seed locations,
-        this would be their R.A. coordinates (in degrees)
+        Right Ascension of user-defined seed locations (in degrees)
     seeds_dec : array_like, optional
-        If the user would like to specify the seed locations,
-        this would be their Declination coordinates (in degrees)
+        Declination of user-defined seed locations (in degrees)
+    seed_spacing : float, optional
+        If the seed locations are to be automatically generated,
+        this keyword specifies the spacing between adjacent seeds
+        (in degrees).
     tile_shape : {'square', 'hexagon'}, optional
         If the seed locations are to be automatically generated,
         this keyword specifies the shape of the Voronoi tile.
         Default: 'square', in which case the Voronoi diagram comprises
         regularly spaced square tiles.
-    seed_spacing : float, optional
-        If the seed locations are to be automatically generated,
-        this keyword specifies the spacing between adjacent seeds.
-        If None, the minimum absolute value of the 'CDELT' entry
-        in the input header will be used.
-    ref_radec : two-tuple, optional
-        (RA, Dec) coordinate of the reference location (in degrees).
-        As all calculations are done in the angular separation frame,
-        this keyword defines the "origin" of this (dx, dy) coordinate.
-        If None, the 'CRVAL' entry in the input header will be used.
     """
 
     __name__ = "VoronoiTessTable"
@@ -434,63 +535,41 @@ class VoronoiTessTable(StatsTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, header, seeds_ra=None, seeds_dec=None,
-            tile_shape='square', seed_spacing=None, ref_radec=None):
+            self, center_ra, center_dec, fov_radius,
+            seeds_ra=None, seeds_dec=None,
+            seed_spacing=None, tile_shape='square'):
 
         # if seed locations are specified, write them into the table
         if seeds_ra is not None and seeds_dec is not None:
+            ras, decs = np.broadcast_arrays(seeds_ra, seeds_dec)
             t = QTable()
-            t['RA'] = np.atleast_1d(seeds_ra)*u.deg
-            t['DEC'] = np.atleast_1d(seeds_dec)*u.deg
+            t['RA'] = ras * u.deg
+            t['DEC'] = decs * u.deg
             super().__init__(t)
-            # extract celestial WCS information from header
-            self._wcs = WCS(header).celestial
-            if not self._wcs.axis_type_names == ['RA', 'DEC']:
-                raise ValueError(
-                    "Input header have unexpected axis type")
-            # find the sky coordinate of the reference point
-            if ref_radec is None:
-                self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
-            else:
-                self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
+            self._center = SkyCoord(
+                center_ra * u.deg, center_dec * u.deg)
+            self._fov = fov_radius * u.deg
             self.meta['TBLTYPE'] = self.__name__
             return
 
         # if seed locations are not specified, generate a list of
         # locations based on specified tile shape and seed spacing
         super().__init__()
-        # extract celestial WCS information from header
-        self._header = header
-        self._wcs = WCS(self._header).celestial
-        if not self._wcs.axis_type_names == ['RA', 'DEC']:
-            raise ValueError(
-                "Input header have unexpected axis type")
-        # find the sky coordinate of the reference point
-        if ref_radec is None:
-            self._ref_coord = SkyCoord(*self._wcs.wcs.crval*u.deg)
-        else:
-            self._ref_coord = SkyCoord(*np.array(ref_radec)*u.deg)
-        # use CDELT if no 'seed_spacing' value is provided
+        self._center = SkyCoord(center_ra * u.deg, center_dec * u.deg)
+        self._fov = fov_radius * u.deg
+        cos_dec = np.cos(self._center.dec.to('rad').value)
         if seed_spacing is None:
-            spacing = np.min(np.abs(self._wcs.wcs.cdelt))*u.deg
+            raise ValueError("Missing seed spacing information")
         else:
-            spacing = seed_spacing*u.deg
-        # estimate the size of the entire Voronoi diagram
-        footprint_world = self._wcs.calc_footprint()
-        radius = []
-        for coord in footprint_world:
-            corner_coord = SkyCoord(*coord*u.deg)
-            radius += [
-                corner_coord.separation(
-                    self._ref_coord).to('deg').value]
+            spacing = seed_spacing * u.deg
         if tile_shape == 'square':
             half_nx = half_ny = int(np.ceil(
-                np.max(radius) / spacing.value))
+                (self._fov / spacing).to('').value)) + 1
         elif tile_shape == 'hexagon':
             half_nx = int(np.ceil(
-                np.max(radius) / spacing.value))
+                (self._fov / spacing).to('').value)) + 1
             half_ny = int(np.ceil(
-                np.max(radius) / spacing.value / np.sqrt(3)))
+                (self._fov / spacing).to('').value / np.sqrt(3))) + 1
         else:
             raise ValueError(
                 f"Unknown tile shape: {tile_shape}")
@@ -498,31 +577,29 @@ class VoronoiTessTable(StatsTable):
         iy, ix = np.mgrid[-half_ny:half_ny+1, -half_nx:half_nx+1]
         if tile_shape == 'square':
             ra_arr = (
-                self._ref_coord.ra.value +
-                ix.flatten() * spacing.value /
-                np.cos(self._ref_coord.dec.to('rad').value))
+                self._center.ra + ix.flatten() * spacing / cos_dec
+            ).to('deg')
             dec_arr = (
-                self._ref_coord.dec.value +
-                iy.flatten() * spacing.value)
+                self._center.dec + iy.flatten() * spacing
+            ).to('deg')
         else:
             ra_arr = (
-                self._ref_coord.ra.value +
+                self._center.ra +
                 np.concatenate([ix, ix+0.5], axis=None) *
-                spacing.value /
-                np.cos(self._ref_coord.dec.to('rad').value))
+                spacing / cos_dec
+            ).to('deg')
             dec_arr = (
-                self._ref_coord.dec.value +
+                self._center.dec +
                 np.concatenate([iy, iy+0.5], axis=None) *
-                spacing.value * np.sqrt(3))
-        self['RA'] = ra_arr * u.deg
-        self['DEC'] = dec_arr * u.deg
-        # discard tiles outside the FITS header footprint
-        iax0 = np.arange(self._wcs._naxis[0])
-        iax1 = np.arange(self._wcs._naxis[1]).reshape(-1, 1)
-        ramap, decmap = self._wcs.all_pix2world(
-            iax0, iax1, 0, ra_dec_order=True)
-        indices = self.find_coords_in_regions(ramap, decmap)
-        self.table = self[np.isin(np.arange(len(ra_arr)), indices)]
+                spacing * np.sqrt(3)
+            ).to('deg')
+        self['RA'] = ra_arr
+        self['DEC'] = dec_arr
+        # discard tiles outside the FoV radius
+        sep = np.sqrt(
+            (self['RA'] - self._center.ra)**2 * cos_dec**2 +
+            (self['DEC'] - self._center.dec)**2)
+        self.table = self[sep <= self._fov + spacing/np.sqrt(3)]
         self.meta['TBLTYPE'] = self.__name__
 
     # ----------------------------------------------------------------
@@ -536,7 +613,7 @@ class VoronoiTessTable(StatsTable):
         ra : array_like
             R.A. of the coordinates in question
         dec : array_like
-            Declication of the coordinates in question
+            Declination of the coordinates in question
         fill_value : float, optional
             The index value to return for input coordinates that have
             no matched regions (default: -1).
@@ -548,13 +625,12 @@ class VoronoiTessTable(StatsTable):
             belongs to. The length of this array equals the number of
             input coordinates.
         """
-        from scipy.spatial import cKDTree
 
         # identify reference coordinate
         radec_ctr = np.array(
-            [self._ref_coord.ra.value, self._ref_coord.dec.value])
+            [self._center.ra.value, self._center.dec.value])
         scale_arr = np.array(
-            [np.cos(self._ref_coord.dec.to('rad').value), 1])
+            [np.cos(self._center.dec.to('rad').value), 1])
 
         # find the angular offset coordinates for the seeds
         radec_seeds = np.stack(
@@ -569,13 +645,10 @@ class VoronoiTessTable(StatsTable):
         kdtree = cKDTree(offset_seeds)
         _, indices = kdtree.query(offset_loc)
 
-        # for all coordinates outside the WCS footprint, overwrite
+        # for all coordinates outside the FoV, overwrite
         # their matched indices with "fill_value"
-        nax0, nax1 = self._wcs._naxis
-        iax0, iax1 = self._wcs.all_world2pix(
-            ra.flatten(), dec.flatten(), 0, ra_dec_order=False)
-        mask = ((iax0 < 0) | (iax0 > nax0-1) |
-                (iax1 < 0) | (iax1 > nax1-1))
+        mask = (
+            np.sqrt(np.sum(offset_loc**2, axis=-1)) > self._fov.value)
         indices[mask] = fill_value
 
         return indices
@@ -629,7 +702,7 @@ class VoronoiTessTable(StatsTable):
                 self[colname] = np.full(len(self), np.nan)
             return
 
-        # find nearest the nearest pixel for each seed location
+        # find the nearest pixel for each seed location
         iax0, iax1 = wcs.all_world2pix(
             self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
         iax0 = np.round(iax0).astype('int')
@@ -641,7 +714,7 @@ class VoronoiTessTable(StatsTable):
         iax1[iax1 < 0] = 0
         iax1[iax1 > wcs._naxis[1]-1] = wcs._naxis[1]-1
 
-        # get nearest pixel value
+        # get data from the nearest pixels
         sub_data = data[iax1, iax0]
 
         # assign values for seed locations outside the image footprint

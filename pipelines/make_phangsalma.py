@@ -379,7 +379,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_co_linewidth(
@@ -417,7 +417,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_freefall_time(
@@ -443,7 +443,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_crossing_time(
@@ -466,7 +466,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_virial_param(
@@ -493,8 +493,8 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
-        self[colname_e] = np.sqrt(self[colname_e] ** 2 + e_sys ** 2).to(unit_e)
+            e_sys = 0.0 * u.dex
+        self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_turb_pressure(
             self, colname='<P_turb_pix>', unit='K cm-3',
@@ -521,7 +521,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname_e] = self[colname_e].to(unit_e)
         # include statistical uncertainty
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_dyn_eq_pressure(
@@ -572,7 +572,7 @@ class PhangsAlmaMegaTable(StatsTable):
         self[colname] = P_DE.to(unit)
         # calculate uncertainty on dynamical equilibrium pressure
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(
             (e_P_cl_selfg *
              P_cl_selfg / P_DE)**2 +
@@ -773,8 +773,7 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<Sigma_mol_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # CO line width
         if verbose:
@@ -796,8 +795,7 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<vdisp_mol_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew, cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            masked_ew=sew, masked_eew=seew, cosi=gal_cosi)
 
         # free-fall time
         if verbose:
@@ -808,8 +806,7 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_ff^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            FWHM_beam=res, radius=radius3d, alpha_CO=t[colname_alphaCO],
-            e_sys=0.1*u.dex)
+            FWHM_beam=res, radius=radius3d, alpha_CO=t[colname_alphaCO])
 
         # crossing time
         if verbose:
@@ -820,8 +817,7 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_cross^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew, radius=radius3d, cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            masked_ew=sew, masked_eew=seew, radius=radius3d, cosi=gal_cosi)
 
         # virial parameter
         if verbose:
@@ -834,8 +830,7 @@ def add_pixel_stats_to_table(
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # internal turbulent pressure
         if verbose:
@@ -848,8 +843,7 @@ def add_pixel_stats_to_table(
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # dynamical equilibrium pressures
         if verbose:
@@ -866,8 +860,7 @@ def add_pixel_stats_to_table(
             Sigma_atom_kpc=t['Sigma_atom'], e_Sigma_atom_kpc=t['e_Sigma_atom'],
             rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'],
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
-            e_sys=0.1*u.dex)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
 
         # Gong+20 ICO-based conversion factor
         if verbose:

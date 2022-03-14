@@ -238,7 +238,8 @@ class PhangsBaseMegaTable(StatsTable):
             'W4ONLY': (-42.63, 22*u.um),
             'W3ONLY': (-42.70, 12*u.um)}
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Leroy+19
+            e_sys = 0.0 * u.dex
+            # e_sys = 0.1 * u.dex  # Leroy+19
         if snr_thresh is None:
             snr_thresh = 3
         if method in cal_UVIR:
@@ -305,7 +306,7 @@ class PhangsBaseMegaTable(StatsTable):
         e_stat = np.log10(
             (alpha_CO * cosi * e_I_CO / self[colname]).to('') + 1) * u.dex
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
@@ -324,7 +325,7 @@ class PhangsBaseMegaTable(StatsTable):
         e_stat = np.log10(
             (alpha_HI * cosi * e_I_HI / self[colname]).to('') + 1) * u.dex
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
@@ -359,7 +360,8 @@ class PhangsBaseMegaTable(StatsTable):
             (MtoL_IR * 4*np.pi*u.sr * nu_IR * cosi * e_I_IR /
              self[colname]).to('') + 1) * u.dex
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Leroy+19
+            e_sys = 0.0 * u.dex
+            # e_sys = 0.1 * u.dex  # Leroy+19
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
@@ -384,7 +386,8 @@ class PhangsBaseMegaTable(StatsTable):
             raise ValueError(f"Unrecognized method: {method}")
         self[colname] = (Sigma_star / 4 / h_star).to(unit)
         if e_sys is None:
-            e_sys = 0.13 * u.dex  # Sun+20a, Appendix B
+            e_sys = 0.0 * u.dex
+            # e_sys = 0.13 * u.dex  # Sun+20a, Appendix B
         self[colname_e] = np.sqrt(e_Sigma_star**2 + e_sys**2).to(unit_e)
 
     def calc_dyn_eq_pressure(
@@ -413,7 +416,8 @@ class PhangsBaseMegaTable(StatsTable):
             (np.pi / 2 * const.G * Sigma_gas +
              vdisp_gas_z * np.sqrt(2 * const.G * rho_star_mp))).to('')
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Sun+20a, Section 6.2
+            e_sys = 0.0 * u.dex
+            # e_sys = 0.1 * u.dex  # Sun+20a, Section 6.2
         self[colname_e] = np.sqrt(
             e_Sigma_gas**2 * (1 + f_gas_grav)**2 +
             e_rho_star_mp**2 * ((1 - f_gas_grav) / 2)**2 +
@@ -672,7 +676,7 @@ def calc_high_level_params_in_table(
                 # input parameters
                 method=method,
                 I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
-                cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+                cosi=gal_cosi, snr_thresh=3)
     # find the best solution given a priority list
     t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
     t['e_Sigma_SFR'] = np.nan * u.Unit('dex')
@@ -690,7 +694,7 @@ def calc_high_level_params_in_table(
         # input parameters
         method=method, I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
         I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # Stellar mass-to-light ratio
     if verbose:
@@ -736,7 +740,7 @@ def calc_high_level_params_in_table(
         colname_e="e_Sigma_star_3p6um", unit_e='dex',
         # input parameters
         method='3p6um', I_IR=t['I_3p6um'], e_I_IR=t['e_I_3p6um'],
-        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3)
     # WISE1-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
@@ -744,7 +748,7 @@ def calc_high_level_params_in_table(
         colname_e="e_Sigma_star_3p4um", unit_e='dex',
         # input parameters
         method='3p4um', I_IR=t['I_3p4um'], e_I_IR=t['e_I_3p4um'],
-        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3)
     # ICA-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
@@ -752,7 +756,7 @@ def calc_high_level_params_in_table(
         colname_e="e_Sigma_star_3p6umICA", unit_e='dex',
         # input parameters
         method='3p6umICA', I_IR=t['I_3p6umICA'], e_I_IR=t['e_I_3p6umICA'],
-        MtoL=0.5*u.Msun/u.Lsun, cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=0.5*u.Msun/u.Lsun, cosi=gal_cosi, snr_thresh=3)
     # find the best solution given a priority list
     t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     t['e_Sigma_star'] = np.nan * u.Unit('dex')
@@ -771,7 +775,7 @@ def calc_high_level_params_in_table(
         colname_e="e_Sigma_atom", unit_e='dex',
         # input parameters
         I_HI=t['I_HI'], e_I_HI=t['e_I_HI'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # CO-to-H2 conversion factor
     if verbose:
@@ -804,7 +808,7 @@ def calc_high_level_params_in_table(
         colname_e="e_Sigma_mol", unit_e='dex',
         # input parameters
         I_CO=t['I_CO21'], e_I_CO=t['e_I_CO21'], alpha_CO=t['alpha_CO21'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # Stellar volume density near mid-plane
     if verbose:
@@ -815,7 +819,7 @@ def calc_high_level_params_in_table(
         colname_e="e_rho_star_mp", unit_e='dex',
         # input parameters
         Sigma_star=t['Sigma_star'], e_Sigma_star=t['e_Sigma_star'],
-        method='flat', Rstar=gal_Rstar, e_sys=0.13*u.dex)
+        method='flat', Rstar=gal_Rstar)
 
     # Dynamical Equilibrium Pressure
     if verbose:
@@ -826,8 +830,7 @@ def calc_high_level_params_in_table(
         # input parameters
         Sigma_mol=t['Sigma_mol'], e_Sigma_mol=t['e_Sigma_mol'],
         Sigma_atom=t['Sigma_atom'], e_Sigma_atom=t['e_Sigma_atom'],
-        rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'],
-        e_sys=0.1*u.dex)
+        rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'])
 
 
 def build_tessell_base_table(

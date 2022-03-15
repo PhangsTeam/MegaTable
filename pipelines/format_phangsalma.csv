@@ -50,6 +50,8 @@
 "e_<P_DE_pix_native>","dex",".2f","Stats error on flux-weighted mean cloud-scale dynamical equilibrium pressure @ native resolution"
 "corr_I_CO21_pix_native","1",".3e","Completeness correction on flux-weighted mean CO21 intensity @ native resolution"
 "corr_c_CO21_pix_native","1",".3e","Completeness correction on CO21 clumping factor @ native resolution"
+"corr_t_ff^-1_pix_native","1",".3e","Completeness correction on inverse free-fall time @ native resolution"
+"corr_P_selfg_pix_native","1",".3e","Completeness correction on self-g hydrostatic pressure @ native resolution"
 
 "N_obj_native","1",".0f","Number of CPROPS objects in each aperture @ native resolution"
 "fracF_CO21_obj_native","1",".3f","Flux completeness of CPROPS objects @ native resolution"
@@ -102,6 +104,8 @@
 "e_<P_DE_pix_60pc>","dex",".2f","Stats error on flux-weighted mean cloud-scale dynamical equilibrium pressure @ 60 pc resolution"
 "corr_I_CO21_pix_60pc","1",".3e","Completeness correction on flux-weighted mean CO21 intensity @ 60 pc resolution"
 "corr_c_CO21_pix_60pc","1",".3e","Completeness correction on CO21 clumping factor @ 60 pc resolution"
+"corr_t_ff^-1_pix_60pc","1",".3e","Completeness correction on inverse free-fall time @ 60pc resolution"
+"corr_P_selfg_pix_60pc","1",".3e","Completeness correction on self-g hydrostatic pressure @ 60pc resolution"
 
 "N_obj_60pc","1",".0f","Number of CPROPS objects in each aperture @ 60 pc resolution"
 "fracF_CO21_obj_60pc","1",".3f","Flux completeness of CPROPS objects @ 60 pc resolution"
@@ -154,6 +158,8 @@
 "e_<P_DE_pix_90pc>","dex",".2f","Stats error on flux-weighted mean cloud-scale dynamical equilibrium pressure @ 90 pc resolution"
 "corr_I_CO21_pix_90pc","1",".3e","Completeness correction on flux-weighted mean CO21 intensity @ 90 pc resolution"
 "corr_c_CO21_pix_90pc","1",".3e","Completeness correction on CO21 clumping factor @ 90 pc resolution"
+"corr_t_ff^-1_pix_90pc","1",".3e","Completeness correction on inverse free-fall time @ 90pc resolution"
+"corr_P_selfg_pix_90pc","1",".3e","Completeness correction on self-g hydrostatic pressure @ 90pc resolution"
 
 "N_obj_90pc","1",".0f","Number of CPROPS objects in each aperture @ 90 pc resolution"
 "fracF_CO21_obj_90pc","1",".3f","Flux completeness of CPROPS objects @ 90 pc resolution"
@@ -206,6 +212,8 @@
 "e_<P_DE_pix_120pc>","dex",".2f","Stats error on flux-weighted mean cloud-scale dynamical equilibrium pressure @ 120 pc resolution"
 "corr_I_CO21_pix_120pc","1",".3e","Completeness correction on flux-weighted mean CO21 intensity @ 120 pc resolution"
 "corr_c_CO21_pix_120pc","1",".3e","Completeness correction on CO21 clumping factor @ 120 pc resolution"
+"corr_t_ff^-1_pix_120pc","1",".3e","Completeness correction on inverse free-fall time @ 120pc resolution"
+"corr_P_selfg_pix_120pc","1",".3e","Completeness correction on self-g hydrostatic pressure @ 120pc resolution"
 
 "N_obj_120pc","1",".0f","Number of CPROPS objects in each aperture @ 120 pc resolution"
 "fracF_CO21_obj_120pc","1",".3f","Flux completeness of CPROPS objects @ 120 pc resolution"
@@ -258,6 +266,8 @@
 "e_<P_DE_pix_150pc>","dex",".2f","Stats error on flux-weighted mean cloud-scale dynamical equilibrium pressure @ 150 pc resolution"
 "corr_I_CO21_pix_150pc","1",".3e","Completeness correction on flux-weighted mean CO21 intensity @ 150 pc resolution"
 "corr_c_CO21_pix_150pc","1",".3e","Completeness correction on CO21 clumping factor @ 150 pc resolution"
+"corr_t_ff^-1_pix_150pc","1",".3e","Completeness correction on inverse free-fall time @ 150pc resolution"
+"corr_P_selfg_pix_150pc","1",".3e","Completeness correction on self-g hydrostatic pressure @ 150pc resolution"
 
 "N_obj_150pc","1",".0f","Number of CPROPS objects in each aperture @ 150 pc resolution"
 "fracF_CO21_obj_150pc","1",".3f","Flux completeness of CPROPS objects @ 150 pc resolution"

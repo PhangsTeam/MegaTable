@@ -90,15 +90,19 @@ class PhangsAlmaMegaTable(StatsTable):
 
     def add_obj_co_flux(
             self, colname='<F_CO21_obj>', unit='K km s-1 pc2',
-            ra=None, dec=None, flux=None):
+            ra=None, dec=None, flux=None, complete_corr=None):
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=1.,
             flux=flux, flux_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_mass(
             self, colname='<M_mol_obj>', unit='Msun',
-            ra=None, dec=None, flux=None, alpha_CO=None):
+            ra=None, dec=None, flux=None, alpha_CO=None,
+            complete_corr=None):
         prefactor = alpha_CO.unit
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
@@ -106,44 +110,63 @@ class PhangsAlmaMegaTable(StatsTable):
             flux=flux, flux_power=1)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_co_linewidth(
             self, colname='<sigmav_CO21_obj>', unit='km s-1',
-            ra=None, dec=None, flux=None, vdisp=None):
+            ra=None, dec=None, flux=None, vdisp=None,
+            complete_corr=None):
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=1.,
             flux=flux, vdisp=vdisp, vdisp_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_vel_disp(
             self, colname='<vdisp_mol_obj>', unit='km s-1',
-            ra=None, dec=None, flux=None, vdisp=None, cosi=None):
+            ra=None, dec=None, flux=None, vdisp=None,
+            cosi=None, complete_corr=None):
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=cosi**0.5,
             flux=flux, vdisp=vdisp, vdisp_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_radius(
             self, colname='<R_obj>', unit='pc',
-            ra=None, dec=None, flux=None, radius=None):
+            ra=None, dec=None, flux=None, radius=None,
+            complete_corr=None):
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=1.,
             flux=flux, radius=radius, radius_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_area(
             self, colname='<Area_obj>', unit='pc2',
-            ra=None, dec=None, flux=None, radius=None, cosi=None):
+            ra=None, dec=None, flux=None, radius=None,
+            cosi=None, complete_corr=None):
         prefactor = np.pi / (2 * np.log(2)) / cosi
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
             flux=flux, radius=radius, radius_power=2)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_surf_density(
             self, colname='<Sigma_mol_obj>', unit='Msun pc-2',
             ra=None, dec=None, flux=None, radius=None,
-            alpha_CO=None, cosi=None):
+            alpha_CO=None, cosi=None, complete_corr=None):
         # Rosolowsky+21, text following Eq.12
         prefactor = alpha_CO.unit * cosi / (2 * np.pi)
         self.add_obj_stat_generic(
@@ -152,10 +175,14 @@ class PhangsAlmaMegaTable(StatsTable):
             flux=flux, flux_power=1, radius=radius, radius_power=-2)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_freefall_time(
             self, colname='<t_ff^-1_obj>', unit='Myr-1',
-            ra=None, dec=None, flux=None, radius=None, alpha_CO=None):
+            ra=None, dec=None, flux=None, radius=None,
+            alpha_CO=None, complete_corr=None):
         # Rosolowsky+21, Eq.17
         prefactor = np.sqrt(4 * const.G * alpha_CO.unit / np.pi**2)
         self.add_obj_stat_generic(
@@ -164,21 +191,28 @@ class PhangsAlmaMegaTable(StatsTable):
             flux=flux, flux_power=0.5, radius=radius, radius_power=-1.5)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value**0.5
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_crossing_time(
             self, colname='<t_cross^-1_obj>', unit='Myr-1',
-            ra=None, dec=None, flux=None, vdisp=None, radius=None, cosi=None):
+            ra=None, dec=None, flux=None, vdisp=None, radius=None,
+            cosi=None, complete_corr=None):
         prefactor = np.sqrt(3) * cosi**0.5 / 2
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
             flux=flux, vdisp=vdisp, vdisp_power=1,
             radius=radius, radius_power=-1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_virial_param(
             self, colname='<alpha_vir_obj>', unit='',
             ra=None, dec=None, flux=None, vdisp=None, radius=None,
-            alpha_CO=None, cosi=None):
+            alpha_CO=None, cosi=None, complete_corr=None):
         # Rosolowsky+21, text following Eq.10
         prefactor = 10 * cosi / (const.G * alpha_CO.unit)
         self.add_obj_stat_generic(
@@ -188,11 +222,14 @@ class PhangsAlmaMegaTable(StatsTable):
             radius=radius, radius_power=1)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value**-1
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     def add_obj_turb_pressure(
             self, colname='<P_turb_obj>', unit='K cm-3',
             ra=None, dec=None, flux=None, vdisp=None, radius=None,
-            alpha_CO=None, cosi=None):
+            alpha_CO=None, cosi=None, complete_corr=None):
         # Rosolowsky+21, Eq.16
         prefactor = 3/8 / np.pi * alpha_CO.unit * cosi / const.k_B
         self.add_obj_stat_generic(
@@ -202,6 +239,9 @@ class PhangsAlmaMegaTable(StatsTable):
             radius=radius, radius_power=-3)
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
 
     # -------------------------------------------------------------------------
     # methods for pixel-based statistics
@@ -244,6 +284,8 @@ class PhangsAlmaMegaTable(StatsTable):
     def calc_completeness_corr(
             self, colname_corr_I='corr_I_CO21_pix', unit_corr_I='',
             colname_corr_c='corr_c_CO21_pix', unit_corr_c='',
+            colname_corr_t='corr_t_ff^-1_pix', unit_corr_t='',
+            colname_corr_P='corr_P_selfg_pix', unit_corr_P='',
             fracA=None, fracF=None):
         from scipy.special import erf, erfinv
         fA = fracA.to('').value.copy()
@@ -251,18 +293,29 @@ class PhangsAlmaMegaTable(StatsTable):
         fF[fF < 0] = 0
         fF[fF > 1] = 1
         fF[fF < fA] = fA[fF < fA]
-        fFsq = 1/2 * (
+        fF_2 = 1/2 * (
             1 - erf(2 * erfinv(1-2*fF) - erfinv(1-2*fA)))
-        fFsq[fA == 1] = 1
+        fF_2[(fA == 1) & (fF == 1)] = 1
+        fF_1p5 = 1/2 * (
+            1 - erf(1.5 * erfinv(1-2*fF) - 0.5 * erfinv(1-2*fA)))
+        fF_1p5[(fA == 1) & (fF == 1)] = 1
+        fF_3 = 1/2 * (
+            1 - erf(3 * erfinv(1-2*fF) - 2 * erfinv(1-2*fA)))
+        fF_3[(fA == 1) & (fF == 1)] = 1
         self[colname_corr_I] = (
-            fF / fFsq * u.Unit('')).to(unit_corr_I)
+            fF / fF_2 * u.Unit('')).to(unit_corr_I)
         self[colname_corr_c] = (
-            fF**2 / fFsq / fA * u.Unit('')).to(unit_corr_c)
+            fF**2 / fF_2 / fA * u.Unit('')).to(unit_corr_c)
+        self[colname_corr_t] = (
+            fF / fF_1p5 * u.Unit('')).to(unit_corr_t)
+        self[colname_corr_P] = (
+            fF / fF_3 * u.Unit('')).to(unit_corr_P)
 
     def add_clumping(
             self, colname='c_CO21_pix', unit='',
             colname_e='e_c_CO21_pix', unit_e='dex',
-            header=None, masked_mom0=None, masked_emom0=None):
+            header=None, masked_mom0=None, masked_emom0=None,
+            complete_corr=None):
         if header is None:
             self[colname] = np.nan * u.Unit(unit)
             self[colname_e] = np.nan * u.Unit(unit_e)
@@ -295,6 +348,10 @@ class PhangsAlmaMegaTable(StatsTable):
         # account for correlated errors among pixels within each beam
         pix_per_beam = calc_pixel_per_beam(header)
         err *= np.sqrt(pix_per_beam)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            err *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
@@ -347,11 +404,16 @@ class PhangsAlmaMegaTable(StatsTable):
     def add_pix_co_intensity(
             self, colname='<I_CO21_pix>', unit='K km s-1',
             colname_e='e_<I_CO21_pix>', unit_e='dex',
-            header=None, masked_mom0=None, masked_emom0=None):
+            header=None, masked_mom0=None, masked_emom0=None,
+            complete_corr=None):
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=1.,
             m0=masked_mom0, em0=masked_emom0, m0_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
@@ -363,7 +425,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<Sigma_mol_pix>', unit='Msun pc-2',
             colname_e='e_<Sigma_mol_pix>', unit_e='dex',
             header=None, masked_mom0=None, masked_emom0=None,
-            alpha_CO=None, cosi=None, e_sys=None):
+            alpha_CO=None, cosi=None, complete_corr=None, e_sys=None):
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=alpha_CO.unit * cosi,
@@ -371,13 +433,17 @@ class PhangsAlmaMegaTable(StatsTable):
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
         self[colname_e] *= alpha_CO.value
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -386,12 +452,16 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<sigmav_CO21_pix>', unit='km s-1',
             colname_e='e_<sigmav_CO21_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
-            masked_mom0=None, masked_emom0=None):
+            masked_mom0=None, masked_emom0=None, complete_corr=None):
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=1.,
             m0=masked_mom0, em0=masked_emom0, m0_power=0,
             ew=masked_ew, eew=masked_eew, ew_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
@@ -403,19 +473,24 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<vdisp_mol_pix>', unit='km s-1',
             colname_e='e_<vdisp_mol_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
-            masked_mom0=None, masked_emom0=None, cosi=None, e_sys=None):
+            masked_mom0=None, masked_emom0=None, cosi=None,
+            complete_corr=None, e_sys=None):
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=cosi**0.5,
             m0=masked_mom0, em0=masked_emom0, m0_power=0,
             ew=masked_ew, eew=masked_eew, ew_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -424,7 +499,8 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<t_ff^-1_pix>', unit='Myr-1',
             colname_e='e_<t_ff^-1_pix>', unit_e='dex',
             header=None, masked_mom0=None, masked_emom0=None,
-            FWHM_beam=None, radius=None, alpha_CO=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None,
+            complete_corr=None, e_sys=None):
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         prefactor = np.sqrt(
             8 * const.G * alpha_CO.unit * area_beam / np.pi**2 / radius**3)
@@ -435,13 +511,17 @@ class PhangsAlmaMegaTable(StatsTable):
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value**0.5
         self[colname_e] *= alpha_CO.value**0.5
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -451,20 +531,24 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<t_cross^-1_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            radius=None, cosi=None, e_sys=None):
+            radius=None, cosi=None, complete_corr=None, e_sys=None):
         prefactor = np.sqrt(3) * cosi**0.5 / (2 * radius)
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=prefactor,
             m0=masked_mom0, em0=masked_emom0, m0_power=0,
             ew=masked_ew, eew=masked_eew, ew_power=1)
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -474,7 +558,8 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<alpha_vir_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None,
+            complete_corr=None, e_sys=None):
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         prefactor = 5 * cosi * radius / (const.G * alpha_CO.unit * area_beam)
         self.add_pix_stat_generic(
@@ -485,13 +570,17 @@ class PhangsAlmaMegaTable(StatsTable):
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value**-1
         self[colname_e] *= alpha_CO.value**-1
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -501,7 +590,8 @@ class PhangsAlmaMegaTable(StatsTable):
             colname_e='e_<P_turb_pix>', unit_e='dex',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
-            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None,
+            complete_corr=None, e_sys=None):
         area_beam = np.pi / (4 * np.log(2)) * FWHM_beam**2
         volume = 4/3 * np.pi * radius**3
         prefactor = alpha_CO.unit * cosi * area_beam / volume / const.k_B
@@ -513,13 +603,17 @@ class PhangsAlmaMegaTable(StatsTable):
         # scale results according to alpha_CO
         self[colname] *= alpha_CO.value
         self[colname_e] *= alpha_CO.value
+        # apply completeness corrections
+        if complete_corr is not None:
+            self[colname] *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
         if unit_e == 'dex':
             self[colname_e] = \
                 np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
         else:
             self[colname_e] = self[colname_e].to(unit_e)
-        # include statistical uncertainty
+        # combine statistical and systematic uncertainties
         if e_sys is None:
             e_sys = 0.0 * u.dex
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
@@ -532,7 +626,8 @@ class PhangsAlmaMegaTable(StatsTable):
             Sigma_mol_kpc=None, e_Sigma_mol_kpc=None,
             Sigma_atom_kpc=None, e_Sigma_atom_kpc=None,
             vdisp_atom_z=None, rho_star_mp=None, e_rho_star_mp=None,
-            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None, e_sys=None):
+            FWHM_beam=None, radius=None, alpha_CO=None, cosi=None,
+            complete_corr=None, e_sys=None):
         if vdisp_atom_z is None:
             vdisp_atom_z = 10 * u.Unit('km s-1')  # Leroy+08, Sun+20a
         # calculate cloud hydrostatic pressure due to self-gravity
@@ -545,10 +640,10 @@ class PhangsAlmaMegaTable(StatsTable):
             header=header, prefactor=prefactor,
             m0=masked_mom0, em0=masked_emom0, m0_power=2)
         P_cl_selfg = self['_<P_selfg>'] * alpha_CO.value**2
+        if complete_corr is not None:
+            P_cl_selfg *= complete_corr
         e_P_cl_selfg = np.log10(
             (self['_e_<P_selfg>'] / self['_<P_selfg>']).to('') + 1) * u.dex
-        e_P_cl_selfg = np.sqrt(  # 2nd term approximates alpha_CO error
-            e_P_cl_selfg**2 + 4*e_Sigma_mol_kpc**2)
         self.table.remove_columns(['_<P_selfg>', '_e_<P_selfg>'])
         # calculate cloud hydrostatic pressure due to external gravity
         P_cl_molg = (
@@ -744,6 +839,19 @@ def add_pixel_stats_to_table(
             # input parameters
             header=hdr, strict_mom0=sm0, broad_mom0=bm0)
 
+        # completeness corrections
+        if verbose:
+            print("    Calculate completeness corrections")
+        t.calc_completeness_corr(
+            # column to save the output
+            colname_corr_I=f"corr_I_CO21_pix_{res_str}",
+            colname_corr_c=f"corr_c_CO21_pix_{res_str}",
+            colname_corr_t=f"corr_t_ff^-1_pix_{res_str}",
+            colname_corr_P=f"corr_P_selfg_pix_{res_str}",
+            # input parameters
+            fracA=t[f"fracA_CO21_pix_{res_str}"],
+            fracF=t[f"fracF_CO21_pix_{res_str}"])
+
         # clumping factor
         if verbose:
             print("    Add clumping factor")
@@ -752,7 +860,8 @@ def add_pixel_stats_to_table(
             colname=f"c_CO21_pix_{res_str}",
             colname_e=f"e_c_CO21_pix_{res_str}",
             # input parameters
-            header=hdr, masked_mom0=sm0, masked_emom0=sem0)
+            header=hdr, masked_mom0=sm0, masked_emom0=sem0,
+            complete_corr=t[f"corr_c_CO21_pix_{res_str}"])
 
         # CO line integrated intensity
         if verbose:
@@ -762,7 +871,8 @@ def add_pixel_stats_to_table(
             colname=f"<I_CO21_pix_{res_str}>",
             colname_e=f"e_<I_CO21_pix_{res_str}>",
             # input parameters
-            header=hdr, masked_mom0=sm0, masked_emom0=sem0)
+            header=hdr, masked_mom0=sm0, masked_emom0=sem0,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # molecular gas surface density
         if verbose:
@@ -773,7 +883,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<Sigma_mol_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # CO line width
         if verbose:
@@ -784,7 +895,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<sigmav_CO21_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew)
+            masked_ew=sew, masked_eew=seew,
+            complete_corr=None)
 
         # molecular gas velocity dispersion
         if verbose:
@@ -795,7 +907,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<vdisp_mol_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew, cosi=gal_cosi)
+            masked_ew=sew, masked_eew=seew,
+            cosi=gal_cosi, complete_corr=None)
 
         # free-fall time
         if verbose:
@@ -806,7 +919,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_ff^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            FWHM_beam=res, radius=radius3d, alpha_CO=t[colname_alphaCO])
+            FWHM_beam=res, radius=radius3d, alpha_CO=t[colname_alphaCO],
+            complete_corr=t[f"corr_t_ff^-1_pix_{res_str}"])
 
         # crossing time
         if verbose:
@@ -817,7 +931,8 @@ def add_pixel_stats_to_table(
             colname_e=f"e_<t_cross^-1_pix_{res_str}>",
             # input parameters
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
-            masked_ew=sew, masked_eew=seew, radius=radius3d, cosi=gal_cosi)
+            masked_ew=sew, masked_eew=seew,
+            radius=radius3d, cosi=gal_cosi, complete_corr=None)
 
         # virial parameter
         if verbose:
@@ -830,7 +945,8 @@ def add_pixel_stats_to_table(
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=None)
 
         # internal turbulent pressure
         if verbose:
@@ -843,7 +959,8 @@ def add_pixel_stats_to_table(
             header=hdr, masked_mom0=sm0, masked_emom0=sem0,
             masked_ew=sew, masked_eew=seew,
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # dynamical equilibrium pressures
         if verbose:
@@ -860,7 +977,8 @@ def add_pixel_stats_to_table(
             Sigma_atom_kpc=t['Sigma_atom'], e_Sigma_atom_kpc=t['e_Sigma_atom'],
             rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'],
             FWHM_beam=res, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=t[f"corr_P_selfg_pix_{res_str}"])
 
         # Gong+20 ICO-based conversion factor
         if verbose:
@@ -871,17 +989,6 @@ def add_pixel_stats_to_table(
             # input parameters
             header=hdr, masked_mom0=sm0, Zprime=t['Zprime'],
             FWHM_beam=res, cosi=gal_cosi, force_res_dependence=True)
-
-        # completeness corrections
-        if verbose:
-            print("    Calculate completeness corrections")
-        t.calc_completeness_corr(
-            # column to save the output
-            colname_corr_I=f"corr_I_CO21_pix_{res_str}",
-            colname_corr_c=f"corr_c_CO21_pix_{res_str}",
-            # input parameters
-            fracA=t[f"fracA_CO21_pix_{res_str}"],
-            fracF=t[f"fracF_CO21_pix_{res_str}"])
 
 
 def add_object_stats_to_table(
@@ -981,7 +1088,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<F_CO21_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux)
+            ra=ra, dec=dec, flux=flux,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # molecular gas mass
         if verbose:
@@ -990,7 +1098,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<M_mol_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, alpha_CO=t[colname_alphaCO])
+            ra=ra, dec=dec, flux=flux, alpha_CO=t[colname_alphaCO],
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # CO line width
         if verbose:
@@ -999,7 +1108,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<sigmav_CO21_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, vdisp=vdisp)
+            ra=ra, dec=dec, flux=flux, vdisp=vdisp,
+            complete_corr=None)
 
         # molecular gas velocity dispersion
         if verbose:
@@ -1008,7 +1118,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<vdisp_mol_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, vdisp=vdisp, cosi=gal_cosi)
+            ra=ra, dec=dec, flux=flux, vdisp=vdisp,
+            cosi=gal_cosi, complete_corr=None)
 
         # radius
         if verbose:
@@ -1017,12 +1128,14 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<R_2d_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, radius=radius2d)
+            ra=ra, dec=dec, flux=flux, radius=radius2d,
+            complete_corr=None)
         t.add_obj_radius(
             # column to save the output
             colname=f"<R_3d_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, radius=radius3d)
+            ra=ra, dec=dec, flux=flux, radius=radius3d,
+            complete_corr=None)
 
         # projected area
         if verbose:
@@ -1031,7 +1144,8 @@ def add_object_stats_to_table(
             # column to save the output
             colname=f"<Area_obj_{res_str}>",
             # input parameters
-            ra=ra, dec=dec, flux=flux, radius=radius2d, cosi=gal_cosi)
+            ra=ra, dec=dec, flux=flux, radius=radius2d,
+            cosi=gal_cosi, complete_corr=None)
 
         # molecular gas surface density
         if verbose:
@@ -1041,7 +1155,8 @@ def add_object_stats_to_table(
             colname=f"<Sigma_mol_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, radius=radius2d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
         # free-fall time
         if verbose:
@@ -1051,7 +1166,8 @@ def add_object_stats_to_table(
             colname=f"<t_ff^-1_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, radius=radius3d,
-            alpha_CO=t[colname_alphaCO])
+            alpha_CO=t[colname_alphaCO],
+            complete_corr=t[f"corr_t_ff^-1_pix_{res_str}"])
 
         # crossing time
         if verbose:
@@ -1061,7 +1177,7 @@ def add_object_stats_to_table(
             colname=f"<t_cross^-1_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
-            cosi=gal_cosi)
+            cosi=gal_cosi, complete_corr=None)
 
         # virial parameter
         if verbose:
@@ -1071,7 +1187,8 @@ def add_object_stats_to_table(
             colname=f"<alpha_vir_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=None)
 
         # internal turbulent pressure
         if verbose:
@@ -1081,7 +1198,8 @@ def add_object_stats_to_table(
             colname=f"<P_turb_obj_{res_str}>",
             # input parameters
             ra=ra, dec=dec, flux=flux, vdisp=vdisp, radius=radius3d,
-            alpha_CO=t[colname_alphaCO], cosi=gal_cosi)
+            alpha_CO=t[colname_alphaCO], cosi=gal_cosi,
+            complete_corr=t[f"corr_I_CO21_pix_{res_str}"])
 
 
 def calc_high_level_params_in_table(

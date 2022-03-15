@@ -313,7 +313,7 @@ class PhangsAlmaMegaTable(StatsTable):
 
     def add_clumping(
             self, colname='c_CO21_pix', unit='',
-            colname_e='e_c_CO21_pix', unit_e='dex',
+            colname_e='e_c_CO21_pix', unit_e='',
             header=None, masked_mom0=None, masked_emom0=None,
             complete_corr=None):
         if header is None:
@@ -341,23 +341,19 @@ class PhangsAlmaMegaTable(StatsTable):
         self.calc_image_stats(
             masked_emom0.value, header=header, stat_func=np.nansum,
             colname='_sum(I)', unit=masked_emom0.unit)
-        err = (
+        self[colname_e] = (
             2 * np.sqrt(self['_sqsum(err)']) / self['_sum(I)'] / self['_A<I>'])
         self.table.remove_columns(
             ['_F<I>', '_A<I>', '_sqsum(err)', '_sum(I)'])
         # account for correlated errors among pixels within each beam
         pix_per_beam = calc_pixel_per_beam(header)
-        err *= np.sqrt(pix_per_beam)
+        self[colname_e] *= np.sqrt(pix_per_beam)
         # apply completeness corrections
         if complete_corr is not None:
             self[colname] *= complete_corr
-            err *= complete_corr
+            self[colname_e] *= complete_corr
         # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((err / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = err.to(unit_e)
+        self[colname_e] = self[colname_e].to(unit_e)
 
     def add_pix_stat_generic(
             self, colname=None, colname_e=None, unit=None,
@@ -395,15 +391,16 @@ class PhangsAlmaMegaTable(StatsTable):
         self.calc_image_stats(
             m0.value, header=header, stat_func=np.nansum,
             colname='_sum(I)', unit=m0.unit)
-        err = np.sqrt(self['_sqsum(err)']) / self['_sum(I)']
+        self[colname_e] = (
+            np.sqrt(self['_sqsum(err)']) / self['_sum(I)']).to(unit)
         self.table.remove_columns(['_sqsum(err)', '_sum(I)'])
         # account for correlated errors among pixels within each beam
         pix_per_beam = calc_pixel_per_beam(header)
-        self[colname_e] = (err * np.sqrt(pix_per_beam)).to(unit)
+        self[colname_e] *= np.sqrt(pix_per_beam)
 
     def add_pix_co_intensity(
             self, colname='<I_CO21_pix>', unit='K km s-1',
-            colname_e='e_<I_CO21_pix>', unit_e='dex',
+            colname_e='e_<I_CO21_pix>', unit_e='K km s-1',
             header=None, masked_mom0=None, masked_emom0=None,
             complete_corr=None):
         self.add_pix_stat_generic(
@@ -415,15 +412,11 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
         # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
+        self[colname_e] = self[colname_e].to(unit_e)
 
     def add_pix_surf_density(
             self, colname='<Sigma_mol_pix>', unit='Msun pc-2',
-            colname_e='e_<Sigma_mol_pix>', unit_e='dex',
+            colname_e='e_<Sigma_mol_pix>', unit_e='Msun pc-2',
             header=None, masked_mom0=None, masked_emom0=None,
             alpha_CO=None, cosi=None, complete_corr=None, e_sys=None):
         self.add_pix_stat_generic(
@@ -437,20 +430,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_co_linewidth(
             self, colname='<sigmav_CO21_pix>', unit='km s-1',
-            colname_e='e_<sigmav_CO21_pix>', unit_e='dex',
+            colname_e='e_<sigmav_CO21_pix>', unit_e='km s-1',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None, complete_corr=None):
         self.add_pix_stat_generic(
@@ -463,15 +450,11 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
         # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
+        self[colname_e] = self[colname_e].to(unit_e)
 
     def add_pix_vel_disp(
             self, colname='<vdisp_mol_pix>', unit='km s-1',
-            colname_e='e_<vdisp_mol_pix>', unit_e='dex',
+            colname_e='e_<vdisp_mol_pix>', unit_e='km s-1',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None, cosi=None,
             complete_corr=None, e_sys=None):
@@ -484,20 +467,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_freefall_time(
             self, colname='<t_ff^-1_pix>', unit='Myr-1',
-            colname_e='e_<t_ff^-1_pix>', unit_e='dex',
+            colname_e='e_<t_ff^-1_pix>', unit_e='Myr-1',
             header=None, masked_mom0=None, masked_emom0=None,
             FWHM_beam=None, radius=None, alpha_CO=None,
             complete_corr=None, e_sys=None):
@@ -515,20 +492,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_crossing_time(
             self, colname='<t_cross^-1_pix>', unit='Myr-1',
-            colname_e='e_<t_cross^-1_pix>', unit_e='dex',
+            colname_e='e_<t_cross^-1_pix>', unit_e='Myr-1',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
             radius=None, cosi=None, complete_corr=None, e_sys=None):
@@ -542,20 +513,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_virial_param(
             self, colname='<alpha_vir_pix>', unit='',
-            colname_e='e_<alpha_vir_pix>', unit_e='dex',
+            colname_e='e_<alpha_vir_pix>', unit_e='',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
             FWHM_beam=None, radius=None, alpha_CO=None, cosi=None,
@@ -574,20 +539,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_turb_pressure(
             self, colname='<P_turb_pix>', unit='K cm-3',
-            colname_e='e_<P_turb_pix>', unit_e='dex',
+            colname_e='e_<P_turb_pix>', unit_e='K cm-3',
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
             FWHM_beam=None, radius=None, alpha_CO=None, cosi=None,
@@ -607,20 +566,14 @@ class PhangsAlmaMegaTable(StatsTable):
         if complete_corr is not None:
             self[colname] *= complete_corr
             self[colname_e] *= complete_corr
-        # convert uncertainty unit
-        if unit_e == 'dex':
-            self[colname_e] = \
-                np.log10((self[colname_e] / self[colname]).to('') + 1) * u.dex
-        else:
-            self[colname_e] = self[colname_e].to(unit_e)
         # combine statistical and systematic uncertainties
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(self[colname_e]**2 + e_sys**2).to(unit_e)
 
     def add_pix_dyn_eq_pressure(
             self, colname='<P_DE_pix>', unit='K cm-3',
-            colname_e='e_<P_DE_pix>', unit_e='dex',
+            colname_e='e_<P_DE_pix>', unit_e='K cm-3',
             header=None, masked_mom0=None, masked_emom0=None,
             Sigma_mol_cloud=None, e_Sigma_mol_cloud=None,
             Sigma_mol_kpc=None, e_Sigma_mol_kpc=None,
@@ -640,10 +593,10 @@ class PhangsAlmaMegaTable(StatsTable):
             header=header, prefactor=prefactor,
             m0=masked_mom0, em0=masked_emom0, m0_power=2)
         P_cl_selfg = self['_<P_selfg>'] * alpha_CO.value**2
+        e_P_cl_selfg = self['_e_<P_selfg>'] * alpha_CO.value**2
         if complete_corr is not None:
             P_cl_selfg *= complete_corr
-        e_P_cl_selfg = np.log10(
-            (self['_e_<P_selfg>'] / self['_<P_selfg>']).to('') + 1) * u.dex
+            e_P_cl_selfg *= complete_corr
         self.table.remove_columns(['_<P_selfg>', '_e_<P_selfg>'])
         # calculate cloud hydrostatic pressure due to external gravity
         P_cl_molg = (
@@ -667,16 +620,17 @@ class PhangsAlmaMegaTable(StatsTable):
         self[colname] = P_DE.to(unit)
         # calculate uncertainty on dynamical equilibrium pressure
         if e_sys is None:
-            e_sys = 0.0 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(
-            (e_P_cl_selfg *
-             P_cl_selfg / P_DE)**2 +
-            (e_Sigma_mol_cloud *
-             (P_cl_molg + P_cl_starg) / P_DE)**2 +
-            (e_Sigma_atom_kpc *
-             (P_amb_selfg*2 + P_amb_molg + P_amb_starg) / P_DE)**2 +
-            (e_rho_star_mp *
-             (P_cl_starg + P_amb_starg/2) / P_DE)**2 +
+            e_P_cl_selfg**2 +
+            ((P_cl_molg + P_cl_starg) *
+             e_Sigma_mol_cloud / Sigma_mol_cloud)**2 +
+            ((P_amb_selfg*2 + P_amb_molg + P_amb_starg) *
+             e_Sigma_atom_kpc / Sigma_atom_kpc)**2 +
+            ((P_cl_molg + P_amb_molg) *
+             e_Sigma_mol_kpc / Sigma_mol_kpc)**2 +
+            ((P_cl_starg + P_amb_starg/2) *
+             e_rho_star_mp / rho_star_mp)**2 +
             e_sys**2).to(unit_e)
 
     def add_pix_co_conversion_g20(

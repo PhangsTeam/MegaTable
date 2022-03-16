@@ -199,7 +199,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self, colname='<t_cross^-1_obj>', unit='Myr-1',
             ra=None, dec=None, flux=None, vdisp=None, radius=None,
             cosi=None, complete_corr=None):
-        prefactor = np.sqrt(3) * cosi**0.5 / 2
+        prefactor = cosi**0.5
         self.add_obj_stat_generic(
             colname=colname, unit=unit,
             ra=ra, dec=dec, prefactor=prefactor,
@@ -503,7 +503,7 @@ class PhangsAlmaMegaTable(StatsTable):
             header=None, masked_ew=None, masked_eew=None,
             masked_mom0=None, masked_emom0=None,
             radius=None, cosi=None, complete_corr=None, e_sys=None):
-        prefactor = np.sqrt(3) * cosi**0.5 / (2 * radius)
+        prefactor = cosi**0.5 / radius
         self.add_pix_stat_generic(
             colname=colname, colname_e=colname_e, unit=unit,
             header=header, prefactor=prefactor,

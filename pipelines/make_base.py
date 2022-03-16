@@ -225,7 +225,7 @@ class PhangsBaseMegaTable(StatsTable):
 
     def calc_surf_dens_sfr(
             self, colname='Sigma_SFR', unit='Msun yr-1 kpc-2',
-            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 Kpc-2',
+            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 kpc-2',
             method='FUVW4', I_Halpha=None, e_I_Halpha=None,
             I_UV=None, e_I_UV=None, I_IR=None, e_I_IR=None,
             cosi=1., e_sys=None, snr_thresh=None):

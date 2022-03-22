@@ -225,7 +225,7 @@ class PhangsBaseMegaTable(StatsTable):
 
     def calc_surf_dens_sfr(
             self, colname='Sigma_SFR', unit='Msun yr-1 kpc-2',
-            colname_e='e_Sigma_SFR', unit_e='dex',
+            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 kpc-2',
             method='FUVW4', I_Halpha=None, e_I_Halpha=None,
             I_UV=None, e_I_UV=None, I_IR=None, e_I_IR=None,
             cosi=1., e_sys=None, snr_thresh=None):
@@ -238,7 +238,7 @@ class PhangsBaseMegaTable(StatsTable):
             'W4ONLY': (-42.63, 22*u.um),
             'W3ONLY': (-42.70, 12*u.um)}
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Leroy+19
+            e_sys = 0.0
         if snr_thresh is None:
             snr_thresh = 3
         if method in cal_UVIR:
@@ -249,30 +249,26 @@ class PhangsBaseMegaTable(StatsTable):
             self[colname] = (
                 C_UV * nu_UV * cosi * 4*np.pi*u.sr * I_UV +
                 C_IR * nu_IR * cosi * 4*np.pi*u.sr * I_IR).to(unit)
-            e_stat = np.log10((
-                np.sqrt(
-                    (C_UV * nu_UV * cosi * 4*np.pi*u.sr * e_I_UV)**2 +
-                    (C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR)**2) /
-                self[colname]).to('') + 1) * u.dex
+            e_stat = np.sqrt(
+                (C_UV * nu_UV * cosi * 4*np.pi*u.sr * e_I_UV)**2 +
+                (C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR)**2)
             self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
             low_snr_flag = (
                 np.isfinite(I_UV) & np.isfinite(I_IR) &
                 ((I_UV / e_I_UV < snr_thresh) |
                  (I_IR / e_I_IR < snr_thresh)))
             self[colname][low_snr_flag] = 0
-            self[colname_e][low_snr_flag] = np.nan
+            # self[colname_e][low_snr_flag] = np.nan
         elif method in cal_IR:
             C_IR = 10**cal_IR[method][0] * u.Unit('Msun yr-1 erg-1 s')
             nu_IR = const.c / cal_IR[method][1]
             self[colname] = (
                 C_IR * nu_IR * cosi * 4*np.pi*u.sr * I_IR).to(unit)
-            e_stat = np.log10(
-                (C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR /
-                 self[colname]).to('') + 1) * u.dex
+            e_stat = C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR
             self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
             low_snr_flag = (I_IR / e_I_IR < snr_thresh)
             self[colname][low_snr_flag] = 0
-            self[colname_e][low_snr_flag] = np.nan
+            # self[colname_e][low_snr_flag] = np.nan
         elif method == 'HaW4':
             # Calzetti+07, Murphy+11
             C_Halpha = 5.37e-42 * u.Unit('Msun yr-1 erg-1 s')
@@ -281,61 +277,57 @@ class PhangsBaseMegaTable(StatsTable):
             self[colname] = (
                 C_Halpha * cosi * 4*np.pi*u.sr * I_Halpha +
                 C_IR * nu_IR * cosi * 4*np.pi*u.sr * I_IR).to(unit)
-            e_stat = np.log10((
-                np.sqrt(
-                    (C_Halpha * cosi * 4*np.pi*u.sr * e_I_Halpha)**2 +
-                    (C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR)**2) /
-                self[colname]).to('') + 1) * u.dex
+            e_stat = np.sqrt(
+                (C_Halpha * cosi * 4*np.pi*u.sr * e_I_Halpha)**2 +
+                (C_IR * nu_IR * cosi * 4*np.pi*u.sr * e_I_IR)**2)
             self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
             low_snr_flag = (
                 np.isfinite(I_Halpha) & np.isfinite(I_IR) &
                 ((I_Halpha / e_I_Halpha < snr_thresh) |
                  (I_IR / e_I_IR < snr_thresh)))
             self[colname][low_snr_flag] = 0
-            self[colname_e][low_snr_flag] = np.nan
+            # self[colname_e][low_snr_flag] = np.nan
         else:
             raise ValueError(f"Unrecognized method: '{method}'")
 
     def calc_surf_dens_mol(
             self, colname='Sigma_mol', unit='Msun pc-2',
-            colname_e='e_Sigma_mol', unit_e='dex',
+            colname_e='e_Sigma_mol', unit_e='Msun pc-2',
             I_CO=None, e_I_CO=None, alpha_CO=None,
             cosi=1., e_sys=None, snr_thresh=None):
         self[colname] = (alpha_CO * cosi * I_CO).to(unit)
-        e_stat = np.log10(
-            (alpha_CO * cosi * e_I_CO / self[colname]).to('') + 1) * u.dex
+        e_stat = alpha_CO * cosi * e_I_CO
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
             snr_thresh = 3
         low_snr_flag = (I_CO / e_I_CO < snr_thresh)
         self[colname][low_snr_flag] = 0
-        self[colname_e][low_snr_flag] = np.nan
+        # self[colname_e][low_snr_flag] = np.nan
 
     def calc_surf_dens_atom(
             self, colname='Sigma_atom', unit='Msun pc-2',
-            colname_e='e_Sigma_atom', unit_e='dex',
+            colname_e='e_Sigma_atom', unit_e='Msun pc-2',
             I_HI=None, e_I_HI=None,
             cosi=1., e_sys=None, snr_thresh=None):
         alpha_HI = 0.0197 * u.Unit('Msun pc-2 K-1 km-1 s')
         self[colname] = (alpha_HI * cosi * I_HI).to(unit)
-        e_stat = np.log10(
-            (alpha_HI * cosi * e_I_HI / self[colname]).to('') + 1) * u.dex
+        e_stat = alpha_HI * cosi * e_I_HI
         if e_sys is None:
-            e_sys = 0.1 * u.dex
+            e_sys = 0.0
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
             snr_thresh = 3
         low_snr_flag = (I_HI / e_I_HI < snr_thresh)
         self[colname][low_snr_flag] = 0
-        self[colname_e][low_snr_flag] = np.nan
+        # self[colname_e][low_snr_flag] = np.nan
 
     def calc_surf_dens_star(
             self, colname='Sigma_star', unit='Msun pc-2',
-            colname_e='e_Sigma_star', unit_e='dex',
+            colname_e='e_Sigma_star', unit_e='Msun pc-2',
             method='3p4um', I_IR=None, e_I_IR=None, MtoL=None,
             cosi=1., e_sys=None, snr_thresh=None):
         # Leroy+21
@@ -355,22 +347,20 @@ class PhangsBaseMegaTable(StatsTable):
             raise ValueError(f"Unrecognized method: '{method}'")
         self[colname] = (
             MtoL_IR * 4*np.pi*u.sr * nu_IR * cosi * I_IR).to(unit)
-        e_stat = np.log10(
-            (MtoL_IR * 4*np.pi*u.sr * nu_IR * cosi * e_I_IR /
-             self[colname]).to('') + 1) * u.dex
+        e_stat = MtoL_IR * 4*np.pi*u.sr * nu_IR * cosi * e_I_IR
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Leroy+19
+            e_sys = 0.0
         self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
         # mask entries below S/N threshold
         if snr_thresh is None:
             snr_thresh = 3
         low_snr_flag = (I_IR / e_I_IR < snr_thresh)
         self[colname][low_snr_flag] = 0
-        self[colname_e][low_snr_flag] = np.nan
+        # self[colname_e][low_snr_flag] = np.nan
 
     def calc_vol_dens_star(
             self, colname='rho_star_mp', unit='Msun pc-3',
-            colname_e='e_rho_star_mp', unit_e='dex',
+            colname_e='e_rho_star_mp', unit_e='Msun pc-3',
             method='flat', Sigma_star=None, e_Sigma_star=None,
             Rstar=None, r_gal=None, flattening=None, e_sys=None):
         if flattening is None:
@@ -383,13 +373,14 @@ class PhangsBaseMegaTable(StatsTable):
         else:
             raise ValueError(f"Unrecognized method: {method}")
         self[colname] = (Sigma_star / 4 / h_star).to(unit)
+        e_stat = e_Sigma_star / 4 / h_star
         if e_sys is None:
-            e_sys = 0.13 * u.dex  # Sun+20a, Appendix B
-        self[colname_e] = np.sqrt(e_Sigma_star**2 + e_sys**2).to(unit_e)
+            e_sys = 0.0
+        self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
 
     def calc_dyn_eq_pressure(
             self, colname='P_DE', unit='K cm-3',
-            colname_e='e_P_DE', unit_e='dex',
+            colname_e='e_P_DE', unit_e='K cm-3',
             Sigma_mol=None, e_Sigma_mol=None,
             Sigma_atom=None, e_Sigma_atom=None,
             rho_star_mp=None, e_rho_star_mp=None,
@@ -407,17 +398,17 @@ class PhangsBaseMegaTable(StatsTable):
              Sigma_gas * vdisp_gas_z *
              np.sqrt(2 * const.G * rho_star_mp)) /
             const.k_B).to(unit)
-        e_Sigma_gas = np.sqrt(e_Sigma_mol**2 + e_Sigma_atom**2) / 2
-        f_gas_grav = (
-            np.pi / 2 * const.G * Sigma_gas /
-            (np.pi / 2 * const.G * Sigma_gas +
-             vdisp_gas_z * np.sqrt(2 * const.G * rho_star_mp))).to('')
+        e_Sigma_gas = np.sqrt(e_Sigma_mol**2 + e_Sigma_atom**2)
+        e_stat = np.sqrt(
+            (np.pi * const.G * Sigma_gas +
+             vdisp_gas_z * np.sqrt(2 * const.G * rho_star_mp))**2 *
+            e_Sigma_gas**2 +
+            (Sigma_gas * vdisp_gas_z *
+             np.sqrt(const.G / 2 / rho_star_mp))**2 *
+            e_rho_star_mp**2) / const.k_B
         if e_sys is None:
-            e_sys = 0.1 * u.dex  # Sun+20a, Section 6.2
-        self[colname_e] = np.sqrt(
-            e_Sigma_gas**2 * (1 + f_gas_grav)**2 +
-            e_rho_star_mp**2 * ((1 - f_gas_grav) / 2)**2 +
-            e_sys**2).to(unit_e)
+            e_sys = 0.0
+        self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
 
 
 class PhangsBaseTessellMegaTable(
@@ -604,10 +595,10 @@ def add_raw_measurements_to_table(
         galaxy=gal_name, product='model_universal')
     t.add_rotation_curve(
         # columns to save the output
-        colname_V_circ='V_circ_CO21_URC', unit_V_circ='km s-1',
-        colname_e_V_circ='e_V_circ_CO21_URC', unit_e_V_circ='km s-1',
-        colname_beta='beta_CO21_URC', unit_beta='',
-        colname_e_beta='e_beta_CO21_URC', unit_e_beta='',
+        colname_V_circ='V_circ_CO21_URC',
+        colname_e_V_circ='e_V_circ_CO21_URC',
+        colname_beta='beta_CO21_URC',
+        colname_e_beta='e_beta_CO21_URC',
         # input parameters
         model_file=in_file, r_gal_angle=t['r_gal'] / gal_ang2lin)
     # Legendre polynomial model
@@ -615,10 +606,10 @@ def add_raw_measurements_to_table(
         galaxy=gal_name, product='model_legendre')
     t.add_rotation_curve(
         # columns to save the output
-        colname_V_circ='V_circ_CO21_lgd', unit_V_circ='km s-1',
-        colname_e_V_circ='e_V_circ_CO21_lgd', unit_e_V_circ='km s-1',
-        colname_beta='beta_CO21_lgd', unit_beta='',
-        colname_e_beta='e_beta_CO21_lgd', unit_e_beta='',
+        colname_V_circ='V_circ_CO21_lgd',
+        colname_e_V_circ='e_V_circ_CO21_lgd',
+        colname_beta='beta_CO21_lgd',
+        colname_e_beta='e_beta_CO21_lgd',
         # input parameters
         model_file=in_file, r_gal_angle=t['r_gal'] / gal_ang2lin)
 
@@ -667,15 +658,15 @@ def calc_high_level_params_in_table(
             methods += [method]
             t.calc_surf_dens_sfr(
                 # columns to save the output
-                colname=f"Sigma_SFR_{method}", unit='Msun yr-1 kpc-2',
-                colname_e=f"e_Sigma_SFR_{method}", unit_e='dex',
+                colname=f"Sigma_SFR_{method}",
+                colname_e=f"e_Sigma_SFR_{method}",
                 # input parameters
                 method=method,
                 I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
-                cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+                cosi=gal_cosi, snr_thresh=3)
     # find the best solution given a priority list
     t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    t['e_Sigma_SFR'] = np.nan * u.Unit('dex')
+    t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
     for method in methods:
         if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
             t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
@@ -685,12 +676,11 @@ def calc_high_level_params_in_table(
     method = 'HaW4'
     t.calc_surf_dens_sfr(
         # columns to save the output
-        colname=f"Sigma_SFR_{method}", unit='Msun yr-1 kpc-2',
-        colname_e=f"e_Sigma_SFR_{method}", unit_e='dex',
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
         # input parameters
         method=method, I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
         I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # Stellar mass-to-light ratio
     if verbose:
@@ -699,14 +689,14 @@ def calc_high_level_params_in_table(
     if np.isfinite(t['Sigma_SFR_FUVW4']).any():
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1', unit='Msun Lsun-1',
+            colname='MtoL_3p4um_SFRW1',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_FUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
     elif np.isfinite(t['Sigma_SFR_NUVW4']).any():
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1', unit='Msun Lsun-1',
+            colname='MtoL_3p4um_SFRW1',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_NUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
@@ -715,7 +705,7 @@ def calc_high_level_params_in_table(
     # WISE4-to-WISE1 color prescription
     t.calc_stellar_m2l(
         # column to save the output
-        colname='MtoL_3p4um_W4W1', unit='Msun Lsun-1',
+        colname='MtoL_3p4um_W4W1',
         # input parameters
         method='W4-to-W1', I_22um=t['I_22um'], e_I_22um=t['e_I_22um'],
         I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
@@ -732,30 +722,27 @@ def calc_high_level_params_in_table(
     # IRAC1-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname="Sigma_star_3p6um", unit='Msun pc-2',
-        colname_e="e_Sigma_star_3p6um", unit_e='dex',
+        colname="Sigma_star_3p6um", colname_e="e_Sigma_star_3p6um",
         # input parameters
         method='3p6um', I_IR=t['I_3p6um'], e_I_IR=t['e_I_3p6um'],
-        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3)
     # WISE1-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname="Sigma_star_3p4um", unit='Msun pc-2',
-        colname_e="e_Sigma_star_3p4um", unit_e='dex',
+        colname="Sigma_star_3p4um", colname_e="e_Sigma_star_3p4um",
         # input parameters
         method='3p4um', I_IR=t['I_3p4um'], e_I_IR=t['e_I_3p4um'],
-        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=t['MtoL_3p4um'], cosi=gal_cosi, snr_thresh=3)
     # ICA-based estimate
     t.calc_surf_dens_star(
         # columns to save the output
-        colname="Sigma_star_3p6umICA", unit='Msun pc-2',
-        colname_e="e_Sigma_star_3p6umICA", unit_e='dex',
+        colname="Sigma_star_3p6umICA", colname_e="e_Sigma_star_3p6umICA",
         # input parameters
         method='3p6umICA', I_IR=t['I_3p6umICA'], e_I_IR=t['e_I_3p6umICA'],
-        MtoL=0.5*u.Msun/u.Lsun, cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        MtoL=0.5*u.Msun/u.Lsun, cosi=gal_cosi, snr_thresh=3)
     # find the best solution given a priority list
     t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
-    t['e_Sigma_star'] = np.nan * u.Unit('dex')
+    t['e_Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     for method in ('3p6um', '3p4um', '3p6umICA'):
         if np.isfinite(t[f"Sigma_star_{method}"]).any():
             t['Sigma_star'] = t[f"Sigma_star_{method}"]
@@ -767,11 +754,10 @@ def calc_high_level_params_in_table(
         print("  Calculate atom gas surface density")
     t.calc_surf_dens_atom(
         # columns to save the output
-        colname="Sigma_atom", unit='Msun pc-2',
-        colname_e="e_Sigma_atom", unit_e='dex',
+        colname="Sigma_atom", colname_e="e_Sigma_atom",
         # input parameters
         I_HI=t['I_HI'], e_I_HI=t['e_I_HI'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # CO-to-H2 conversion factor
     if verbose:
@@ -779,13 +765,13 @@ def calc_high_level_params_in_table(
     # PHANGS prescription
     t.calc_co_conversion(
         # columns to save the output
-        colname="alpha_CO21_S20", unit='Msun pc-2 K-1 km-1 s',
+        colname="alpha_CO21_S20",
         # input parameters
         method='S20', Zprime=t['Zprime'])
     # Galactic value
     t.calc_co_conversion(
         # columns to save the output
-        colname="alpha_CO21_Galactic", unit='Msun pc-2 K-1 km-1 s',
+        colname="alpha_CO21_Galactic",
         # input parameters
         method='Galactic')
     # find the best solution given a priority list
@@ -800,34 +786,31 @@ def calc_high_level_params_in_table(
         print("  Calculate molecular gas surface density")
     t.calc_surf_dens_mol(
         # columns to save the output
-        colname="Sigma_mol", unit='Msun pc-2',
-        colname_e="e_Sigma_mol", unit_e='dex',
+        colname="Sigma_mol", colname_e="e_Sigma_mol",
         # input parameters
         I_CO=t['I_CO21'], e_I_CO=t['e_I_CO21'], alpha_CO=t['alpha_CO21'],
-        cosi=gal_cosi, snr_thresh=3, e_sys=0.1*u.dex)
+        cosi=gal_cosi, snr_thresh=3)
 
     # Stellar volume density near mid-plane
     if verbose:
         print("  Calculate stellar volume density near mid-plane")
     t.calc_vol_dens_star(
         # columns to save the output
-        colname="rho_star_mp", unit='Msun pc-3',
-        colname_e="e_rho_star_mp", unit_e='dex',
+        colname="rho_star_mp", colname_e="e_rho_star_mp",
         # input parameters
         Sigma_star=t['Sigma_star'], e_Sigma_star=t['e_Sigma_star'],
-        method='flat', Rstar=gal_Rstar, e_sys=0.13*u.dex)
+        method='flat', Rstar=gal_Rstar)
 
     # Dynamical Equilibrium Pressure
     if verbose:
         print("  Calculate dynamical equilibrium pressure")
     t.calc_dyn_eq_pressure(
         # columns to save the output
-        colname="P_DE", unit='K cm-3', colname_e="e_P_DE", unit_e='dex',
+        colname="P_DE", colname_e="e_P_DE",
         # input parameters
         Sigma_mol=t['Sigma_mol'], e_Sigma_mol=t['e_Sigma_mol'],
         Sigma_atom=t['Sigma_atom'], e_Sigma_atom=t['e_Sigma_atom'],
-        rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'],
-        e_sys=0.1*u.dex)
+        rho_star_mp=t['rho_star_mp'], e_rho_star_mp=t['e_rho_star_mp'])
 
 
 def build_tessell_base_table(

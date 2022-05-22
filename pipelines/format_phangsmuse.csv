@@ -1,0 +1,9 @@
+"colname","unit","format","description"
+
+"N_HII","1",".0f","Number of HII regions in each aperture"
+"<F_Halpha_HII>","erg s-1 cm-2",".3e","Flux-weighted mean HII region Halpha line flux"
+"e_<F_Halpha_HII>","erg s-1 cm-2",".1e","Stats error on flux-weighted mean HII region Halpha line flux"
+"<Zprime_HII>","1",".3e","Flux-weighted mean HII region metallicity relative to solar (PG16S)"
+"e_<Zprime_HII>","1",".1e","Stats error on flux-weighted mean HII region metallicity relative to solar (PG16S)"
+"med[E(B-V)_HII]","mag",".4f","Median HII region extinction"
+"e_med[E(B-V)_HII]","mag",".4f","Stats error on median HII region extinction"

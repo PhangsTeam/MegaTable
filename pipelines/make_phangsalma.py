@@ -1159,6 +1159,9 @@ def add_object_stats_to_table(
 def calc_high_level_params_in_table(
         t: PhangsAlmaMegaTable, res_pcs=None, verbose=True):
 
+    if verbose:
+        print("  Calculate high-level parameters")
+
     # CO-to-H2 conversion factors
     if verbose:
         print("    Calculate CO-to-H2 conversion factors")

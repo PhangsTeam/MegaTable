@@ -510,50 +510,50 @@ def add_raw_measurements_to_table(
     # PHANGS narrow-band Halpha data
     if verbose:
         print("  Add PHANGS narrow-band Halpha data")
-        in_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb',
-            postfix_resolution='')
-        err_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb_err',
-            postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
-            colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_Halpha'].format(
+        galaxy=gal_name, product='wcomb',
+        postfix_resolution='')
+    err_file = data_paths['PHANGS_Halpha'].format(
+        galaxy=gal_name, product='wcomb_err',
+        postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
+        colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS-VLA & archival HI data
     if verbose:
         print("  Add PHANGS-VLA & archival HI data")
-        in_file = data_paths['PHANGS_HI'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_resolution='')
-        err_file = data_paths['PHANGS_HI'].format(
-            galaxy=gal_name, product='emom0',
-            postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_HI', unit='K km s-1',
-            colname_e="e_I_HI", unit_e='K km s-1',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='mom0',
+        postfix_resolution='')
+    err_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='emom0',
+        postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HI', unit='K km s-1',
+        colname_e="e_I_HI", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS-ALMA CO(2-1) data
     if verbose:
         print("  Add PHANGS-ALMA CO(2-1) data")
-        in_file = data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution='')
-        err_file = data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='emom0',
-            postfix_masking='_broad', postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_CO21', unit='K km s-1',
-            colname_e="e_I_CO21", unit_e='K km s-1',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMA_CO21'].format(
+        galaxy=gal_name, product='mom0',
+        postfix_masking='_broad', postfix_resolution='')
+    err_file = data_paths['PHANGS_ALMA_CO21'].format(
+        galaxy=gal_name, product='emom0',
+        postfix_masking='_broad', postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_CO21', unit='K km s-1',
+        colname_e="e_I_CO21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS environmental mask-related measurements
     if verbose:

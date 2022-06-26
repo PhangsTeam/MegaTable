@@ -4,14 +4,14 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from astropy import units as u, constants as const
-from astropy import uncertainty as unc
+from astropy import units as u  # , constants as const
+# from astropy import uncertainty as unc
 from astropy.io import fits
 from astropy.table import Table
 
 from mega_table.core import StatsTable
 from mega_table.table import TessellMegaTable, RadialMegaTable
-from mega_table.utils import nanaverage
+from mega_table.utils import nanaverage, nanrms
 
 ###############################################################################
 
@@ -150,6 +150,64 @@ class PhangsMuseMegaTable(StatsTable):
     # methods for DAP map statistics
     # -------------------------------------------------------------------------
 
+    def add_area_average_for_image(
+            self, colname=None, unit=None, colname_e=None, unit_e=None,
+            img_file=None, err_file=None):
+
+        if not Path(img_file).is_file():
+            self[colname] = np.nan * u.Unit(unit)
+            if colname_e is not None:
+                self[colname_e] = np.nan * u.Unit(unit_e)
+            return
+
+        # sample image
+        with fits.open(img_file) as hdul:
+            data = hdul[0].data.copy()
+            hdr = hdul[0].header.copy()
+        self.calc_image_stats(
+            data, header=hdr, stat_func=nanaverage, weight=None,
+            colname=colname, unit='header')
+        self[colname] = self[colname].to(unit)
+
+        # sample error image
+        if colname_e is None:
+            return
+        if not Path(err_file).is_file():
+            self[colname_e] = np.nan * u.Unit(unit_e)
+            return
+        with fits.open(err_file) as hdul:
+            data_e = hdul[0].data.copy()
+        nanflag = np.isnan(data)
+        # calculate the direct RMS of errors in each pixel
+        self.calc_image_stats(
+            data_e, header=hdr, stat_func=nanrms, weight=~nanflag,
+            colname=colname_e, unit='header')
+        self[colname_e] = self[colname_e].to(unit_e)
+
+    def calc_surf_dens_sfr(
+            self, colname='Sigma_SFR', unit='Msun yr-1 kpc-2',
+            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 kpc-2',
+            method='Hacorr', I_Halpha=None, e_I_Halpha=None,
+            cosi=1., e_sys=None, snr_thresh=None):
+        if e_sys is None:
+            e_sys = 0.0
+        if snr_thresh is None:
+            snr_thresh = 3
+        if method == 'Hacorr':
+            # Calzetti+07, Belfiore+22
+            C_Halpha = 10**-41.26 * u.Unit('Msun yr-1 erg-1 s')
+            self[colname] = (
+                C_Halpha * cosi * 4*np.pi*u.sr * I_Halpha).to(unit)
+            e_stat = C_Halpha * cosi * 4*np.pi*u.sr * e_I_Halpha
+            self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
+            low_snr_flag = (
+                np.isfinite(I_Halpha) &
+                (I_Halpha / e_I_Halpha < snr_thresh))
+            self[colname][low_snr_flag] = 0
+            # self[colname_e][low_snr_flag] = np.nan
+        else:
+            raise ValueError(f"Unrecognized method: '{method}'")
+
 
 class PhangsMuseTessellMegaTable(TessellMegaTable, PhangsMuseMegaTable):
 
@@ -169,20 +227,45 @@ class PhangsMuseRadialMegaTable(RadialMegaTable, PhangsMuseMegaTable):
 
 
 def add_DAP_stats_to_table(
-        t: PhangsMuseMegaTable, data_paths=None, res_pcs=None, verbose=True):
+        t: PhangsMuseMegaTable, data_paths=None, verbose=True):
 
     gal_name = t.meta['GALAXY']
-    gal_dist = t.meta['DIST_MPC'] * u.Mpc
-    gal_cosi = np.cos(np.deg2rad(t.meta['INCL_DEG']))
 
-    for res_pc in res_pcs:
+    res_str = 'copt'
+    if verbose:
+        print("  Add DAP map statistics")
 
-        if res_pc is None:
-            res_str = 'copt'
-        else:
-            res_str = f"{res_pc}pc"
-        if verbose:
-            print(f"  Add DAP map statistics @ {res_str} resolution")
+    # MUSE DAP Halpha flux map (raw)
+    if verbose:
+        print("    Add DAP Halpha flux (raw)")
+    in_file = data_paths['PHANGS_MUSE_DAP'].format(
+        galaxy=gal_name, product='Ha6562_flux',
+        resolution=res_str)
+    err_file = data_paths['PHANGS_MUSE_DAP'].format(
+        galaxy=gal_name, product='Ha6562_flux_err',
+        resolution=res_str)
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_Halpha_DAP', unit='erg s-1 cm-2 arcsec-2',
+        colname_e="e_I_Halpha_DAP", unit_e='erg s-1 cm-2 arcsec-2',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
+    # MUSE DAP Halpha flux map (extinction-corrected)
+    if verbose:
+        print("    Add DAP Halpha flux (extinction-corrected)")
+    in_file = data_paths['PHANGS_MUSE_DAP'].format(
+        galaxy=gal_name, product='Ha6562_flux_corr',
+        resolution=res_str)
+    err_file = data_paths['PHANGS_MUSE_DAP'].format(
+        galaxy=gal_name, product='Ha6562_flux_corr_err',
+        resolution=res_str)
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_Halpha_DAP_corr', unit='erg s-1 cm-2 arcsec-2',
+        colname_e="e_I_Halpha_DAP_corr", unit_e='erg s-1 cm-2 arcsec-2',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
 
 def add_nebulae_stats_to_table(
@@ -260,19 +343,40 @@ def add_nebulae_stats_to_table(
         ra=ra, dec=dec, EBV=EBV, e_EBV=e_EBV)
 
 
+def calc_high_level_params_in_table(
+        t: PhangsMuseMegaTable, verbose=True):
+
+    gal_cosi = np.cos(np.deg2rad(t.meta['INCL_DEG']))
+
+    if verbose:
+        print("  Calculate high-level parameters")
+
+    # SFR surface density (Av-corrected Halpha)
+    if verbose:
+        print("    Calculate SFR surface density (Av-corrected Halpha)")
+    method = 'Hacorr'
+    t.calc_surf_dens_sfr(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_Halpha=t['I_Halpha_DAP_corr'],
+        e_I_Halpha=t['e_I_Halpha_DAP_corr'],
+        cosi=gal_cosi, snr_thresh=3)
+
+
 def build_muse_table_from_base_table(
-        t, data_paths=None, output_format=None, resolutions=None,
+        t, data_paths=None, output_format=None,
         writefile=None, verbose=True):
 
-    if resolutions is None:
-        resolutions = (None, )
+    # if resolutions is None:
+    #     resolutions = (None, )
 
     # ------------------------------------------------
     # add DAP map statistics
     # ------------------------------------------------
 
     add_DAP_stats_to_table(
-        t, data_paths=data_paths, res_pcs=resolutions, verbose=verbose)
+        t, data_paths=data_paths, verbose=verbose)
 
     # ------------------------------------------------
     # add nebulae statistics
@@ -280,6 +384,13 @@ def build_muse_table_from_base_table(
 
     add_nebulae_stats_to_table(
         t, data_paths=data_paths, verbose=verbose)
+
+    # ------------------------------------------------
+    # calculate high-level parameters
+    # ------------------------------------------------
+
+    calc_high_level_params_in_table(
+        t, verbose=verbose)
 
     # ------------------------------------------------
     # clean and format output table

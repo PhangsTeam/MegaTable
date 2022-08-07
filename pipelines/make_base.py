@@ -484,10 +484,10 @@ def add_raw_measurements_to_table(
         print("  Add Spitzer IRAC data")
     in_file = data_paths['PHANGS_IRAC'].format(
         galaxy=gal_name, product='3p6um',
-        postfix_resolution='_gauss7p5')  # for now
+        postfix_resolution='_gauss3p0')
     err_file = data_paths['PHANGS_IRAC'].format(
         galaxy=gal_name, product='3p6um_err',
-        postfix_resolution='_gauss7p5')  # for now
+        postfix_resolution='_gauss3p0')
     t.add_area_average_for_image(
         # column to save the output
         colname='I_3p6um', unit='MJy sr-1',
@@ -510,6 +510,7 @@ def add_raw_measurements_to_table(
     # PHANGS narrow-band Halpha data
     if verbose:
         print("  Add PHANGS narrow-band Halpha data")
+<<<<<<< Updated upstream
     in_file = data_paths['PHANGS_Halpha'].format(
         galaxy=gal_name, product='wcomb',
         postfix_resolution='')
@@ -522,10 +523,25 @@ def add_raw_measurements_to_table(
         colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
         # input parameters
         img_file=in_file, err_file=err_file)
+=======
+        in_file = data_paths['PHANGS_Halpha'].format(
+            galaxy=gal_name, product='cleaned',
+            postfix_resolution='')
+        err_file = data_paths['PHANGS_Halpha'].format(
+            galaxy=gal_name, product='err_cleaned',
+            postfix_resolution='')
+        t.add_area_average_for_image(
+            # column to save the output
+            colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
+            colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
+            # input parameters
+            img_file=in_file, err_file=err_file)
+>>>>>>> Stashed changes
 
     # PHANGS-VLA & archival HI data
     if verbose:
         print("  Add PHANGS-VLA & archival HI data")
+<<<<<<< Updated upstream
     in_file = data_paths['PHANGS_HI'].format(
         galaxy=gal_name, product='mom0',
         postfix_resolution='')
@@ -538,6 +554,20 @@ def add_raw_measurements_to_table(
         colname_e="e_I_HI", unit_e='K km s-1',
         # input parameters
         img_file=in_file, err_file=err_file)
+=======
+        in_file = data_paths['PHANGS_HI'].format(
+            galaxy=gal_name, product='broadmask_mom0',
+            postfix_resolution='')
+        err_file = data_paths['PHANGS_HI'].format(
+            galaxy=gal_name, product='broadmask_emom0',
+            postfix_resolution='')
+        t.add_area_average_for_image(
+            # column to save the output
+            colname='I_HI', unit='K km s-1',
+            colname_e="e_I_HI", unit_e='K km s-1',
+            # input parameters
+            img_file=in_file, err_file=err_file)
+>>>>>>> Stashed changes
 
     # PHANGS-ALMA CO(2-1) data
     if verbose:

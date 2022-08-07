@@ -1,11 +1,6 @@
 {
-<<<<<<< Updated upstream
-    "table_version": 3.0,
-    "table_notes": "PHANGS sample table v1.6; PHANGS-ALMA v4; PHANGS-ALMA CPROPS v4; PHANGS-ALMA rot. curve v1.0; PHANGS-VLA v1.1; PHANGS-Halpha v2.3; PHANGS environ. mask v5.3",
-=======
     "table_version": 4.0,
     "table_notes": "PHANGS sample table v1.6; PHANGS-ALMA v4; PHANGS-ALMA CPROPS v4; PHANGS-ALMA rot. curve v1.0; PHANGS-MUSE v2.2; PHANGS-MUSE nebulae catalog v3; PHANGS-VLA v2.0; PHANGS-Halpha v2.3; PHANGS environ. mask v5.3",
->>>>>>> Stashed changes
     "tessell_table_name": "{galaxy}_{content}_{tile_shape}_{tile_size_str}.ecsv",
     "tessell_tile_shape": "hexagon",
     "tessell_tile_size": 1.5,

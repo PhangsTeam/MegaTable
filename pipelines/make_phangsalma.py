@@ -675,7 +675,7 @@ class PhangsAlmaMegaTable(StatsTable):
                 Zprime=Zprime, WCO10GMC=I_CO_cloud/line_ratio)
         elif method == 'B13':
             alphaCO10 = alphaCO.predict_alphaCO10_B13(
-                Zprime=Zprime, WCO10GMC=I_CO_cloud/line_ratio,
+                Zprime=Zprime,  # WCO10GMC=I_CO_cloud/line_ratio,
                 WCO10kpc=I_CO_kpc/line_ratio, Sigmaelsekpc=Sigma_else_kpc,
                 suppress_error=True)
         else:

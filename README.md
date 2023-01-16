@@ -4,7 +4,7 @@
 
 This repository contains the source code for generating rich multiwavelength data tables (a.k.a. the "mega-tables") for [the PHANGS team](https://sites.google.com/view/phangs/home). The table construction and data aggregation schemes are described in the following papers:
 
-+ [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022arXiv220607055S)
++ [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S)
 + [Sun, Leroy, Ostriker, et al. (2020), *"Dynamical Equilibrium in the Molecular ISM in 28 Nearby Star-forming Galaxies"*](https://ui.adsabs.harvard.edu/abs/2020ApJ...892..148S)
 
 The current version of the repository corresponds to PHANGS mega-tables **version 3.0**, which is the first public release version.

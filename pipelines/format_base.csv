@@ -74,9 +74,7 @@
 "Sigma_mol","Msun pc-2",".3e","Region-average molecular gas surface density (PHANGS-ALMA)"
 "e_Sigma_mol","Msun pc-2",".1e","Stats error on region-average molecular gas surface density (PHANGS-ALMA)"
 
-"MtoL_3p4um","Msun Lsun-1",".3e","Stellar mass-to-light ratio at 3.4um (fiducial)"
-"MtoL_3p4um_SFRW1","Msun Lsun-1",".3e","Stellar mass-to-light ratio at 3.4um (SFR-to-WISE1 color; Leroy+21)"
-"MtoL_3p4um_W4W1","Msun Lsun-1",".3e","Stellar mass-to-light ratio at 3.4um (WISE4-to-WISE1 color; Leroy+21)"
+"MtoL_3p4um","Msun Lsun-1",".3e","Stellar mass-to-light ratio at 3.4um (Leroy+21)"
 
 "Sigma_star","Msun pc-2",".3e","Region-average stellar mass surface density (fiducial)"
 "e_Sigma_star","Msun pc-2",".1e","Stats error on region-average stellar mass surface density (fiducial)"

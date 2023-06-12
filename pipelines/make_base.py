@@ -771,36 +771,30 @@ def calc_high_level_params_in_table(
     # Stellar mass-to-light ratio
     if verbose:
         print("  Calculate stellar mass-to-light ratio")
-    # SFR-to-WISE1 color prescription
     if np.isfinite(t['Sigma_SFR_FUVW4']).any():
+        # SFR-to-WISE1 color prescription (FUVW4)
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1',
+            colname='MtoL_3p4um',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_FUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
     elif np.isfinite(t['Sigma_SFR_NUVW4']).any():
+        # SFR-to-WISE1 color prescription (NUVW4)
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1',
+            colname='MtoL_3p4um',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_NUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
     else:
-        t['MtoL_3p4um_SFRW1'] = np.nan * u.Unit('Msun Lsun-1')
-    # WISE4-to-WISE1 color prescription
-    t.calc_stellar_m2l(
-        # column to save the output
-        colname='MtoL_3p4um_W4W1',
-        # input parameters
-        method='W4-to-W1', I_22um=t['I_22um'], e_I_22um=t['e_I_22um'],
-        I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
-    # find the best solution given a priority list
-    t['MtoL_3p4um'] = np.nan * u.Unit('Msun Lsun-1')
-    for method in ('SFRW1', 'W4W1'):
-        if np.isfinite(t[f"MtoL_3p4um_{method}"]).any():
-            t['MtoL_3p4um'] = t[f"MtoL_3p4um_{method}"]
-            break
+        # WISE4-to-WISE1 color prescription
+        t.calc_stellar_m2l(
+            # column to save the output
+            colname='MtoL_3p4um',
+            # input parameters
+            method='W4-to-W1', I_22um=t['I_22um'], e_I_22um=t['e_I_22um'],
+            I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
 
     # Stellar surface density
     if verbose:

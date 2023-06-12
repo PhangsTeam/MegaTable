@@ -290,6 +290,72 @@ class PhangsBaseMegaTable(StatsTable):
         else:
             raise ValueError(f"Unrecognized method: '{method}'")
 
+    def calc_surf_dens_sfr_recal(
+            self, colname='Sigma_SFR', unit='Msun yr-1 kpc-2',
+            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 kpc-2',
+            method='Hacorr', I_Halpha=None, e_I_Halpha=None,
+            I_FUV=None, e_I_FUV=None, I_W4=None, e_I_W4=None,
+            I_W1=None, e_I_W1=None, cosi=1., e_sys=None, snr_thresh=None):
+        if e_sys is None:
+            e_sys = 0.0
+        if snr_thresh is None:
+            snr_thresh = 3
+        if method == 'HaW4recal':
+            # Calzetti+07, Murphy+11
+            C_Halpha = 5.37e-42 * u.Unit('Msun yr-1 erg-1 s')
+            # Belfiore+22
+            a1 = 0.44
+            logQmax = -1.51
+            logCmax = -42.87
+            nu_W1 = const.c / (3.4 * u.um)
+            nu_W4 = const.c / (22 * u.um)
+            logQ = np.log10((I_Halpha / (nu_W1 * I_W1)).to('').value)
+            logC_W4 = logCmax + a1 * (logQ - logQmax)
+            logC_W4[logQ > logQmax] = logCmax
+            C_W4 = 10**logC_W4 * u.Unit('Msun yr-1 erg-1 s')
+            self[colname] = (
+                C_Halpha * cosi * 4*np.pi*u.sr * I_Halpha +
+                C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * I_W4).to(unit)
+            e_stat = np.sqrt(
+                (C_Halpha * cosi * 4*np.pi*u.sr * e_I_Halpha)**2 +
+                (C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * e_I_W4)**2)
+            self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
+            low_snr_flag = (
+                np.isfinite(I_Halpha) & np.isfinite(I_W4) &
+                ((I_Halpha / e_I_Halpha < snr_thresh) |
+                 (I_W4 / e_I_W4 < snr_thresh)))
+            self[colname][low_snr_flag] = 0
+            # self[colname_e][low_snr_flag] = np.nan
+        elif method == 'FUVW4recal':
+            # Leroy+19
+            C_FUV = 10**-43.42 * u.Unit('Msun yr-1 erg-1 s')
+            nu_FUV = const.c / (154 * u.nm)
+            # Belfiore+22, FUV/W1
+            a1 = 0.22
+            logQmax = 0.60
+            logCmax = -42.73
+            nu_W1 = const.c / (3.4 * u.um)
+            nu_W4 = const.c / (22 * u.um)
+            logQ = np.log10((nu_FUV * I_FUV / (nu_W1 * I_W1)).to('').value)
+            logC_W4 = logCmax + a1 * (logQ - logQmax)
+            logC_W4[logQ > logQmax] = logCmax
+            C_W4 = 10**logC_W4 * u.Unit('Msun yr-1 erg-1 s')
+            self[colname] = (
+                C_FUV * nu_FUV * cosi * 4*np.pi*u.sr * I_FUV +
+                C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * I_W4).to(unit)
+            e_stat = np.sqrt(
+                (C_FUV * nu_FUV * cosi * 4*np.pi*u.sr * e_I_FUV)**2 +
+                (C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * e_I_W4)**2)
+            self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
+            low_snr_flag = (
+                np.isfinite(I_FUV) & np.isfinite(I_W4) &
+                ((I_FUV / e_I_FUV < snr_thresh) |
+                 (I_W4 / e_I_W4 < snr_thresh)))
+            self[colname][low_snr_flag] = 0
+            # self[colname_e][low_snr_flag] = np.nan
+        else:
+            raise ValueError(f"Unrecognized method: '{method}'")
+
     def calc_surf_dens_mol(
             self, colname='Sigma_mol', unit='Msun pc-2',
             colname_e='e_Sigma_mol', unit_e='Msun pc-2',
@@ -641,7 +707,36 @@ def calc_high_level_params_in_table(
     # SFR surface density
     if verbose:
         print("  Calculate SFR surface density")
-    # UV+IR prescriptions
+    # Belfiore+22 Halpha+WISE4 prescription
+    method = 'HaW4recal'
+    t.calc_surf_dens_sfr_recal(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
+        I_W1=t['I_3p4um'], e_I_W1=t['e_I_3p4um'],
+        I_W4=t['I_22um'], e_I_W4=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Belfiore+22 FUV+WISE4 prescription
+    method = 'FUVW4recal'
+    t.calc_surf_dens_sfr_recal(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_FUV=t['I_154nm'], e_I_FUV=t['e_I_154nm'],
+        I_W1=t['I_3p4um'], e_I_W1=t['e_I_3p4um'],
+        I_W4=t['I_22um'], e_I_W4=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Murphy+11 Halpha+WISE4 prescription
+    method = 'HaW4'
+    t.calc_surf_dens_sfr(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
+        I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Leroy+19 UV+IR prescriptions
     bands_IR = ('W4', 'W3')
     data_IR = (t['I_22um'], t['I_12um'])
     errs_IR = (t['e_I_22um'], t['e_I_12um'])
@@ -664,23 +759,14 @@ def calc_high_level_params_in_table(
                 method=method,
                 I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
                 cosi=gal_cosi, snr_thresh=3)
-    # find the best solution given a priority list
-    t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    for method in methods:
-        if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
-            t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
-            t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
-            break
-    # Halpha+WISE4 prescription
-    method = 'HaW4'
-    t.calc_surf_dens_sfr(
-        # columns to save the output
-        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
-        # input parameters
-        method=method, I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
-        I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
-        cosi=gal_cosi, snr_thresh=3)
+    # # find the best solution given a priority list
+    # t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    # t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    # for method in methods:
+    #     if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
+    #         t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
+    #         t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
+    #         break
 
     # Stellar mass-to-light ratio
     if verbose:

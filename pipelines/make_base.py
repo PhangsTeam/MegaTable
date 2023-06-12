@@ -759,14 +759,16 @@ def calc_high_level_params_in_table(
                 method=method,
                 I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
                 cosi=gal_cosi, snr_thresh=3)
-    # # find the best solution given a priority list
-    # t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    # t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    # for method in methods:
-    #     if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
-    #         t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
-    #         t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
-    #         break
+    # find the best solution given a priority list
+    t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    for method in (
+            'HaW4recal', 'FUVW4recal',
+            'HaW4', 'FUVW4', 'NUVW4', 'W4ONLY'):
+        if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
+            t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
+            t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
+            break
 
     # Stellar mass-to-light ratio
     if verbose:

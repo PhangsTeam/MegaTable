@@ -47,104 +47,102 @@ class PhangsMuseMegaTable(StatsTable):
             np.isfinite(flux_Ha).astype('int'), ra, dec,
             stat_func=np.nansum, colname=colname, unit=unit)
 
+    def add_hii_stat_generic(
+            self, colname=None, colname_e=None, unit=None,
+            ra=None, dec=None, quantity=None, e_quantity=None,
+            weight=None, e_weight=None):
+        # check input
+        if ra is None or dec is None:
+            self[colname] = np.nan * u.Unit(unit)
+            return
+        # clean up weight array
+        if weight is not None:
+            wt = weight.value.copy()
+            wt[~np.isfinite(weight)] = 0
+            e_wt = e_weight.value.copy()
+            e_wt[~np.isfinite(weight)] = 0
+        else:
+            wt = e_wt = None
+        # calculate (weighted) average for the quantity of interest
+        self.calc_catalog_stats(
+            quantity.to(unit).value, ra, dec, weight=wt,
+            stat_func=nanaverage, colname=colname, unit=unit)
+        if colname_e is None:
+            return
+        # calculate formal uncertainty on the (weighted) averaged value
+        if weight is None:
+            self.calc_catalog_stats(
+                e_quantity.value**2, ra, dec, stat_func=np.nansum,
+                colname='_sqsum(err)', unit=e_quantity.unit**2)
+            self[colname_e] = (
+                np.sqrt(self['_sqsum(err)']) / self['N_HII']).to(unit)
+            self.table.remove_column('_sqsum(err)')
+        else:
+            findarr = self.find_coords_in_regions(ra, dec)
+            if findarr.ndim == 2:
+                avg = np.full(len(ra), np.nan) * self[colname].unit
+                for ireg in range(len(self)):
+                    avg[findarr[:, ireg]] = self[colname][ireg]
+            else:
+                avg = self[colname][findarr]
+                avg[findarr == -1] = np.nan
+            self.calc_catalog_stats(
+                ((quantity - avg)**2 * e_wt**2 +
+                 wt**2 * e_quantity**2).value,
+                ra, dec, stat_func=np.nansum,
+                colname='_sqsum(err)', unit=quantity.unit**2)
+            self.calc_catalog_stats(
+                wt, ra, dec, stat_func=np.nansum,
+                colname='_sum(wt)', unit='')
+            self[colname_e] = (
+                np.sqrt(self['_sqsum(err)']) / self['_sum(wt)']).to(unit)
+            self.table.remove_columns(['_sqsum(err)', '_sum(wt)'])
+
     def add_hii_ha_flux(
+            self, colname='F_Halpha_HII', unit='erg s-1 cm-2',
+            colname_e='e_F_Halpha_HII', unit_e='erg s-1 cm-2',
+            ra=None, dec=None, flux_Ha=None, e_flux_Ha=None):
+        self.add_hii_stat_generic(
+            colname=colname, colname_e=colname_e, unit=unit,
+            ra=ra, dec=dec, quantity=flux_Ha, e_quantity=e_flux_Ha)
+        # convert uncertainty unit
+        self[colname_e] = self[colname_e].to(unit_e)
+
+    def add_hii_ha_flux_weighted(
             self, colname='<F_Halpha_HII>', unit='erg s-1 cm-2',
             colname_e='e_<F_Halpha_HII>', unit_e='erg s-1 cm-2',
             ra=None, dec=None, flux_Ha=None, e_flux_Ha=None):
-        if ra is None or dec is None:
-            self[colname] = np.nan * u.Unit(unit)
-            return
-        # contruct weight array
-        wt = flux_Ha.value.copy()
-        wt[~np.isfinite(wt)] = 0
-        # calculate flux-weighted average
-        self.calc_catalog_stats(
-            flux_Ha.to(unit).value, ra, dec, weight=wt,
-            stat_func=nanaverage, colname=colname, unit=unit)
-        if colname_e is None:
-            return
-        # calculate formal uncertainty on the averaged value
-        findarr = self.find_coords_in_regions(ra, dec)
-        if findarr.ndim == 2:
-            avg_flux_Ha = np.full(len(ra), np.nan) * self[colname].unit
-            for ireg in range(len(self)):
-                avg_flux_Ha[findarr[:, ireg]] = self[colname][ireg]
-        else:
-            avg_flux_Ha = self[colname][findarr]
-            avg_flux_Ha[findarr == -1] = np.nan
-        self.calc_catalog_stats(
-            ((2 * flux_Ha - avg_flux_Ha)**2 * e_flux_Ha**2).value,
-            ra, dec, stat_func=np.nansum, colname='_sqsum(err)',
-            unit=flux_Ha.unit**2 * e_flux_Ha.unit**2)
-        self.calc_catalog_stats(
-            flux_Ha.value, ra, dec, stat_func=np.nansum,
-            colname='_sum(F)', unit=flux_Ha.unit)
-        self[colname_e] = (
-            np.sqrt(self['_sqsum(err)']) / self['_sum(F)']).to(unit_e)
-        self.table.remove_columns(['_sqsum(err)', '_sum(F)'])
+        self.add_hii_stat_generic(
+            colname=colname, colname_e=colname_e, unit=unit,
+            ra=ra, dec=dec, quantity=flux_Ha, e_quantity=e_flux_Ha,
+            weight=flux_Ha, e_weight=e_flux_Ha)
+        # convert uncertainty unit
+        self[colname_e] = self[colname_e].to(unit_e)
 
     def add_hii_metallicity(
-            self, colname='<Zprime_HII>', unit='',
-            colname_e='e_<Zprime_HII>', unit_e='',
-            ra=None, dec=None, flux_Ha=None, e_flux_Ha=None,
+            self, colname='Zprime_HII', unit='',
+            colname_e='e_Zprime_HII', unit_e='',
+            ra=None, dec=None,
             logOH=None, e_logOH=None, logOH_solar=None):
-        if ra is None or dec is None:
-            self[colname] = np.nan * u.Unit(unit)
-            return
-        # contruct weight array
-        wt = flux_Ha.value.copy()
-        wt[~np.isfinite(wt)] = 0
-        # calculate flux-weighted average
         if logOH_solar is None:
             logOH_solar = 8.69  # Asplund+09
         Zprime = 10 ** (logOH - logOH_solar) * u.Unit('')
-        self.calc_catalog_stats(
-            Zprime.to(unit).value, ra, dec, weight=wt,
-            stat_func=nanaverage, colname=colname, unit=unit)
-        if colname_e is None:
-            return
-        # calculate formal uncertainty on the averaged value
-        findarr = self.find_coords_in_regions(ra, dec)
-        if findarr.ndim == 2:
-            avg_Zprime = np.full(len(ra), np.nan) * self[colname].unit
-            for ireg in range(len(self)):
-                avg_Zprime[findarr[:, ireg]] = self[colname][ireg]
-        else:
-            avg_Zprime = self[colname][findarr]
-            avg_Zprime[findarr == -1] = np.nan
         e_Zprime = Zprime * (10**e_logOH - 1)
-        self.calc_catalog_stats(
-            ((Zprime - avg_Zprime)**2 * e_flux_Ha**2 +
-             flux_Ha**2 * e_Zprime**2).value,
-            ra, dec, stat_func=np.nansum, colname='_sqsum(err)',
-            unit=Zprime.unit**2 * flux_Ha.unit**2)
-        self.calc_catalog_stats(
-            flux_Ha.value, ra, dec, stat_func=np.nansum,
-            colname='_sum(F)', unit=flux_Ha.unit)
-        self[colname_e] = (
-            np.sqrt(self['_sqsum(err)']) / self['_sum(F)']).to(unit_e)
-        self.table.remove_columns(['_sqsum(err)', '_sum(F)'])
+        self.add_hii_stat_generic(
+            colname, colname_e=colname_e, unit=unit,
+            ra=ra, dec=dec, quantity=Zprime, e_quantity=e_Zprime)
+        # convert uncertainty unit
+        self[colname_e] = self[colname_e].to(unit_e)
 
     def add_hii_extinction(
-            self, colname='med[E(B-V)_HII]', unit='mag',
-            colname_e='e_med[E(B-V)_HII]', unit_e='mag',
+            self, colname='EBV_HII', unit='mag',
+            colname_e='e_EBV_HII', unit_e='mag',
             ra=None, dec=None, EBV=None, e_EBV=None):
-        if ra is None or dec is None:
-            self[colname] = np.nan * u.Unit(unit)
-            return
-        # calculate median
-        self.calc_catalog_stats(
-            EBV.to(unit).value, ra, dec,
-            stat_func=np.median, colname=colname, unit=unit)
-        if colname_e is None:
-            return
-        # calculate error on median
-        self[colname_e] = np.nan * u.Unit(unit_e)
-        # def err_on_median(x): return np.median(x).pdf_std()
-        # EBV_dist = unc.normal(EBV, std=e_EBV, n_samples=1000)
-        # self.calc_catalog_stats(
-        #     EBV_dist.to(unit).value, ra, dec,
-        #     stat_func=err_on_median, colname=colname, unit=unit_e)
+        self.add_hii_stat_generic(
+            colname=colname, colname_e=colname_e, unit=unit,
+            ra=ra, dec=dec, quantity=EBV, e_quantity=e_EBV)
+        # convert uncertainty unit
+        self[colname_e] = self[colname_e].to(unit_e)
 
     # -------------------------------------------------------------------------
     # methods for DAP map statistics
@@ -318,33 +316,41 @@ def add_nebulae_stats_to_table(
         # input parameters
         ra=ra, dec=dec, flux_Ha=flux_Ha)
 
-    # Halpha line flux
+    # Halpha flux (direct mean)
     if verbose:
-        print("    Add Halpha line flux")
+        print("    Add Halpha flux (direct mean)")
     t.add_hii_ha_flux(
+        # column to save the output
+        colname="F_Halpha_HII", colname_e="e_F_Halpha_HII",
+        # input parameters
+        ra=ra, dec=dec, flux_Ha=flux_Ha, e_flux_Ha=e_flux_Ha)
+
+    # Halpha flux (weighted mean)
+    if verbose:
+        print("    Add Halpha flux (weighted mean)")
+    t.add_hii_ha_flux_weighted(
         # column to save the output
         colname="<F_Halpha_HII>", colname_e="e_<F_Halpha_HII>",
         # input parameters
         ra=ra, dec=dec, flux_Ha=flux_Ha, e_flux_Ha=e_flux_Ha)
-
-    # metallicity
-    if verbose:
-        print("    Add metallicity")
-    t.add_hii_metallicity(
-        # column to save the output
-        colname="<Zprime_HII>", colname_e="e_<Zprime_HII>",
-        # input parameters
-        ra=ra, dec=dec, flux_Ha=flux_Ha, e_flux_Ha=e_flux_Ha,
-        logOH=logOH, e_logOH=e_logOH)
 
     # extinction
     if verbose:
         print("    Add extinction")
     t.add_hii_extinction(
         # column to save the output
-        colname="med[E(B-V)_HII]", colname_e="e_med[E(B-V)_HII]",
+        colname="EBV_HII", colname_e="e_EBV_HII",
         # input parameters
         ra=ra, dec=dec, EBV=EBV, e_EBV=e_EBV)
+
+    # metallicity
+    if verbose:
+        print("    Add metallicity")
+    t.add_hii_metallicity(
+        # column to save the output
+        colname="Zprime_HII", colname_e="e_Zprime_HII",
+        # input parameters
+        ra=ra, dec=dec, logOH=logOH, e_logOH=e_logOH)
 
 
 def calc_high_level_params_in_table(

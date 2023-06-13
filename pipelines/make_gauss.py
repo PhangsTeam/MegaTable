@@ -340,9 +340,6 @@ def add_gauss_average_to_table(
         # input parameters
         img_file=in_file, err_file=err_file)
 
-    # PHANGS-VLA & archival HI data
-    # !!! no data at 1.5 kpc resolution is currently available !!!
-
     # PHANGS-ALMA CO(2-1) data
     if verbose:
         print("    Add PHANGS-ALMA CO(2-1) data")
@@ -409,48 +406,6 @@ def calc_high_level_params_in_table(
     # SFR surface density
     if verbose:
         print("    Calculate SFR surface density")
-    # UV+IR prescriptions
-    bands_IR = ('W4', 'W3')
-    data_IR = (t['I_22um_gauss'], t['I_12um_gauss'])
-    errs_IR = (t['e_I_22um_gauss'], t['e_I_12um_gauss'])
-    bands_UV = ('FUV', 'NUV', '')
-    data_UV = (t['I_154nm_gauss'], t['I_231nm_gauss'], None)
-    errs_UV = (t['e_I_154nm_gauss'], t['e_I_231nm_gauss'], None)
-    methods = []
-    for band_IR, I_IR, e_I_IR in zip(bands_IR, data_IR, errs_IR):
-        for band_UV, I_UV, e_I_UV in zip(bands_UV, data_UV, errs_UV):
-            if band_UV == '':
-                method = f"{band_IR}ONLY"
-            else:
-                method = f"{band_UV}{band_IR}"
-            methods += [method]
-            t.calc_surf_dens_sfr(
-                # columns to save the output
-                colname=f"Sigma_SFR_{method}_gauss",
-                colname_e=f"e_Sigma_SFR_{method}_gauss",
-                # input parameters
-                method=method,
-                I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
-                cosi=gal_cosi, snr_thresh=3)
-    # find the best solution given a priority list
-    t['Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    t['e_Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    for method in methods:
-        if np.isfinite(t[f"Sigma_SFR_{method}_gauss"]).any():
-            t['Sigma_SFR_gauss'] = t[f"Sigma_SFR_{method}_gauss"]
-            t['e_Sigma_SFR_gauss'] = t[f"e_Sigma_SFR_{method}_gauss"]
-            break
-    # Halpha+WISE4 prescription
-    method = 'HaW4'
-    t.calc_surf_dens_sfr(
-        # columns to save the output
-        colname=f"Sigma_SFR_{method}_gauss",
-        colname_e=f"e_Sigma_SFR_{method}_gauss",
-        # input parameters
-        method=method,
-        I_IR=t['I_22um_gauss'], e_I_IR=t['e_I_22um_gauss'],
-        I_Halpha=t['I_Halpha_gauss'], e_I_Halpha=t['e_I_Halpha_gauss'],
-        cosi=gal_cosi, snr_thresh=3)
     # Av-corrected Halpha
     method = 'Hacorr'
     t.calc_surf_dens_sfr_new(
@@ -485,6 +440,50 @@ def calc_high_level_params_in_table(
         I_W1=t['I_3p4um_gauss'], e_I_W1=t['e_I_3p4um_gauss'],
         I_W4=t['I_22um_gauss'], e_I_W4=t['e_I_22um_gauss'],
         cosi=gal_cosi, snr_thresh=3)
+    # Halpha+WISE4 prescription
+    method = 'HaW4'
+    t.calc_surf_dens_sfr(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}_gauss",
+        colname_e=f"e_Sigma_SFR_{method}_gauss",
+        # input parameters
+        method=method,
+        I_IR=t['I_22um_gauss'], e_I_IR=t['e_I_22um_gauss'],
+        I_Halpha=t['I_Halpha_gauss'], e_I_Halpha=t['e_I_Halpha_gauss'],
+        cosi=gal_cosi, snr_thresh=3)
+    # UV+IR prescriptions
+    bands_IR = ('W4', 'W3')
+    data_IR = (t['I_22um_gauss'], t['I_12um_gauss'])
+    errs_IR = (t['e_I_22um_gauss'], t['e_I_12um_gauss'])
+    bands_UV = ('FUV', 'NUV', '')
+    data_UV = (t['I_154nm_gauss'], t['I_231nm_gauss'], None)
+    errs_UV = (t['e_I_154nm_gauss'], t['e_I_231nm_gauss'], None)
+    methods = []
+    for band_IR, I_IR, e_I_IR in zip(bands_IR, data_IR, errs_IR):
+        for band_UV, I_UV, e_I_UV in zip(bands_UV, data_UV, errs_UV):
+            if band_UV == '':
+                method = f"{band_IR}ONLY"
+            else:
+                method = f"{band_UV}{band_IR}"
+            methods += [method]
+            t.calc_surf_dens_sfr(
+                # columns to save the output
+                colname=f"Sigma_SFR_{method}_gauss",
+                colname_e=f"e_Sigma_SFR_{method}_gauss",
+                # input parameters
+                method=method,
+                I_IR=I_IR, e_I_IR=e_I_IR, I_UV=I_UV, e_I_UV=e_I_UV,
+                cosi=gal_cosi, snr_thresh=3)
+    # find the best solution given a priority list
+    t['Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    t['e_Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
+    for method in (
+            'Hacorr', 'HaW4recal', 'FUVW4recal',
+            'HaW4', 'FUVW4', 'NUVW4', 'W4ONLY'):
+        if np.isfinite(t[f"Sigma_SFR_{method}_gauss"]).any():
+            t['Sigma_SFR_gauss'] = t[f"Sigma_SFR_{method}_gauss"]
+            t['e_Sigma_SFR_gauss'] = t[f"e_Sigma_SFR_{method}_gauss"]
+            break
 
     # Stellar surface density
     if verbose:

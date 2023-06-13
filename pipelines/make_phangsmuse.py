@@ -54,6 +54,8 @@ class PhangsMuseMegaTable(StatsTable):
         # check input
         if ra is None or dec is None:
             self[colname] = np.nan * u.Unit(unit)
+            if colname_e is not None:
+                self[colname_e] = np.nan * u.Unit(unit)
             return
         # clean up weight array
         if weight is not None:
@@ -126,8 +128,14 @@ class PhangsMuseMegaTable(StatsTable):
             logOH=None, e_logOH=None, logOH_solar=None):
         if logOH_solar is None:
             logOH_solar = 8.69  # Asplund+09
-        Zprime = 10 ** (logOH - logOH_solar) * u.Unit('')
-        e_Zprime = Zprime * (10**e_logOH - 1)
+        if logOH is not None:
+            Zprime = 10 ** (logOH - logOH_solar) * u.Unit('')
+        else:
+            Zprime = None
+        if e_logOH is not None:
+            e_Zprime = Zprime * (10**e_logOH - 1)
+        else:
+            e_Zprime = None
         self.add_hii_stat_generic(
             colname, colname_e=colname_e, unit=unit,
             ra=ra, dec=dec, quantity=Zprime, e_quantity=e_Zprime)
@@ -289,7 +297,7 @@ def add_nebulae_stats_to_table(
         if verbose:
             print("    Input file found")
         nebulaecat = Table.read(nebulae_file)
-        hiicat = nebulaecat[nebulaecat['HII_class'] == 1]  # HII regions only
+        hiicat = nebulaecat[nebulaecat['HII_class_v3'] == 1]  # HII only
         ra = hiicat['cen_ra'].quantity.to('deg').value
         dec = hiicat['cen_dec'].quantity.to('deg').value
         flux_Ha = hiicat['HA6562_FLUX_CORR'].quantity.to('erg s-1 cm-2')

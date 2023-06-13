@@ -941,7 +941,7 @@ def add_pixel_stats_to_table(
             # column to save the output
             colname=f"<alpha_CO21_G20ICO_{res_str}>",
             # input parameters
-            header=hdr, masked_mom0=sm0, Zprime=t['Zprime'],
+            header=hdr, masked_mom0=sm0, Zprime=t['Zprime_scaling'],
             FWHM_beam=res, cosi=gal_cosi, force_res_dependence=True)
 
 
@@ -1170,13 +1170,13 @@ def calc_high_level_params_in_table(
         # column to save the output
         colname='alpha_CO21_N12',
         # input parameters
-        method='N12', Zprime=t['Zprime'],
+        method='N12', Zprime=t['Zprime_scaling'],
         I_CO_cloud=t[f"<I_CO21_pix_{res_str}>"])
     t.calc_co_conversion(
         # column to save the output
         colname='alpha_CO21_B13',
         # input parameters
-        method='B13', Zprime=t['Zprime'],
+        method='B13', Zprime=t['Zprime_scaling'],
         I_CO_cloud=t[f"<I_CO21_pix_{res_str}>"], I_CO_kpc=t['I_CO21'],
         Sigma_else_kpc=t['Sigma_star']+t['Sigma_atom'])
 

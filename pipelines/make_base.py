@@ -645,7 +645,7 @@ def add_raw_measurements_to_table(
             env_file=in_file, weight_file=w_file)
         # fraction of Halpha flux
         w_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb',
+            galaxy=gal_name, product='cleaned',
             postfix_resolution='')
         t.add_environ_fraction(
             # column to save the output

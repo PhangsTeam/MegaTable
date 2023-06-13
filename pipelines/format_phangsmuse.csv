@@ -1,12 +1,5 @@
 "colname","unit","format","description"
 
-"Sigma_star_3p6um","Msun pc-2",".3e","Region-average stellar mass surface density (3.6um + varying M/L; Leroy+21)"
-"e_Sigma_star_3p6um","Msun pc-2",".1e","Stats error on region-average stellar mass surface density (3.6um + varying M/L; Leroy+21)"
-"Sigma_star_3p4um","Msun pc-2",".3e","Region-average stellar mass surface density (3.4um + varying M/L; Leroy+21)"
-"e_Sigma_star_3p4um","Msun pc-2",".1e","Stats error on region-average stellar mass surface density (3.4um + varying M/L; Leroy+21)"
-"Sigma_star_3p6umICA","Msun pc-2",".3e","Region-average stellar mass surface density (S4G ICA + fixed M/L; Leroy+21)"
-"e_Sigma_star_3p6umICA","Msun pc-2",".1e","Stats error on region-average stellar mass surface density (S4G ICA + fixed M/L; Leroy+21)"
-
 "I_Halpha_DAP","erg s-1 cm-2 arcsec-2",".3e","Region-average Halpha line intensity (DAP)"
 "e_I_Halpha_DAP","erg s-1 cm-2 arcsec-2",".1e","Stats error on region-average Halpha line intensity (DAP)"
 "I_Halpha_DAP_corr","erg s-1 cm-2 arcsec-2",".3e","Region-average Halpha line intensity (DAP, Av-corrected)"
@@ -38,5 +31,4 @@
 "e_EBV_HII","mag",".4f","Stats error on mean HII region extinction"
 "Zprime_HII","1",".3e","Mean HII region metallicity relative to solar (PG16S)"
 "e_Zprime_HII","1",".1e","Stats error on mean HII region metallicity relative to solar (PG16S)"
-
 "Zprime_scaling","1",".3e","Gas-phase metallicity relative to solar (scaling relation-based prediction; Sun+20)"

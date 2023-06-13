@@ -156,8 +156,8 @@ class PhangsBaseMegaTable(StatsTable):
             (models[4](r) - models[5](r)) / 2 * t_model['beta'].unit
         ).to(unit_e_beta)
 
-    def calc_metallicity(
-            self, colname='Zprime', unit='',
+    def calc_metallicity_pred(
+            self, colname='Zprime_scaling', unit='',
             method='PHANGS', Mstar=None, Rstar=None, r_gal=None,
             logOH_solar=None):
         from CO_conversion_factor import metallicity
@@ -692,17 +692,11 @@ def calc_high_level_params_in_table(
     # Scaling relation-based metallicity
     if verbose:
         print("  Calculate scaling relation-based metallicity")
-    t.calc_metallicity(
+    t.calc_metallicity_pred(
         # column to save the output
         colname='Zprime_scaling',
         # input parameters
         Mstar=gal_Mstar, Rstar=gal_Rstar, r_gal=t['r_gal'])
-    # find the best solution given a priority list
-    t['Zprime'] = np.nan
-    for colname in ('Zprime_scaling', ):
-        if np.isfinite(t[colname]).any():
-            t['Zprime'] = t[colname]
-            break
 
     # SFR surface density
     if verbose:
@@ -825,7 +819,7 @@ def calc_high_level_params_in_table(
     # find the best solution given a priority list
     t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     t['e_Sigma_star'] = np.nan * u.Unit('Msun pc-2')
-    for method in ('3p6um', '3p4um', '3p6umICA'):
+    for method in ('3p6um', '3p4um'):
         if np.isfinite(t[f"Sigma_star_{method}"]).any():
             t['Sigma_star'] = t[f"Sigma_star_{method}"]
             t['e_Sigma_star'] = t[f"e_Sigma_star_{method}"]
@@ -849,7 +843,7 @@ def calc_high_level_params_in_table(
         # columns to save the output
         colname="alpha_CO21_S20",
         # input parameters
-        method='S20', Zprime=t['Zprime'])
+        method='S20', Zprime=t['Zprime_scaling'])
     # Galactic value
     t.calc_co_conversion(
         # columns to save the output

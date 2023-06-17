@@ -103,14 +103,29 @@ if __name__ == '__main__':
             work_dir / table_configs['tessell_table_name'].format(
                 galaxy=gal_name, content='phangsalma',
                 tile_shape=tile_shape, tile_size_str=tile_size_str))
+        tessell_muse_table_file = (
+            work_dir / table_configs['tessell_table_name'].format(
+                galaxy=gal_name, content='phangsmuse',
+                tile_shape=tile_shape, tile_size_str=tile_size_str))
         if (not tessell_combined_table_file.is_file() and
                 tessell_base_table_file.is_file() and
-                tessell_alma_table_file.is_file()):
+                tessell_alma_table_file.is_file() and
+                tessell_muse_table_file.is_file()):
             print("Combining all tessellation statistics tables...")
             t_base = TessellMegaTable.read(tessell_base_table_file)
             t_alma = TessellMegaTable.read(tessell_alma_table_file)
+            t_muse = TessellMegaTable.read(tessell_muse_table_file)
             combine_tables(
-                t_base, t_alma, writefile=tessell_combined_table_file)
+                t_base, t_alma, t_muse,
+                writefile=tessell_combined_table_file)
+            # remove PHANGS-ALMA table if empty
+            if np.isfinite(t_alma['I_CO21']).sum() == 0:
+                print("Remove empty PHANGS-ALMA table")
+                tessell_alma_table_file.unlink()
+            # remove PHANGS-MUSE table if empty
+            if np.isfinite(t_muse['I_Halpha_DAP']).sum() == 0:
+                print("Remove empty PHANGS-MUSE table")
+                tessell_muse_table_file.unlink()
             print("Done\n")
 
         # RadialMegaTable
@@ -130,14 +145,29 @@ if __name__ == '__main__':
             work_dir / table_configs['radial_table_name'].format(
                 galaxy=gal_name, content='phangsalma',
                 annulus_width_str=annulus_width_str))
+        radial_muse_table_file = (
+            work_dir / table_configs['radial_table_name'].format(
+                galaxy=gal_name, content='phangsmuse',
+                annulus_width_str=annulus_width_str))
         if (not radial_combined_table_file.is_file() and
                 radial_base_table_file.is_file() and
-                radial_alma_table_file.is_file()):
+                radial_alma_table_file.is_file() and
+                radial_muse_table_file.is_file()):
             print("Combining all radial statistics tables...")
             t_base = RadialMegaTable.read(radial_base_table_file)
             t_alma = RadialMegaTable.read(radial_alma_table_file)
+            t_muse = RadialMegaTable.read(radial_muse_table_file)
             combine_tables(
-                t_base, t_alma, writefile=radial_combined_table_file)
+                t_base, t_alma, t_muse,
+                writefile=radial_combined_table_file)
+            # remove PHANGS-ALMA table if empty
+            if np.isfinite(t_alma['I_CO21']).sum() == 0:
+                print("Remove empty PHANGS-ALMA table")
+                radial_alma_table_file.unlink()
+            # remove PHANGS-MUSE table if empty
+            if np.isfinite(t_muse['I_Halpha_DAP']).sum() == 0:
+                print("Remove empty PHANGS-MUSE table")
+                radial_muse_table_file.unlink()
             print("Done\n")
 
     # logging settings

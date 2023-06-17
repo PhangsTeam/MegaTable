@@ -675,7 +675,7 @@ class PhangsAlmaMegaTable(StatsTable):
                 Zprime=Zprime, WCO10GMC=I_CO_cloud/line_ratio)
         elif method == 'B13':
             alphaCO10 = alphaCO.predict_alphaCO10_B13(
-                Zprime=Zprime, WCO10GMC=I_CO_cloud/line_ratio,
+                Zprime=Zprime,  # WCO10GMC=I_CO_cloud/line_ratio,
                 WCO10kpc=I_CO_kpc/line_ratio, Sigmaelsekpc=Sigma_else_kpc,
                 suppress_error=True)
         else:
@@ -941,7 +941,7 @@ def add_pixel_stats_to_table(
             # column to save the output
             colname=f"<alpha_CO21_G20ICO_{res_str}>",
             # input parameters
-            header=hdr, masked_mom0=sm0, Zprime=t['Zprime'],
+            header=hdr, masked_mom0=sm0, Zprime=t['Zprime_scaling'],
             FWHM_beam=res, cosi=gal_cosi, force_res_dependence=True)
 
 
@@ -1159,6 +1159,9 @@ def add_object_stats_to_table(
 def calc_high_level_params_in_table(
         t: PhangsAlmaMegaTable, res_pcs=None, verbose=True):
 
+    if verbose:
+        print("  Calculate high-level parameters")
+
     # CO-to-H2 conversion factors
     if verbose:
         print("    Calculate CO-to-H2 conversion factors")
@@ -1167,13 +1170,13 @@ def calc_high_level_params_in_table(
         # column to save the output
         colname='alpha_CO21_N12',
         # input parameters
-        method='N12', Zprime=t['Zprime'],
+        method='N12', Zprime=t['Zprime_scaling'],
         I_CO_cloud=t[f"<I_CO21_pix_{res_str}>"])
     t.calc_co_conversion(
         # column to save the output
         colname='alpha_CO21_B13',
         # input parameters
-        method='B13', Zprime=t['Zprime'],
+        method='B13', Zprime=t['Zprime_scaling'],
         I_CO_cloud=t[f"<I_CO21_pix_{res_str}>"], I_CO_kpc=t['I_CO21'],
         Sigma_else_kpc=t['Sigma_star']+t['Sigma_atom'])
 

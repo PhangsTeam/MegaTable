@@ -5,6 +5,8 @@
     "/data/kant/0/sun.1608/PHANGS/ALMA/v4-CPROPS/{galaxy}_CO21_CPROPS{postfix_resolution}{postfix_sensitivity}.fits",
     "PHANGS_ALMA_rotcurve":
     "/data/kant/0/sun.1608/PHANGS/rotcurve/{galaxy}_{product}.ecsv",
+    "PHANGS_MUSE_DAP": "/data/kant/0/sun.1608/PHANGS/MUSE/DR2.2/{galaxy}_map_{product}_{resolution}.fits",
+    "PHANGS_MUSE_nebulae": "/data/kant/0/sun.1608/PHANGS/MUSE/nebulae_catalog_v3/{galaxy}_nebulae_catalog.fits",
     "PHANGS_HI":
     "/data/kant/0/sun.1608/PHANGS/HI/{galaxy}_21cm_{product}{postfix_resolution}.fits",
     "PHANGS_Halpha":

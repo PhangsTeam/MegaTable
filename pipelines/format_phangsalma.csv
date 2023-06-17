@@ -9,10 +9,9 @@
 "frac_CO21_lenses","1",".3f","Fraction of CO21 flux in the lens region"
 "frac_CO21_sp_arms","1",".3f","Fraction of CO21 flux in the spiral arm region"
 
-"Zprime","1",".3e","Gas-phase metallicity relative to solar (fiducial)"
 "Zprime_scaling","1",".3e","Gas-phase metallicity relative to solar (scaling relation-based prediction; Sun+20)"
 
-"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial)"
+"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: S20>Galactic)"
 "alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 Zprime-based power law)"
 "alpha_CO21_Galactic","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Galactic value)"
 "alpha_CO21_N12","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Narayanan+12 prescription)"

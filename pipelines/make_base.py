@@ -156,8 +156,8 @@ class PhangsBaseMegaTable(StatsTable):
             (models[4](r) - models[5](r)) / 2 * t_model['beta'].unit
         ).to(unit_e_beta)
 
-    def calc_metallicity(
-            self, colname='Zprime', unit='',
+    def calc_metallicity_pred(
+            self, colname='Zprime_scaling', unit='',
             method='PHANGS', Mstar=None, Rstar=None, r_gal=None,
             logOH_solar=None):
         from CO_conversion_factor import metallicity
@@ -285,6 +285,72 @@ class PhangsBaseMegaTable(StatsTable):
                 np.isfinite(I_Halpha) & np.isfinite(I_IR) &
                 ((I_Halpha / e_I_Halpha < snr_thresh) |
                  (I_IR / e_I_IR < snr_thresh)))
+            self[colname][low_snr_flag] = 0
+            # self[colname_e][low_snr_flag] = np.nan
+        else:
+            raise ValueError(f"Unrecognized method: '{method}'")
+
+    def calc_surf_dens_sfr_recal(
+            self, colname='Sigma_SFR', unit='Msun yr-1 kpc-2',
+            colname_e='e_Sigma_SFR', unit_e='Msun yr-1 kpc-2',
+            method='Hacorr', I_Halpha=None, e_I_Halpha=None,
+            I_FUV=None, e_I_FUV=None, I_W4=None, e_I_W4=None,
+            I_W1=None, e_I_W1=None, cosi=1., e_sys=None, snr_thresh=None):
+        if e_sys is None:
+            e_sys = 0.0
+        if snr_thresh is None:
+            snr_thresh = 3
+        if method == 'HaW4recal':
+            # Calzetti+07, Murphy+11
+            C_Halpha = 5.37e-42 * u.Unit('Msun yr-1 erg-1 s')
+            # Belfiore+22
+            a1 = 0.44
+            logQmax = -1.51
+            logCmax = -42.87
+            nu_W1 = const.c / (3.4 * u.um)
+            nu_W4 = const.c / (22 * u.um)
+            logQ = np.log10((I_Halpha / (nu_W1 * I_W1)).to('').value)
+            logC_W4 = logCmax + a1 * (logQ - logQmax)
+            logC_W4[logQ > logQmax] = logCmax
+            C_W4 = 10**logC_W4 * u.Unit('Msun yr-1 erg-1 s')
+            self[colname] = (
+                C_Halpha * cosi * 4*np.pi*u.sr * I_Halpha +
+                C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * I_W4).to(unit)
+            e_stat = np.sqrt(
+                (C_Halpha * cosi * 4*np.pi*u.sr * e_I_Halpha)**2 +
+                (C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * e_I_W4)**2)
+            self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
+            low_snr_flag = (
+                np.isfinite(I_Halpha) & np.isfinite(I_W4) &
+                ((I_Halpha / e_I_Halpha < snr_thresh) |
+                 (I_W4 / e_I_W4 < snr_thresh)))
+            self[colname][low_snr_flag] = 0
+            # self[colname_e][low_snr_flag] = np.nan
+        elif method == 'FUVW4recal':
+            # Leroy+19
+            C_FUV = 10**-43.42 * u.Unit('Msun yr-1 erg-1 s')
+            nu_FUV = const.c / (154 * u.nm)
+            # Belfiore+22, FUV/W1
+            a1 = 0.22
+            logQmax = 0.60
+            logCmax = -42.73
+            nu_W1 = const.c / (3.4 * u.um)
+            nu_W4 = const.c / (22 * u.um)
+            logQ = np.log10((nu_FUV * I_FUV / (nu_W1 * I_W1)).to('').value)
+            logC_W4 = logCmax + a1 * (logQ - logQmax)
+            logC_W4[logQ > logQmax] = logCmax
+            C_W4 = 10**logC_W4 * u.Unit('Msun yr-1 erg-1 s')
+            self[colname] = (
+                C_FUV * nu_FUV * cosi * 4*np.pi*u.sr * I_FUV +
+                C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * I_W4).to(unit)
+            e_stat = np.sqrt(
+                (C_FUV * nu_FUV * cosi * 4*np.pi*u.sr * e_I_FUV)**2 +
+                (C_W4 * nu_W4 * cosi * 4*np.pi*u.sr * e_I_W4)**2)
+            self[colname_e] = np.sqrt(e_stat**2 + e_sys**2).to(unit_e)
+            low_snr_flag = (
+                np.isfinite(I_FUV) & np.isfinite(I_W4) &
+                ((I_FUV / e_I_FUV < snr_thresh) |
+                 (I_W4 / e_I_W4 < snr_thresh)))
             self[colname][low_snr_flag] = 0
             # self[colname_e][low_snr_flag] = np.nan
         else:
@@ -484,10 +550,10 @@ def add_raw_measurements_to_table(
         print("  Add Spitzer IRAC data")
     in_file = data_paths['PHANGS_IRAC'].format(
         galaxy=gal_name, product='3p6um',
-        postfix_resolution='_gauss7p5')  # for now
+        postfix_resolution='_gauss3p0')
     err_file = data_paths['PHANGS_IRAC'].format(
         galaxy=gal_name, product='3p6um_err',
-        postfix_resolution='_gauss7p5')  # for now
+        postfix_resolution='_gauss3p0')
     t.add_area_average_for_image(
         # column to save the output
         colname='I_3p6um', unit='MJy sr-1',
@@ -510,50 +576,50 @@ def add_raw_measurements_to_table(
     # PHANGS narrow-band Halpha data
     if verbose:
         print("  Add PHANGS narrow-band Halpha data")
-        in_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb',
-            postfix_resolution='')
-        err_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb_err',
-            postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
-            colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_Halpha'].format(
+        galaxy=gal_name, product='cleaned',
+        postfix_resolution='')
+    err_file = data_paths['PHANGS_Halpha'].format(
+        galaxy=gal_name, product='err_cleaned',
+        postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_Halpha', unit='erg s-1 cm-2 arcsec-2',
+        colname_e="e_I_Halpha", unit_e='erg s-1 cm-2 arcsec-2',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS-VLA & archival HI data
     if verbose:
         print("  Add PHANGS-VLA & archival HI data")
-        in_file = data_paths['PHANGS_HI'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_resolution='')
-        err_file = data_paths['PHANGS_HI'].format(
-            galaxy=gal_name, product='emom0',
-            postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_HI', unit='K km s-1',
-            colname_e="e_I_HI", unit_e='K km s-1',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='broadmask_mom0',
+        postfix_resolution='')
+    err_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='broadmask_emom0',
+        postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HI', unit='K km s-1',
+        colname_e="e_I_HI", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS-ALMA CO(2-1) data
     if verbose:
         print("  Add PHANGS-ALMA CO(2-1) data")
-        in_file = data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution='')
-        err_file = data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='emom0',
-            postfix_masking='_broad', postfix_resolution='')
-        t.add_area_average_for_image(
-            # column to save the output
-            colname='I_CO21', unit='K km s-1',
-            colname_e="e_I_CO21", unit_e='K km s-1',
-            # input parameters
-            img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMA_CO21'].format(
+        galaxy=gal_name, product='mom0',
+        postfix_masking='_broad', postfix_resolution='')
+    err_file = data_paths['PHANGS_ALMA_CO21'].format(
+        galaxy=gal_name, product='emom0',
+        postfix_masking='_broad', postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_CO21', unit='K km s-1',
+        colname_e="e_I_CO21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
 
     # PHANGS environmental mask-related measurements
     if verbose:
@@ -579,7 +645,7 @@ def add_raw_measurements_to_table(
             env_file=in_file, weight_file=w_file)
         # fraction of Halpha flux
         w_file = data_paths['PHANGS_Halpha'].format(
-            galaxy=gal_name, product='wcomb',
+            galaxy=gal_name, product='cleaned',
             postfix_resolution='')
         t.add_environ_fraction(
             # column to save the output
@@ -626,22 +692,45 @@ def calc_high_level_params_in_table(
     # Scaling relation-based metallicity
     if verbose:
         print("  Calculate scaling relation-based metallicity")
-    t.calc_metallicity(
+    t.calc_metallicity_pred(
         # column to save the output
         colname='Zprime_scaling',
         # input parameters
         Mstar=gal_Mstar, Rstar=gal_Rstar, r_gal=t['r_gal'])
-    # find the best solution given a priority list
-    t['Zprime'] = np.nan
-    for colname in ('Zprime_scaling', ):
-        if np.isfinite(t[colname]).any():
-            t['Zprime'] = t[colname]
-            break
 
     # SFR surface density
     if verbose:
         print("  Calculate SFR surface density")
-    # UV+IR prescriptions
+    # Belfiore+22 Halpha+WISE4 prescription
+    method = 'HaW4recal'
+    t.calc_surf_dens_sfr_recal(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
+        I_W1=t['I_3p4um'], e_I_W1=t['e_I_3p4um'],
+        I_W4=t['I_22um'], e_I_W4=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Belfiore+22 FUV+WISE4 prescription
+    method = 'FUVW4recal'
+    t.calc_surf_dens_sfr_recal(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_FUV=t['I_154nm'], e_I_FUV=t['e_I_154nm'],
+        I_W1=t['I_3p4um'], e_I_W1=t['e_I_3p4um'],
+        I_W4=t['I_22um'], e_I_W4=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Murphy+11 Halpha+WISE4 prescription
+    method = 'HaW4'
+    t.calc_surf_dens_sfr(
+        # columns to save the output
+        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
+        # input parameters
+        method=method, I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
+        I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
+        cosi=gal_cosi, snr_thresh=3)
+    # Leroy+19 UV+IR prescriptions
     bands_IR = ('W4', 'W3')
     data_IR = (t['I_22um'], t['I_12um'])
     errs_IR = (t['e_I_22um'], t['e_I_12um'])
@@ -667,54 +756,41 @@ def calc_high_level_params_in_table(
     # find the best solution given a priority list
     t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
     t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    for method in methods:
+    for method in (
+            'HaW4recal', 'FUVW4recal',
+            'HaW4', 'FUVW4', 'NUVW4', 'W4ONLY'):
         if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
             t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
             t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
             break
-    # Halpha+WISE4 prescription
-    method = 'HaW4'
-    t.calc_surf_dens_sfr(
-        # columns to save the output
-        colname=f"Sigma_SFR_{method}", colname_e=f"e_Sigma_SFR_{method}",
-        # input parameters
-        method=method, I_IR=t['I_22um'], e_I_IR=t['e_I_22um'],
-        I_Halpha=t['I_Halpha'], e_I_Halpha=t['e_I_Halpha'],
-        cosi=gal_cosi, snr_thresh=3)
 
     # Stellar mass-to-light ratio
     if verbose:
         print("  Calculate stellar mass-to-light ratio")
-    # SFR-to-WISE1 color prescription
     if np.isfinite(t['Sigma_SFR_FUVW4']).any():
+        # SFR-to-WISE1 color prescription (FUVW4)
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1',
+            colname='MtoL_3p4um',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_FUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
     elif np.isfinite(t['Sigma_SFR_NUVW4']).any():
+        # SFR-to-WISE1 color prescription (NUVW4)
         t.calc_stellar_m2l(
             # column to save the output
-            colname='MtoL_3p4um_SFRW1',
+            colname='MtoL_3p4um',
             # input parameters
             method='SFR-to-W1', Sigma_SFR=t['Sigma_SFR_NUVW4'],
             I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
     else:
-        t['MtoL_3p4um_SFRW1'] = np.nan * u.Unit('Msun Lsun-1')
-    # WISE4-to-WISE1 color prescription
-    t.calc_stellar_m2l(
-        # column to save the output
-        colname='MtoL_3p4um_W4W1',
-        # input parameters
-        method='W4-to-W1', I_22um=t['I_22um'], e_I_22um=t['e_I_22um'],
-        I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
-    # find the best solution given a priority list
-    t['MtoL_3p4um'] = np.nan * u.Unit('Msun Lsun-1')
-    for method in ('SFRW1', 'W4W1'):
-        if np.isfinite(t[f"MtoL_3p4um_{method}"]).any():
-            t['MtoL_3p4um'] = t[f"MtoL_3p4um_{method}"]
-            break
+        # WISE4-to-WISE1 color prescription
+        t.calc_stellar_m2l(
+            # column to save the output
+            colname='MtoL_3p4um',
+            # input parameters
+            method='W4-to-W1', I_22um=t['I_22um'], e_I_22um=t['e_I_22um'],
+            I_3p4um=t['I_3p4um'], e_I_3p4um=t['e_I_3p4um'])
 
     # Stellar surface density
     if verbose:
@@ -743,7 +819,7 @@ def calc_high_level_params_in_table(
     # find the best solution given a priority list
     t['Sigma_star'] = np.nan * u.Unit('Msun pc-2')
     t['e_Sigma_star'] = np.nan * u.Unit('Msun pc-2')
-    for method in ('3p6um', '3p4um', '3p6umICA'):
+    for method in ('3p6um', '3p4um'):
         if np.isfinite(t[f"Sigma_star_{method}"]).any():
             t['Sigma_star'] = t[f"Sigma_star_{method}"]
             t['e_Sigma_star'] = t[f"e_Sigma_star_{method}"]
@@ -767,7 +843,7 @@ def calc_high_level_params_in_table(
         # columns to save the output
         colname="alpha_CO21_S20",
         # input parameters
-        method='S20', Zprime=t['Zprime'])
+        method='S20', Zprime=t['Zprime_scaling'])
     # Galactic value
     t.calc_co_conversion(
         # columns to save the output

@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from astropy.table import Table, join
+from astropy.table import Table, join, vstack
 
 from mega_table.table import TessellMegaTable, RadialMegaTable
 
@@ -75,6 +75,10 @@ if __name__ == '__main__':
     # sub-select sample
     t_sample = t_sample[t_sample['data_has_megatable']]
 
+    # initialize table lists for subsequent vstack
+    tessell_list = []
+    radial_list = []
+
     # loop through all galaxies
     for row in t_sample:
 
@@ -128,6 +132,15 @@ if __name__ == '__main__':
                 tessell_muse_table_file.unlink()
             print("Done\n")
 
+        t_combined = Table.read(tessell_combined_table_file)
+        # add galaxy name
+        t_combined.add_column(gal_name, name='galaxy', index=0)
+        # clean metadata
+        for key in t_combined.meta.copy():
+            if key not in ('TBLNOTE', 'VERSION'):
+                t_combined.meta.pop(key)
+        tessell_list.append(t_combined)
+
         # RadialMegaTable
         annulus_width_str = (
             str(table_configs['radial_annulus_width']).replace('.', 'p') +
@@ -169,6 +182,32 @@ if __name__ == '__main__':
                 print("Remove empty PHANGS-MUSE table")
                 radial_muse_table_file.unlink()
             print("Done\n")
+
+        t_combined = Table.read(radial_combined_table_file)
+        # add galaxy name
+        t_combined.add_column(gal_name, name='galaxy', index=0)
+        # clean metadata
+        for key in t_combined.meta.copy():
+            if key not in ('TBLNOTE', 'VERSION'):
+                t_combined.meta.pop(key)
+        radial_list.append(t_combined)
+
+    # merge tables for all galaxies
+    print("\n############################################################")
+    print("# Merge tables for all galaxies")
+    print("############################################################\n")
+    tessell_all_table_file = (
+        work_dir / table_configs['tessell_table_name'].format(
+            galaxy='all', content='combined',
+            tile_shape=tile_shape, tile_size_str=tile_size_str))
+    t_tessell_all = vstack(tessell_list)
+    t_tessell_all.write(tessell_all_table_file, overwrite=True)
+    radial_all_table_file = (
+        work_dir / table_configs['radial_table_name'].format(
+            galaxy='all', content='combined',
+            annulus_width_str=annulus_width_str))
+    t_radial_all = vstack(radial_list)
+    t_radial_all.write(radial_all_table_file, overwrite=True)
 
     # logging settings
     if logging:

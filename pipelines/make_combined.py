@@ -77,6 +77,7 @@ if __name__ == '__main__':
 
     # initialize table lists for subsequent vstack
     tessell_list = []
+    tessellngauss_list = []
     radial_list = []
 
     # loop through all galaxies
@@ -132,14 +133,38 @@ if __name__ == '__main__':
                 tessell_muse_table_file.unlink()
             print("Done\n")
 
+        tessell_gcombined_table_file = (
+            work_dir / table_configs['tessell_table_name'].format(
+                galaxy=gal_name, content='combined',
+                tile_shape=tile_shape+'+gauss', tile_size_str=tile_size_str))
+        tessell_gauss_table_file = (
+            work_dir / table_configs['tessell_table_name'].format(
+                galaxy=gal_name, content='gauss',
+                tile_shape=tile_shape, tile_size_str=tile_size_str))
+        if (not tessell_gcombined_table_file.is_file() and
+                tessell_combined_table_file.is_file() and
+                tessell_gauss_table_file.is_file()):
+            print("Combining tessell+gauss statistics tables...")
+            t_combined = TessellMegaTable.read(tessell_combined_table_file)
+            t_gauss = TessellMegaTable.read(tessell_gauss_table_file)
+            combine_tables(
+                t_combined, t_gauss, writefile=tessell_gcombined_table_file)
+            print("Done\n")
+
         t_combined = Table.read(tessell_combined_table_file)
+        t_gcombined = Table.read(tessell_gcombined_table_file)
         # add galaxy name
         t_combined.add_column(gal_name, name='galaxy', index=0)
+        t_gcombined.add_column(gal_name, name='galaxy', index=0)
         # clean metadata
         for key in t_combined.meta.copy():
             if key not in ('TBLNOTE', 'VERSION'):
                 t_combined.meta.pop(key)
+        for key in t_gcombined.meta.copy():
+            if key not in ('TBLNOTE', 'VERSION'):
+                t_gcombined.meta.pop(key)
         tessell_list.append(t_combined)
+        tessellngauss_list.append(t_gcombined)
 
         # RadialMegaTable
         annulus_width_str = (
@@ -200,14 +225,23 @@ if __name__ == '__main__':
         work_dir / table_configs['tessell_table_name'].format(
             galaxy='all', content='combined',
             tile_shape=tile_shape, tile_size_str=tile_size_str))
-    t_tessell_all = vstack(tessell_list)
-    t_tessell_all.write(tessell_all_table_file, overwrite=True)
+    if not tessell_all_table_file.is_file():
+        t_tessell_all = vstack(tessell_list)
+        t_tessell_all.write(tessell_all_table_file)
+    tessellngauss_all_table_file = (
+        work_dir / table_configs['tessell_table_name'].format(
+            galaxy='all', content='combined',
+            tile_shape=tile_shape+'+gauss', tile_size_str=tile_size_str))
+    if not tessellngauss_all_table_file.is_file():
+        t_tessellngauss_all = vstack(tessellngauss_list)
+        t_tessellngauss_all.write(tessellngauss_all_table_file)
     radial_all_table_file = (
         work_dir / table_configs['radial_table_name'].format(
             galaxy='all', content='combined',
             annulus_width_str=annulus_width_str))
-    t_radial_all = vstack(radial_list)
-    t_radial_all.write(radial_all_table_file, overwrite=True)
+    if not radial_all_table_file.is_file():
+        t_radial_all = vstack(radial_list)
+        t_radial_all.write(radial_all_table_file)
 
     # logging settings
     if logging:

@@ -68,8 +68,9 @@
 "Sigma_atom","Msun pc-2",".3e","Region-average atomic gas surface density (PHANGS-HI)"
 "e_Sigma_atom","Msun pc-2",".1e","Stats error on region-average atomic gas surface density (PHANGS-HI)"
 
-"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: S20>Galactic)"
-"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 Zprime-based power law)"
+"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: SL24>S20>Galactic)"
+"alpha_CO21_SL24","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Schinnerer&Leroy+24 composite)"
+"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 power-law Z' scaling)"
 "alpha_CO21_Galactic","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Galactic value)"
 
 "Sigma_mol","Msun pc-2",".3e","Region-average molecular gas surface density (PHANGS-ALMA)"

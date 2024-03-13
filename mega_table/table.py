@@ -1,11 +1,11 @@
+import warnings
 import numpy as np
 from functools import partial
 from astropy import units as u
 from astropy.table import QTable
-from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from .core import GeneralRegionTable, VoronoiTessTable
-from .utils import deproject
+from .utils import deproject, identical_units, reduce_image_input
 
 
 ######################################################################
@@ -157,7 +157,7 @@ class ApertureMegaTable(GeneralRegionTable):
 
     Each aperture corresponds to a row in the table.
     Once a table is constructed, additional columns can be added
-    by calculating statistics of images within each ring.
+    by calculating statistics of images within each aperture.
 
     Parameters
     ----------
@@ -252,6 +252,87 @@ class ApertureMegaTable(GeneralRegionTable):
             mt.meta[key] = t.meta[key]
 
         return mt
+
+    # ----------------------------------------------------------------
+
+    def resample_image(
+            self, image, ihdu=0, header=None,
+            colname='new_col', unit='', suppress_error=False,
+            fill_outside='nearest'):
+        """
+        Resample an image at the location of the aperture centers.
+
+        The resampling is done by finding the nearest image pixel to
+        each aperture center.
+
+        Parameters
+        ----------
+        image : str, fits.HDUList, fits.HDU, or np.ndarray
+            The image to be resampled.
+        ihdu : int, optional
+            If 'image' is a str or an HDUList, this keyword should
+            specify which HDU (extension) to use (default=0)
+        header : astropy.fits.Header, optional
+            If 'image' is an ndarray, this keyword should be a FITS
+            header providing the WCS information.
+        colname : str, optional
+            Name of a column in the table to save the output values.
+            Default: 'new_col'
+        unit : str or astropy.unit.Unit, optional
+            Physical unit of the output values (default='').
+            If unit='header', the 'BUNIT' entry in the header is used.
+        fill_outside : {'nearest', float}, optional
+            The behavior outside the footprint of the input image.
+            If fill_outside='nearest', all seeds outside the footprint
+            are assigned the value of the nearest pixel in the image.
+            Otherwise, all aperture centers outside the image footprint
+            are assigned the value of this keyword.
+        suppress_error : bool, optional
+            Whether to suppress the error message if 'image' looks
+            like a file but is not found on disk (default=False)
+        """
+
+        data, hdr, wcs = reduce_image_input(
+            image, ihdu, header, suppress_error=suppress_error)
+        if data is None:
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
+            return
+
+        # find the nearest pixel for each aperture center
+        iax0, iax1 = wcs.all_world2pix(
+            self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
+        iax0 = np.round(iax0).astype('int')
+        iax1 = np.round(iax1).astype('int')
+        mask = ((iax0 < 0) | (iax0 > wcs._naxis[0]-1) |
+                (iax1 < 0) | (iax1 > wcs._naxis[1]-1))
+        iax0[iax0 < 0] = 0
+        iax0[iax0 > wcs._naxis[0]-1] = wcs._naxis[0]-1
+        iax1[iax1 < 0] = 0
+        iax1[iax1 > wcs._naxis[1]-1] = wcs._naxis[1]-1
+
+        # get data from the nearest pixels
+        sub_data = data[iax1, iax0]
+
+        # assign values for apertures outside the image footprint
+        if fill_outside != 'nearest':
+            sub_data[mask] = fill_outside
+
+        # save the resampled values as a new column in the table
+        self[colname] = sub_data
+        if unit == 'header':
+            self[colname].unit = u.Unit(hdr['BUNIT'])
+        else:
+            if 'BUNIT' in hdr:
+                if not identical_units(
+                        u.Unit(hdr['BUNIT']), u.Unit(unit)):
+                    warnings.warn(
+                        "Specified unit is not the same as the unit "
+                        "recorded in the FITS header")
+            self[colname].unit = u.Unit(unit)
 
 
 ######################################################################

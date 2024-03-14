@@ -50,7 +50,7 @@
 
 "Zprime_scaling","1",".3e","Gas-phase metallicity relative to solar (scaling relation-based prediction; Sun+20)"
 
-"Sigma_SFR","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (fiducial: HaW4recal>FUVW4recal>HaW4>FUVW4>NUVW4>W4ONLY)"
+"Sigma_SFR","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (fiducial: HaW4recal>FUVW4recal>W4ONLY)"
 "e_Sigma_SFR","Msun yr-1 kpc-2",".1e","Stats error on region-average SFR surface density (fiducial)"
 "Sigma_SFR_HaW4recal","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (Halpha + WISE4; Belfiore+22)"
 "e_Sigma_SFR_HaW4recal","Msun yr-1 kpc-2",".1e","Stats error on region-average SFR surface density (Halpha + WISE4; Belfiore+22)"

@@ -1,19 +1,19 @@
 {
-    "PHANGS_sample_table": "/data/kant/0/sun.1608/PHANGS/mega-tables/sample.ecsv",
-    "PHANGS_ALMA_CO21": "/data/kant/0/sun.1608/PHANGS/ALMA/v4-processed/{galaxy}_CO21_{product}{postfix_masking}{postfix_resolution}.fits",
+    "PHANGS_sample_table": "/data/bell-kant/sun.1608/PHANGS/mega-tables/sample.ecsv",
+    "PHANGS_ALMA_CO21": "/data/bell-kant/sun.1608/PHANGS/ALMA/v4-processed/{galaxy}_CO21_{product}{postfix_masking}{postfix_resolution}.fits",
     "PHANGS_ALMA_CPROPS":
-    "/data/kant/0/sun.1608/PHANGS/ALMA/v4-CPROPS/{galaxy}_CO21_CPROPS{postfix_resolution}{postfix_sensitivity}.fits",
+    "/data/bell-kant/sun.1608/PHANGS/ALMA/v4-CPROPS/{galaxy}_CO21_CPROPS{postfix_resolution}{postfix_sensitivity}.fits",
     "PHANGS_ALMA_rotcurve":
-    "/data/kant/0/sun.1608/PHANGS/rotcurve/{galaxy}_{product}.ecsv",
-    "PHANGS_MUSE_DAP": "/data/kant/0/sun.1608/PHANGS/MUSE/DR2.2/{galaxy}_map_{product}_{resolution}.fits",
-    "PHANGS_MUSE_nebulae": "/data/kant/0/sun.1608/PHANGS/MUSE/nebulae_catalog_v3/{galaxy}_nebulae_catalog.fits",
+    "/data/bell-kant/sun.1608/PHANGS/rotcurve/{galaxy}_{product}.ecsv",
+    "PHANGS_MUSE_DAP": "/data/bell-kant/sun.1608/PHANGS/MUSE/DR2.2/{galaxy}_map_{product}_{resolution}.fits",
+    "PHANGS_MUSE_nebulae": "/data/bell-kant/sun.1608/PHANGS/MUSE/nebulae_catalog_v3/{galaxy}_nebulae_catalog.fits",
     "PHANGS_HI":
-    "/data/kant/0/sun.1608/PHANGS/HI/{galaxy}_21cm_{product}{postfix_resolution}.fits",
+    "/data/bell-kant/sun.1608/PHANGS/HI/{galaxy}_21cm_{product}{postfix_resolution}.fits",
     "PHANGS_Halpha":
-    "/data/kant/0/sun.1608/PHANGS/Halpha/{galaxy}_Halpha_{product}{postfix_resolution}.fits",
+    "/data/bell-kant/sun.1608/PHANGS/Halpha/{galaxy}_Halpha_{product}{postfix_resolution}.fits",
     "PHANGS_IRAC":
-    "/data/kant/0/sun.1608/PHANGS/IRAC/{galaxy}_IRAC_{product}{postfix_resolution}.fits",
-    "PHANGS_env_mask": "/data/kant/0/sun.1608/PHANGS/IRAC/environmental_masks/{galaxy}_mask_{product}.fits",
+    "/data/bell-kant/sun.1608/PHANGS/IRAC/{galaxy}_IRAC_{product}{postfix_resolution}.fits",
+    "PHANGS_env_mask": "/data/bell-kant/sun.1608/PHANGS/IRAC/environmental_masks/{galaxy}_mask_{product}.fits",
     "PHANGS_z0MGS":
-    "/data/kant/0/sun.1608/PHANGS/z0MGS/{galaxy}_{product}{postfix_resolution}.fits"
+    "/data/bell-kant/sun.1608/PHANGS/z0MGS/{galaxy}_{product}{postfix_resolution}.fits"
 }

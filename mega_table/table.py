@@ -31,7 +31,7 @@ class RadialMegaTable(GeneralRegionTable):
     gal_dec_deg : float
         Declination of the galaxy center (in degrees).
     rgal_bin_arcsec : float
-        The (deprojected) width of each ring (in arcseconds).
+        Radial width of each ring (in arcseconds).
     gal_incl_deg : float, optional
         Inclination angle of the galaxy (in degrees).
         Default is 0 degree.
@@ -39,8 +39,8 @@ class RadialMegaTable(GeneralRegionTable):
         Position angle of the galaxy (in degrees; North through East).
         Default is 0 degree.
     rgal_max_arcsec : float, optional
-        The (deprojected) maximum galactic radius (in arcseconds)
-        covered by the radial profile.
+        The maximum galactic radius (in arcseconds) that the outermost
+        ring will cover.
         Default is to cover out to 20 times the ring width.
     """
 
@@ -64,8 +64,8 @@ class RadialMegaTable(GeneralRegionTable):
                 gal_ra=None, gal_dec=None,
                 gal_incl=None, gal_posang=None):
             projrad, projang = deproject(
-                center_ra=gal_ra, center_dec=gal_dec,
-                incl=gal_incl, pa=gal_posang, ra=ra, dec=dec)
+                ra=ra, dec=dec, center_coord=(gal_ra, gal_dec),
+                incl=gal_incl, pa=gal_posang)
             return (projrad >= rmin) & (projrad < rmax)
 
         # ring ids and definitions

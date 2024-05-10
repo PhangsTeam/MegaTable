@@ -976,7 +976,7 @@ def build_tessell_base_table(
         colname_r_gal='r_gal', colname_phi_gal='phi_gal',
         # input parameters
         ra=t['RA'], dec=t['DEC'],
-        center_ra=gal_ra, center_dec=gal_dec,
+        center_coord=(gal_ra, gal_dec),
         incl=gal_incl, pa=gal_pa, dist=gal_dist)
 
     # ------------------------------------------------

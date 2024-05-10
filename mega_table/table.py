@@ -250,7 +250,7 @@ class StripeMegaTable(GeneralRegionTable):
         t = QTable.read(filename, **kwargs)
 
         # input file should be a valid StripeMegaTable output
-        if 'TLBTYPE' not in t.meta:
+        if 'TBLTYPE' not in t.meta:
             raise ValueError("Input file not recognized")
         if t.meta['TBLTYPE'] != 'StripeMegaTable':
             raise ValueError(

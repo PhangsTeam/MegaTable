@@ -15,10 +15,10 @@ from mega_table.utils import nanaverage, nanrms, calc_pixel_per_beam
 ###############################################################################
 
 # location of all relevant config files
-config_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables/code')
+config_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables/code')
 
 # location to save the output data tables
-work_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables')
+work_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables')
 
 # logging setting
 logging = False

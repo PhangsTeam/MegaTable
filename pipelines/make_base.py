@@ -165,7 +165,7 @@ class PhangsBaseMegaTable(StatsTable):
             logOH_solar = 8.69  # Asplund+09
         if method == 'PHANGS':
             logOH_Re = metallicity.predict_logOH_SAMI19(
-                Mstar * 10**0.21)  # Appendix A in Sanchez+19
+                Mstar * 10**0.10)  # Appendix A in Sanchez+19
             logOH = metallicity.extrapolate_logOH_radially(
                 logOH_Re, gradient='CALIFA14',
                 Rgal=r_gal, Re=Rstar * 1.68)  # Eq. A.3 in Sanchez+14

@@ -333,7 +333,7 @@ class PhangsAlmaMegaTable(StatsTable):
             colname='_A<I>', unit=masked_mom0.unit)
         self[colname] = (self['_F<I>'] / self['_A<I>']).to(unit)
         # calculate uncertainty on the clumping factor
-        avg_mom0 = t.create_maps_from_columns(['_F<I>'], header)[0]
+        avg_mom0 = self.create_maps_from_columns(['_F<I>'], header)[0]
         self.calc_image_stats(
             (masked_emom0**2 * (masked_mom0 - avg_mom0)**2).value,
             header=header, stat_func=np.nansum, colname='_sqsum(err)',

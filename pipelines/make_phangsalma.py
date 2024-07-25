@@ -735,9 +735,8 @@ def add_pixel_stats_to_table(
             print(f"  Add pixel-based GMC statistics @ {res_str} resolution")
 
         # read data files
-        bm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution=postfix_res))
+        bm0_file = Path(data_paths['PHANGS_ALMA_CO21_flat'].format(
+            galaxy=gal_name, product='mom0', masking='narrow_broad'))
         sm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
             galaxy=gal_name, product='mom0',
             postfix_masking='_strict', postfix_resolution=postfix_res))
@@ -772,7 +771,7 @@ def add_pixel_stats_to_table(
                 sew = hdul[0].data * u.Unit(hdul[0].header['BUNIT'])
             with fits.open(seew_file) as hdul:
                 seew = hdul[0].data * u.Unit(hdul[0].header['BUNIT'])
-            if not (bm0.shape == sm0.shape == sem0.shape ==
+            if not (sm0.shape == sem0.shape ==
                     sew.shape == seew.shape):
                 raise ValueError("Input maps have inconsistent shape")
             mask = (sm0 > 0) & (sew > 0)
@@ -983,9 +982,8 @@ def add_object_stats_to_table(
         cprops_file = Path(data_paths['PHANGS_ALMA_CPROPS'].format(
             galaxy=gal_name, postfix_resolution=postfix_res,
             postfix_sensitivity=''))
-        bm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution=postfix_res))
+        bm0_file = Path(data_paths['PHANGS_ALMA_CO21_flat'].format(
+            galaxy=gal_name, product='mom0', masking='narrow_broad'))
         if not (cprops_file.is_file() and bm0_file.is_file()):
             if verbose:
                 print("    Some input file not found -- will do a dry run")

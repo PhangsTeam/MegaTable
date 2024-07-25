@@ -599,12 +599,10 @@ def add_raw_measurements_to_table(
     # PHANGS-ALMA CO(2-1) data
     if verbose:
         print("  Add PHANGS-ALMA CO(2-1) data")
-    in_file = data_paths['PHANGS_ALMA_CO21'].format(
-        galaxy=gal_name, product='mom0',
-        postfix_masking='_broad', postfix_resolution='')
-    err_file = data_paths['PHANGS_ALMA_CO21'].format(
-        galaxy=gal_name, product='emom0',
-        postfix_masking='_broad', postfix_resolution='')
+    in_file = data_paths['PHANGS_ALMA_CO21_flat'].format(
+        galaxy=gal_name, product='mom0', masking='narrow_broad')
+    err_file = data_paths['PHANGS_ALMA_CO21_flat'].format(
+        galaxy=gal_name, product='emom0', masking='narrow_broad')
     t.add_area_average_for_image(
         # column to save the output
         colname='I_CO21', unit='K km s-1',

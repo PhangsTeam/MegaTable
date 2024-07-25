@@ -20,6 +20,12 @@
 "e_I_22um","MJy sr-1",".1e","Stats error on region-average 22um intensity (WISE4)"
 "I_CO21","K km s-1",".3e","Region-average CO(2-1) line intensity (PHANGS-ALMA)"
 "e_I_CO21","K km s-1",".1e","Stats error on region-average CO(2-1) line intensity (PHANGS-ALMA)"
+"I_HCN10","K km s-1",".3e","Region-average HCN(1-0) line intensity (ALMOND)"
+"e_I_HCN10","K km s-1",".1e","Stats error on region-average HCN(1-0) line intensity (ALMOND)"
+"I_HCO+10","K km s-1",".3e","Region-average HCO+(1-0) line intensity (ALMOND)"
+"e_I_HCO+10","K km s-1",".1e","Stats error on region-average HCO+(1-0) line intensity (ALMOND)"
+"I_CS21","K km s-1",".3e","Region-average CS(2-1) line intensity (ALMOND)"
+"e_I_CS21","K km s-1",".1e","Stats error on region-average CS(2-1) line intensity (ALMOND)"
 "I_HI","K km s-1",".3e","Region-average HI 21cm line intensity (PHANGS-HI)"
 "e_I_HI","K km s-1",".1e","Stats error on region-average HI 21cm line intensity (PHANGS-HI)"
 

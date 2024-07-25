@@ -358,6 +358,46 @@ def add_gauss_average_to_table(
         # input parameters
         img_file=in_file, err_file=err_file)
 
+    # ALMOND dense gas data
+    if verbose:
+        print("    Add ALMOND dense gas data")
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_HCN10_gauss', unit='K km s-1',
+        colname_e="e_I_HCN10_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_HCO+10_gauss', unit='K km s-1',
+        colname_e="e_I_HCO+10_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_CS21_gauss', unit='K km s-1',
+        colname_e="e_I_CS21_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
     # PHANGS-MUSE Halpha data (raw)
     if verbose:
         print("    Add PHANGS-MUSE Halpha data (raw)")

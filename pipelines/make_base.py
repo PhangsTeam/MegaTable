@@ -596,22 +596,6 @@ def add_raw_measurements_to_table(
         # input parameters
         img_file=in_file, err_file=err_file)
 
-    # PHANGS-VLA & archival HI data
-    if verbose:
-        print("  Add PHANGS-VLA & archival HI data")
-    in_file = data_paths['PHANGS_HI'].format(
-        galaxy=gal_name, product='broadmask_mom0',
-        postfix_resolution='')
-    err_file = data_paths['PHANGS_HI'].format(
-        galaxy=gal_name, product='broadmask_emom0',
-        postfix_resolution='')
-    t.add_area_average_for_image(
-        # column to save the output
-        colname='I_HI', unit='K km s-1',
-        colname_e="e_I_HI", unit_e='K km s-1',
-        # input parameters
-        img_file=in_file, err_file=err_file)
-
     # PHANGS-ALMA CO(2-1) data
     if verbose:
         print("  Add PHANGS-ALMA CO(2-1) data")
@@ -625,6 +609,62 @@ def add_raw_measurements_to_table(
         # column to save the output
         colname='I_CO21', unit='K km s-1',
         colname_e="e_I_CO21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
+    # ALMOND dense gas data
+    if verbose:
+        print("  Add ALMOND dense gas data")
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HCN10', unit='K km s-1',
+        colname_e="e_I_HCN10", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HCO+10', unit='K km s-1',
+        colname_e="e_I_HCO+10", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_CS21', unit='K km s-1',
+        colname_e="e_I_CS21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
+    # PHANGS-VLA & archival HI data
+    if verbose:
+        print("  Add PHANGS-VLA & archival HI data")
+    in_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='broadmask_mom0',
+        postfix_resolution='')
+    err_file = data_paths['PHANGS_HI'].format(
+        galaxy=gal_name, product='broadmask_emom0',
+        postfix_resolution='')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HI', unit='K km s-1',
+        colname_e="e_I_HI", unit_e='K km s-1',
         # input parameters
         img_file=in_file, err_file=err_file)
 

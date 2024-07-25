@@ -551,6 +551,30 @@ def add_raw_measurements_to_table(
             colname_e=f"e_{colname}", unit_e='MJy sr-1',
             # input parameters
             img_file=in_file, err_file=err_file)
+    # filled Mstar and SFR data (for SL24 alphaCO only)
+    in_file = data_paths['PHANGS_z0MGS'].format(
+        galaxy='SFR_Mstar_filled/'+gal_name,
+        product='Mstar', postfix_resolution='_1500pc')
+    err_file = data_paths['PHANGS_z0MGS'].format(
+        galaxy='SFR_Mstar_filled/'+gal_name,
+        product='Mstar_err', postfix_resolution='_1500pc')
+    t.add_area_average_for_image(
+        colname='_Sigma_star_filled', unit='Msun pc-2',
+        colname_e='_e_Sigma_star_filled', unit_e='Msun pc-2',
+        img_file=in_file, err_file=err_file)
+    for product in ('SFR_FUVW4', 'SFR_NUVW4', 'SFR_W4ONLY'):
+        in_file = data_paths['PHANGS_z0MGS'].format(
+            galaxy='SFR_Mstar_filled/'+gal_name,
+            product=product, postfix_resolution='_1500pc')
+        err_file = data_paths['PHANGS_z0MGS'].format(
+            galaxy='SFR_Mstar_filled/'+gal_name,
+            product=f"{product}_err", postfix_resolution='_1500pc')
+        t.add_area_average_for_image(
+            colname='_Sigma_SFR_filled', unit='Msun yr-1 kpc-2',
+            colname_e='_e_Sigma_SFR_filled', unit_e='Msun yr-1 kpc-2',
+            img_file=in_file, err_file=err_file)
+        if np.isfinite(t['_Sigma_SFR_filled']).any():
+            break
 
     # Spitzer IRAC data
     if verbose:
@@ -882,34 +906,19 @@ def calc_high_level_params_in_table(
     # CO-to-H2 conversion factor
     if verbose:
         print("  Calculate CO-to-H2 conversion factor")
-    # SL24 prescription (requires filled Mstar & SFR maps...)
-    # --- \begin{ugly_patch} ---
-    Mstar_file = data_paths['PHANGS_z0MGS'].format(
-        galaxy='SFR_Mstar_filled/'+gal_name,
-        product='Mstar', postfix_resolution='_gauss7p5')
-    t.add_area_average_for_image(
-        colname='_Sigma_star_filled', unit='Msun pc-2',
-        img_file=Mstar_file)
-    for product in ('SFR_FUVW4', 'SFR_NUVW4', 'SFR_W4ONLY'):
-        SFR_file = data_paths['PHANGS_z0MGS'].format(
-            galaxy='SFR_Mstar_filled/'+gal_name,
-            product=product, postfix_resolution='_gauss15')
-        t.add_area_average_for_image(
-            colname='_Sigma_SFR_filled', unit='Msun yr-1 kpc-2',
-            img_file=SFR_file)
-        if np.isfinite(t['_Sigma_SFR_filled']).any():
-            break
-    t['_Sigma_star_filled'] *= gal_cosi
-    t['_Sigma_SFR_filled'] *= gal_cosi
+    # SL24 prescription (requires filled Mstar & SFR maps)
+    low_snr_flag = t['_Sigma_star_filled'] < t['_e_Sigma_star_filled'] * 3
+    t['_Sigma_star_filled'][low_snr_flag] = 0.
+    low_snr_flag = t['_Sigma_SFR_filled'] < t['_e_Sigma_SFR_filled'] * 3
+    t['_Sigma_SFR_filled'][low_snr_flag] = (  # avoid division by zero
+        1e-10 * t['_Sigma_SFR_filled'].unit)
     t.calc_co_conversion(
         # columns to save the output
         colname="alpha_CO21_SL24",
         # input parameters
         method='SL24', Zprime=t['Zprime_scaling'],
-        Sigma_star=t['_Sigma_star_filled'],
-        Sigma_SFR=t['_Sigma_SFR_filled'])
-    t.table.remove_columns(['_Sigma_star_filled', '_Sigma_SFR_filled'])
-    # --- /end{ugly_patch} ---
+        Sigma_star=t['_Sigma_star_filled']*gal_cosi,
+        Sigma_SFR=t['_Sigma_SFR_filled']*gal_cosi)
     # S20 prescription
     t.calc_co_conversion(
         # columns to save the output

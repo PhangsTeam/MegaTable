@@ -1,11 +1,11 @@
+import warnings
 import numpy as np
 from functools import partial
 from astropy import units as u
 from astropy.table import QTable
-from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from .core import GeneralRegionTable, VoronoiTessTable
-from .utils import deproject
+from .utils import deproject, identical_units, reduce_image_input
 
 
 ######################################################################
@@ -18,7 +18,7 @@ from .utils import deproject
 class RadialMegaTable(GeneralRegionTable):
 
     """
-    Mega-table built by radially binning a galaxy's sky footprint.
+    Mega-table built from radial bins for a (inclined) galaxy disk.
 
     Each ring (annular region) corresponds to a row in the table.
     Once a table is constructed, additional columns can be added
@@ -26,12 +26,12 @@ class RadialMegaTable(GeneralRegionTable):
 
     Parameters
     ----------
-    gal_ra_deg : float, optional
+    gal_ra_deg : float
         Right Ascension of the galaxy center (in degrees).
-    gal_dec_deg : float, optional
+    gal_dec_deg : float
         Declination of the galaxy center (in degrees).
     rgal_bin_arcsec : float
-        The (deprojected) width of each ring (in arcseconds).
+        Radial width of each ring (in arcseconds).
     gal_incl_deg : float, optional
         Inclination angle of the galaxy (in degrees).
         Default is 0 degree.
@@ -39,8 +39,8 @@ class RadialMegaTable(GeneralRegionTable):
         Position angle of the galaxy (in degrees; North through East).
         Default is 0 degree.
     rgal_max_arcsec : float, optional
-        The (deprojected) maximum galactic radius (in arcseconds)
-        covered by the radial profile.
+        The maximum galactic radius (in arcseconds) that the outermost
+        ring will cover.
         Default is to cover out to 20 times the ring width.
     """
 
@@ -64,12 +64,12 @@ class RadialMegaTable(GeneralRegionTable):
                 gal_ra=None, gal_dec=None,
                 gal_incl=None, gal_posang=None):
             projrad, projang = deproject(
-                center_ra=gal_ra, center_dec=gal_dec,
-                incl=gal_incl, pa=gal_posang, ra=ra, dec=dec)
+                ra=ra, dec=dec, center_coord=(gal_ra, gal_dec),
+                incl=gal_incl, pa=gal_posang)
             return (projrad >= rmin) & (projrad < rmax)
 
-        # ring names and definitions
-        ring_names = [f"Ring#{iring+1}" for iring in np.arange(nring)]
+        # ring ids and definitions
+        ring_ids = np.arange(nring, dtype='int')
         rbounds_arcsec = np.arange(nring+1) * rgal_bin_arcsec
         ring_defs = [
             partial(
@@ -81,7 +81,7 @@ class RadialMegaTable(GeneralRegionTable):
         ]
 
         # initialize object
-        super().__init__(ring_defs, names=ring_names)
+        super().__init__(ring_defs, names=ring_ids)
         # save ring inner/outer radii in table
         self['r_gal_angl_min'] = rbounds_arcsec[:-1] * u.arcsec
         self['r_gal_angl_max'] = rbounds_arcsec[1:] * u.arcsec
@@ -145,6 +145,135 @@ class RadialMegaTable(GeneralRegionTable):
 
 ######################################################################
 #
+# Stripes along Minor Axis
+#
+######################################################################
+
+
+class StripeMegaTable(GeneralRegionTable):
+
+    """
+    Mega-table built from stripes along a galaxy's minor axis.
+
+    Each stripe corresponds to a row in the table.
+    Once a table is constructed, additional columns can be added
+    by calculating statistics of images within each stripe.
+
+    Parameters
+    ----------
+    gal_ra_deg : float
+        Right Ascension of the galaxy center (in degrees).
+    gal_dec_deg : float
+        Declination of the galaxy center (in degrees).
+    gal_posang_deg : float
+        Position angle of the galaxy (in degrees; North through East).
+        Default is 0 degree.
+    xbin_arcsec : float
+        Width of each stripe (in arcseconds) along the galaxy major axis.
+    xmax_arcsec : float
+        The maximum distance (in arcseconds) along the galaxy major axis
+        that the outermost stripes will cover.
+    ymax_arcsec : float, optional
+        Width of each stripe (in arcseconds) along the galaxy minor axis.
+        Default is the same as `xmax_arcsec`.
+    """
+
+    __name__ = "StripeMegaTable"
+
+    def __init__(
+            self, gal_ra_deg, gal_dec_deg, gal_posang_deg,
+            xbin_arcsec, xmax_arcsec, ymax_arcsec=None):
+
+        if ymax_arcsec is None:
+            ymax_arcsec = xmax_arcsec
+
+        nbin = int(np.ceil(xmax_arcsec / xbin_arcsec)) * 2
+
+        def coord2bool(
+                ra, dec,
+                gal_ra_deg=None, gal_dec_deg=None, gal_posang_deg=None,
+                xmin_arcsec=None, xmax_arcsec=None, ymax_arcsec=None):
+            _, _, _, _, dmaj_deg, dmin_deg = deproject(
+                ra=ra, dec=dec, center_coord=(gal_ra_deg, gal_dec_deg),
+                incl=0, pa=gal_posang_deg, return_offset=True)
+            dmaj_arcsec, dmin_arcsec = dmaj_deg * 3600, dmin_deg * 3600
+            return (
+                (dmaj_arcsec > xmin_arcsec) & (dmaj_arcsec < xmax_arcsec) &
+                (np.abs(dmin_arcsec) < ymax_arcsec))
+
+        # stripe ids and definitions
+        stripe_ids = np.arange(nbin / 2, dtype='int') + 1
+        stripe_ids = np.hstack([-stripe_ids[::-1], stripe_ids])
+        xlims_arcsec = (np.arange(nbin+1) - nbin/2) * xbin_arcsec
+        stripe_defs = [
+            partial(
+                coord2bool, gal_ra_deg=gal_ra_deg, gal_dec_deg=gal_dec_deg,
+                gal_posang_deg=gal_posang_deg, ymax_arcsec=ymax_arcsec,
+                xmin_arcsec=xmin, xmax_arcsec=xmax)
+            for xmin, xmax in zip(
+                xlims_arcsec[:-1], xlims_arcsec[1:])
+        ]
+
+        # initialize object
+        super().__init__(stripe_defs, names=stripe_ids)
+        # save stripe parameters in the table
+        self['x_gal_angl_min'] = xlims_arcsec[:-1] * u.arcsec
+        self['x_gal_angl_max'] = xlims_arcsec[1:] * u.arcsec
+
+        # record meta data in table
+        self.meta['TBLTYPE'] = 'StripeMegaTable'
+        self.meta['RA_DEG'] = gal_ra_deg
+        self.meta['DEC_DEG'] = gal_dec_deg
+        self.meta['PA_DEG'] = gal_posang_deg
+        self.meta['XBIN_AS'] = xbin_arcsec
+        self.meta['XMAX_AS'] = xmax_arcsec
+        self.meta['YMAX_AS'] = ymax_arcsec
+
+    # ----------------------------------------------------------------
+
+    @classmethod
+    def read(cls, filename, **kwargs):
+        """
+        Read (and reconstruct) a StripeMegaTable object from file.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file to read.
+        **kwargs
+            Keyword arguments to be passed to `~astropy.table.read`
+
+        Return
+        ------
+        table : StripeMegaTable
+        """
+        t = QTable.read(filename, **kwargs)
+
+        # input file should be a valid StripeMegaTable output
+        if 'TBLTYPE' not in t.meta:
+            raise ValueError("Input file not recognized")
+        if t.meta['TBLTYPE'] != 'StripeMegaTable':
+            raise ValueError(
+                "Cannot reconstruct an StripeMegaTable object from "
+                f"the input {t.meta['TBLTYPE']} file")
+
+        # initiate StripeMegaTable w/ recorded data in file
+        mt = cls(
+            t.meta['RA_DEG'], t.meta['DEC_DEG'], t.meta['PA_DEG'],
+            t.meta['XBIN_AS'], t.meta['XMAX_AS'], t.meta['YMAX_AS'])
+
+        # overwrite the underlying data table
+        mt.table = QTable()
+        for key in t.colnames:
+            mt[key] = t[key]
+        for key in t.meta:
+            mt.meta[key] = t.meta[key]
+
+        return mt
+
+
+######################################################################
+#
 # User-defined Apertures
 #
 ######################################################################
@@ -157,7 +286,7 @@ class ApertureMegaTable(GeneralRegionTable):
 
     Each aperture corresponds to a row in the table.
     Once a table is constructed, additional columns can be added
-    by calculating statistics of images within each ring.
+    by calculating statistics of images within each aperture.
 
     Parameters
     ----------
@@ -252,6 +381,87 @@ class ApertureMegaTable(GeneralRegionTable):
             mt.meta[key] = t.meta[key]
 
         return mt
+
+    # ----------------------------------------------------------------
+
+    def resample_image(
+            self, image, ihdu=0, header=None,
+            colname='new_col', unit='', suppress_error=False,
+            fill_outside='nearest'):
+        """
+        Resample an image at the location of the aperture centers.
+
+        The resampling is done by finding the nearest image pixel to
+        each aperture center.
+
+        Parameters
+        ----------
+        image : str, fits.HDUList, fits.HDU, or np.ndarray
+            The image to be resampled.
+        ihdu : int, optional
+            If 'image' is a str or an HDUList, this keyword should
+            specify which HDU (extension) to use (default=0)
+        header : astropy.fits.Header, optional
+            If 'image' is an ndarray, this keyword should be a FITS
+            header providing the WCS information.
+        colname : str, optional
+            Name of a column in the table to save the output values.
+            Default: 'new_col'
+        unit : str or astropy.unit.Unit, optional
+            Physical unit of the output values (default='').
+            If unit='header', the 'BUNIT' entry in the header is used.
+        fill_outside : {'nearest', float}, optional
+            The behavior outside the footprint of the input image.
+            If fill_outside='nearest', all seeds outside the footprint
+            are assigned the value of the nearest pixel in the image.
+            Otherwise, all aperture centers outside the image footprint
+            are assigned the value of this keyword.
+        suppress_error : bool, optional
+            Whether to suppress the error message if 'image' looks
+            like a file but is not found on disk (default=False)
+        """
+
+        data, hdr, wcs = reduce_image_input(
+            image, ihdu, header, suppress_error=suppress_error)
+        if data is None:
+            if unit != 'header':
+                self[colname] = (
+                    np.full(len(self), np.nan) * u.Unit(unit))
+            else:
+                self[colname] = np.full(len(self), np.nan)
+            return
+
+        # find the nearest pixel for each aperture center
+        iax0, iax1 = wcs.all_world2pix(
+            self['RA'].value, self['DEC'].value, 0, ra_dec_order=True)
+        iax0 = np.round(iax0).astype('int')
+        iax1 = np.round(iax1).astype('int')
+        mask = ((iax0 < 0) | (iax0 > wcs._naxis[0]-1) |
+                (iax1 < 0) | (iax1 > wcs._naxis[1]-1))
+        iax0[iax0 < 0] = 0
+        iax0[iax0 > wcs._naxis[0]-1] = wcs._naxis[0]-1
+        iax1[iax1 < 0] = 0
+        iax1[iax1 > wcs._naxis[1]-1] = wcs._naxis[1]-1
+
+        # get data from the nearest pixels
+        sub_data = data[iax1, iax0]
+
+        # assign values for apertures outside the image footprint
+        if fill_outside != 'nearest':
+            sub_data[mask] = fill_outside
+
+        # save the resampled values as a new column in the table
+        self[colname] = sub_data
+        if unit == 'header':
+            self[colname].unit = u.Unit(hdr['BUNIT'])
+        else:
+            if 'BUNIT' in hdr:
+                if not identical_units(
+                        u.Unit(hdr['BUNIT']), u.Unit(unit)):
+                    warnings.warn(
+                        "Specified unit is not the same as the unit "
+                        "recorded in the FITS header")
+            self[colname].unit = u.Unit(unit)
 
 
 ######################################################################

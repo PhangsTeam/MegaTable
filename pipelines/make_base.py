@@ -15,10 +15,10 @@ from mega_table.utils import nanaverage, nanrms, calc_pixel_per_beam
 ###############################################################################
 
 # location of all relevant config files
-config_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables/code')
+config_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables/code')
 
 # location to save the output data tables
-work_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables')
+work_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables')
 
 # logging setting
 logging = False
@@ -165,7 +165,7 @@ class PhangsBaseMegaTable(StatsTable):
             logOH_solar = 8.69  # Asplund+09
         if method == 'PHANGS':
             logOH_Re = metallicity.predict_logOH_SAMI19(
-                Mstar * 10**0.10)  # Fig. A1 in Sanchez+19
+                Mstar * 10**0.10)  # Appendix A in Sanchez+19
             logOH = metallicity.extrapolate_logOH_radially(
                 logOH_Re, gradient='CALIFA14',
                 Rgal=r_gal, Re=Rstar * 1.68)  # Eq. A.3 in Sanchez+14
@@ -176,17 +176,24 @@ class PhangsBaseMegaTable(StatsTable):
 
     def calc_co_conversion(
             self, colname='alphaCO21', unit='Msun pc-2 K-1 km-1 s',
-            method='S20', Zprime=None, line_ratio=None):
+            method='SL24', Zprime=None, Sigma_star=None, Sigma_SFR=None,
+            line_ratio=None):
         from CO_conversion_factor import alphaCO
         if line_ratio is None:
-            line_ratio = 0.65  # Leroy+13; den Brok+21
+            line_ratio = 0.65  # Leroy+22 (only used for Galactic & S20)
         if method == 'Galactic':
-            alphaCO10 = alphaCO.alphaCO10_Galactic.to(unit)
+            alphaCO10 = alphaCO.alphaCO10_Galactic
+            alphaCO21 = alphaCO10 / line_ratio
         elif method == 'S20':
-            alphaCO10 = alphaCO.predict_alphaCO10_S20(Zprime=Zprime).to(unit)
+            alphaCO10 = alphaCO.predict_alphaCO10_S20(Zprime=Zprime)
+            alphaCO21 = alphaCO10 / line_ratio
+        elif method == 'SL24':
+            alphaCO21 = alphaCO.predict_alphaCO_SL24(
+                J='2-1', Zprime=Zprime,
+                Sigma_star=Sigma_star, Sigma_sfr=Sigma_SFR)
         else:
             raise ValueError(f"Unrecognized method: '{method}'")
-        self[colname] = (alphaCO10 / line_ratio).to(unit)
+        self[colname] = alphaCO21.to(unit)
 
     def calc_stellar_m2l(
             self, colname='MtoL', unit='Msun Lsun-1',
@@ -544,6 +551,30 @@ def add_raw_measurements_to_table(
             colname_e=f"e_{colname}", unit_e='MJy sr-1',
             # input parameters
             img_file=in_file, err_file=err_file)
+    # filled Mstar and SFR data (for SL24 alphaCO only)
+    in_file = data_paths['PHANGS_z0MGS'].format(
+        galaxy='SFR_Mstar_filled/'+gal_name,
+        product='Mstar', postfix_resolution='_1500pc')
+    err_file = data_paths['PHANGS_z0MGS'].format(
+        galaxy='SFR_Mstar_filled/'+gal_name,
+        product='Mstar_err', postfix_resolution='_1500pc')
+    t.add_area_average_for_image(
+        colname='_Sigma_star_filled', unit='Msun pc-2',
+        colname_e='_e_Sigma_star_filled', unit_e='Msun pc-2',
+        img_file=in_file, err_file=err_file)
+    for product in ('SFR_FUVW4', 'SFR_NUVW4', 'SFR_W4ONLY'):
+        in_file = data_paths['PHANGS_z0MGS'].format(
+            galaxy='SFR_Mstar_filled/'+gal_name,
+            product=product, postfix_resolution='_1500pc')
+        err_file = data_paths['PHANGS_z0MGS'].format(
+            galaxy='SFR_Mstar_filled/'+gal_name,
+            product=f"{product}_err", postfix_resolution='_1500pc')
+        t.add_area_average_for_image(
+            colname='_Sigma_SFR_filled', unit='Msun yr-1 kpc-2',
+            colname_e='_e_Sigma_SFR_filled', unit_e='Msun yr-1 kpc-2',
+            img_file=in_file, err_file=err_file)
+        if np.isfinite(t['_Sigma_SFR_filled']).any():
+            break
 
     # Spitzer IRAC data
     if verbose:
@@ -589,6 +620,60 @@ def add_raw_measurements_to_table(
         # input parameters
         img_file=in_file, err_file=err_file)
 
+    # PHANGS-ALMA CO(2-1) data
+    if verbose:
+        print("  Add PHANGS-ALMA CO(2-1) data")
+    in_file = data_paths['PHANGS_ALMA_CO21_flat'].format(
+        galaxy=gal_name, product='mom0', masking='narrow_broad')
+    err_file = data_paths['PHANGS_ALMA_CO21_flat'].format(
+        galaxy=gal_name, product='emom0', masking='narrow_broad')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_CO21', unit='K km s-1',
+        colname_e="e_I_CO21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
+    # ALMOND dense gas data
+    if verbose:
+        print("  Add ALMOND dense gas data")
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HCN10', unit='K km s-1',
+        colname_e="e_I_HCN10", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_HCO+10', unit='K km s-1',
+        colname_e="e_I_HCO+10", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='mom0', resolution='1p5kpc')
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='emom0', resolution='1p5kpc')
+    t.add_area_average_for_image(
+        # column to save the output
+        colname='I_CS21', unit='K km s-1',
+        colname_e="e_I_CS21", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
     # PHANGS-VLA & archival HI data
     if verbose:
         print("  Add PHANGS-VLA & archival HI data")
@@ -602,22 +687,6 @@ def add_raw_measurements_to_table(
         # column to save the output
         colname='I_HI', unit='K km s-1',
         colname_e="e_I_HI", unit_e='K km s-1',
-        # input parameters
-        img_file=in_file, err_file=err_file)
-
-    # PHANGS-ALMA CO(2-1) data
-    if verbose:
-        print("  Add PHANGS-ALMA CO(2-1) data")
-    in_file = data_paths['PHANGS_ALMA_CO21'].format(
-        galaxy=gal_name, product='mom0',
-        postfix_masking='_broad', postfix_resolution='')
-    err_file = data_paths['PHANGS_ALMA_CO21'].format(
-        galaxy=gal_name, product='emom0',
-        postfix_masking='_broad', postfix_resolution='')
-    t.add_area_average_for_image(
-        # column to save the output
-        colname='I_CO21', unit='K km s-1',
-        colname_e="e_I_CO21", unit_e='K km s-1',
         # input parameters
         img_file=in_file, err_file=err_file)
 
@@ -683,6 +752,7 @@ def add_raw_measurements_to_table(
 def calc_high_level_params_in_table(
         t, gal_params=None, verbose=True):
 
+    gal_name = gal_params['name']
     gal_cosi = np.cos((gal_params['incl_deg'] * u.deg).to('rad').value)
     gal_ang2lin = gal_params['dist_Mpc'] * u.Mpc / u.rad
     gal_Rstar = (
@@ -756,9 +826,7 @@ def calc_high_level_params_in_table(
     # find the best solution given a priority list
     t['Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
     t['e_Sigma_SFR'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    for method in (
-            'HaW4recal', 'FUVW4recal',
-            'HaW4', 'FUVW4', 'NUVW4', 'W4ONLY'):
+    for method in ('HaW4recal', 'FUVW4recal', 'W4ONLY'):
         if np.isfinite(t[f"Sigma_SFR_{method}"]).any():
             t['Sigma_SFR'] = t[f"Sigma_SFR_{method}"]
             t['e_Sigma_SFR'] = t[f"e_Sigma_SFR_{method}"]
@@ -838,7 +906,20 @@ def calc_high_level_params_in_table(
     # CO-to-H2 conversion factor
     if verbose:
         print("  Calculate CO-to-H2 conversion factor")
-    # PHANGS prescription
+    # SL24 prescription (requires filled Mstar & SFR maps)
+    low_snr_flag = t['_Sigma_star_filled'] < t['_e_Sigma_star_filled'] * 3
+    t['_Sigma_star_filled'][low_snr_flag] = 0.
+    low_snr_flag = t['_Sigma_SFR_filled'] < t['_e_Sigma_SFR_filled'] * 3
+    t['_Sigma_SFR_filled'][low_snr_flag] = (  # avoid division by zero
+        1e-10 * t['_Sigma_SFR_filled'].unit)
+    t.calc_co_conversion(
+        # columns to save the output
+        colname="alpha_CO21_SL24",
+        # input parameters
+        method='SL24', Zprime=t['Zprime_scaling'],
+        Sigma_star=t['_Sigma_star_filled']*gal_cosi,
+        Sigma_SFR=t['_Sigma_SFR_filled']*gal_cosi)
+    # S20 prescription
     t.calc_co_conversion(
         # columns to save the output
         colname="alpha_CO21_S20",
@@ -852,7 +933,8 @@ def calc_high_level_params_in_table(
         method='Galactic')
     # find the best solution given a priority list
     t['alpha_CO21'] = np.nan * u.Unit('Msun pc-2 K-1 km-1 s')
-    for colname in ('alpha_CO21_S20', 'alpha_CO21_Galactic'):
+    for colname in (
+            'alpha_CO21_SL24', 'alpha_CO21_S20', 'alpha_CO21_Galactic'):
         if np.isfinite(t[colname]).any():
             t['alpha_CO21'] = t[colname]
             break
@@ -941,7 +1023,7 @@ def build_tessell_base_table(
         colname_r_gal='r_gal', colname_phi_gal='phi_gal',
         # input parameters
         ra=t['RA'], dec=t['DEC'],
-        center_ra=gal_ra, center_dec=gal_dec,
+        center_coord=(gal_ra, gal_dec),
         incl=gal_incl, pa=gal_pa, dist=gal_dist)
 
     # ------------------------------------------------

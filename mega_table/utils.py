@@ -4,6 +4,7 @@ from pathlib import Path
 from astropy import units as u
 from astropy.wcs import WCS
 from astropy.io import fits
+from astropy.coordinates import SkyCoord
 
 HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
 
@@ -159,32 +160,29 @@ def reduce_image_input(
 
 
 def deproject(
-        center_ra=0*u.deg, center_dec=0*u.deg,
-        incl=0*u.deg, pa=0*u.deg,
+        center_coord=None, incl=0*u.deg, pa=0*u.deg,
         header=None, wcs=None, naxis=None, ra=None, dec=None,
         return_offset=False):
 
     """
-    Calculate deprojected radii and projected angles.
+    Calculate deprojected coordinates from sky coordinates.
 
-    This function deals with projected images of astronomical objects
-    with an intrinsic disk geometry. Given sky coordinates of the
-    disk center, disk inclination and position angle, this function
-    calculates deprojected radii and projected angles based on
+    This function deals with sky images of astronomical objects with
+    an intrinsic disk geometry. Given disk center coordinates,
+    inclination, and position angle, it calculates the deprojected
+    coordinates in the disk plane (radius and azimuthal angle) from
     (1) a FITS header (`header`), or
     (2) a WCS object with specified axis sizes (`wcs` + `naxis`), or
-    (3) RA and DEC coordinates (`ra` + `dec`).
-    Both deprojected radii and projected angles are defined relative
-    to the center in the inclined disk frame. For (1) and (2), the
+    (3) RA and DEC coodinates (`ra` + `dec`).
+    Note that the deprojected azimuthal angle is defined w.r.t. the
+    line of nodes (given by the position angle). For (1) and (2), the
     outputs are 2D images; for (3), the outputs are arrays with shapes
     matching the broadcasted shape of `ra` and `dec`.
 
     Parameters
     ----------
-    center_ra : `~astropy.units.Quantity` object or number, optional
-        RA coordinate of the disk center. Default is 0 degree.
-    center_dec : `~astropy.units.Quantity` object or number, optional
-        Dec coordinate of the disk center. Default is 0 degree.
+    center_coord : `~astropy.coordinates.SkyCoord` object or 2-tuple
+        Sky coordinates of the disk center
     incl : `~astropy.units.Quantity` object or number, optional
         Inclination angle of the disk (0 degree means face-on)
         Default is 0 degree.
@@ -202,16 +200,16 @@ def deproject(
     dec : array-like, optional
         DEC coordinate of the sky locations of interest
     return_offset : bool, optional
-        Whether to return the angular offset coordinates together with
-        deprojected radii and angles. Default is to not return.
+        Whether to also return angular offset coordinates together with
+        the deprojected radii and angles. Default is to not return.
 
     Returns
     -------
-    deprojected coordinates : tuple of array-like
+    deprojected_coordinates : list of arrays
         If `return_offset` is set to True, the returned arrays include
         deprojected radii, projected angles, as well as angular offset
-        coordinates along East-West and North-South direction;
-        otherwise only the former two arrays are returned.
+        coordinates along the RA-Dec and major-minor directions;
+        otherwise only the former two arrays will be returned.
 
     Notes
     -----
@@ -220,14 +218,14 @@ def deproject(
     https://github.com/akleroy/cpropstoo/blob/master/cubes/deproject.pro
     """
 
-    if hasattr(center_ra, 'unit'):
-        x0_deg = center_ra.to(u.deg).value
+    if isinstance(center_coord, SkyCoord):
+        x0_deg = center_coord.ra.degree
+        y0_deg = center_coord.dec.degree
     else:
-        x0_deg = center_ra
-    if hasattr(center_dec, 'unit'):
-        y0_deg = center_dec.to(u.deg).value
-    else:
-        y0_deg = center_dec
+        x0_deg, y0_deg = center_coord
+        if hasattr(x0_deg, 'unit'):
+            x0_deg = x0_deg.to(u.deg).value
+            y0_deg = y0_deg.to(u.deg).value
     if hasattr(incl, 'unit'):
         incl_deg = incl.to(u.deg).value
     else:
@@ -267,19 +265,20 @@ def deproject(
     rotangle = np.pi/2 - np.deg2rad(pa_deg)
 
     # create deprojected coordinate grids
-    deprojdx_deg = (dx_deg * np.cos(rotangle) +
-                    dy_deg * np.sin(rotangle))
-    deprojdy_deg = (dy_deg * np.cos(rotangle) -
-                    dx_deg * np.sin(rotangle))
-    deprojdy_deg /= np.cos(np.deg2rad(incl_deg))
+    dmaj_deg = (dx_deg * np.cos(rotangle) +
+                dy_deg * np.sin(rotangle))
+    dmin_deg = (dy_deg * np.cos(rotangle) -
+                dx_deg * np.sin(rotangle))
+    dmin_deg /= np.cos(np.deg2rad(incl_deg))
 
     # make map of deprojected distance from the center
-    radius_deg = np.sqrt(deprojdx_deg**2 + deprojdy_deg**2)
+    radius_deg = np.sqrt(dmaj_deg**2 + dmin_deg**2)
 
     # make map of angle w.r.t. position angle
-    projang_deg = np.rad2deg(np.arctan2(deprojdy_deg, deprojdx_deg))
+    projang_deg = np.rad2deg(np.arctan2(dmin_deg, dmaj_deg))
 
     if return_offset:
-        return radius_deg, projang_deg, dx_deg, dy_deg
+        return radius_deg, projang_deg, \
+            dx_deg, dy_deg, dmaj_deg, dmin_deg
     else:
         return radius_deg, projang_deg

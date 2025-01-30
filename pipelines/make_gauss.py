@@ -13,10 +13,10 @@ from mega_table.table import TessellMegaTable
 ###############################################################################
 
 # location of all relevant config files
-config_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables/code')
+config_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables/code')
 
 # location to save the output data tables
-work_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables')
+work_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables')
 
 # logging setting
 logging = False
@@ -358,6 +358,46 @@ def add_gauss_average_to_table(
         # input parameters
         img_file=in_file, err_file=err_file)
 
+    # ALMOND dense gas data
+    if verbose:
+        print("    Add ALMOND dense gas data")
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcn10',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_HCN10_gauss', unit='K km s-1',
+        colname_e="e_I_HCN10_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='hcop10',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_HCO+10_gauss', unit='K km s-1',
+        colname_e="e_I_HCO+10_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+    in_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='mom0', resolution=res_str_alt)
+    err_file = data_paths['PHANGS_ALMOND'].format(
+        galaxy=gal_name, line='cs21',
+        product='emom0', resolution=res_str_alt)
+    t.add_gauss_average_from_convolved_image(
+        # column to save the output
+        colname='I_CS21_gauss', unit='K km s-1',
+        colname_e="e_I_CS21_gauss", unit_e='K km s-1',
+        # input parameters
+        img_file=in_file, err_file=err_file)
+
     # PHANGS-MUSE Halpha data (raw)
     if verbose:
         print("    Add PHANGS-MUSE Halpha data (raw)")
@@ -477,9 +517,7 @@ def calc_high_level_params_in_table(
     # find the best solution given a priority list
     t['Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
     t['e_Sigma_SFR_gauss'] = np.nan * u.Unit('Msun yr-1 kpc-2')
-    for method in (
-            'Hacorr', 'HaW4recal', 'FUVW4recal',
-            'HaW4', 'FUVW4', 'NUVW4', 'W4ONLY'):
+    for method in ('HaW4recal', 'FUVW4recal', 'W4ONLY'):
         if np.isfinite(t[f"Sigma_SFR_{method}_gauss"]).any():
             t['Sigma_SFR_gauss'] = t[f"Sigma_SFR_{method}_gauss"]
             t['e_Sigma_SFR_gauss'] = t[f"e_Sigma_SFR_{method}_gauss"]

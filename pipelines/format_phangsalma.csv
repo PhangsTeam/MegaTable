@@ -11,11 +11,14 @@
 
 "Zprime_scaling","1",".3e","Gas-phase metallicity relative to solar (scaling relation-based prediction; Sun+20)"
 
-"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: S20>Galactic)"
-"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 Zprime-based power law)"
-"alpha_CO21_Galactic","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Galactic value)"
-"alpha_CO21_N12","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Narayanan+12 prescription)"
+"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: SL24>S20>Galactic)"
+"alpha_CO21_SL24","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Schinnerer&Leroy+24 composite)"
+"alpha_CO21_T24","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Teng+24 prescription)"
+"alpha_CO21_T24alt","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Teng+24 alternative w/ Z' scaling)"
+"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 power-law Z' scaling)"
 "alpha_CO21_B13","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Bolatto+13 prescription)"
+"alpha_CO21_N12","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Narayanan+12 prescription)"
+"alpha_CO21_Galactic","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Galactic value)"
 "<alpha_CO21_G20ICO_native>","Msun pc-2 K-1 km-1 s",".3e","FLux-weighted mean CO(2-1)-to-H2 conversion factor (Gong+20 ICO-based, native resolution)"
 "<alpha_CO21_G20ICO_60pc>","Msun pc-2 K-1 km-1 s",".3e","FLux-weighted mean CO(2-1)-to-H2 conversion factor (Gong+20 ICO-based, 60 pc resolution)"
 "<alpha_CO21_G20ICO_90pc>","Msun pc-2 K-1 km-1 s",".3e","FLux-weighted mean CO(2-1)-to-H2 conversion factor (Gong+20 ICO-based, 90 pc resolution)"

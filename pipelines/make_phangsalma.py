@@ -15,10 +15,10 @@ from mega_table.utils import nanaverage, calc_pixel_area, calc_pixel_per_beam
 ###############################################################################
 
 # location of all relevant config files
-config_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables/code')
+config_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables/code')
 
 # location to save the output data tables
-work_dir = Path('/data/kant/0/sun.1608/PHANGS/mega-tables')
+work_dir = Path('/data/bell-kant/sun.1608/PHANGS/mega-tables')
 
 # logging setting
 logging = False
@@ -333,7 +333,7 @@ class PhangsAlmaMegaTable(StatsTable):
             colname='_A<I>', unit=masked_mom0.unit)
         self[colname] = (self['_F<I>'] / self['_A<I>']).to(unit)
         # calculate uncertainty on the clumping factor
-        avg_mom0 = t.create_maps_from_columns(['_F<I>'], header)[0]
+        avg_mom0 = self.create_maps_from_columns(['_F<I>'], header)[0]
         self.calc_image_stats(
             (masked_emom0**2 * (masked_mom0 - avg_mom0)**2).value,
             header=header, stat_func=np.nansum, colname='_sqsum(err)',
@@ -642,7 +642,7 @@ class PhangsAlmaMegaTable(StatsTable):
             self[colname] = np.nan * u.Unit(unit)
             return
         # Gong et al. (2020), Table 3
-        if not force_res_dependence and (FWHM_beam <= 100*u.pc):
+        if not force_res_dependence and (FWHM_beam >= 100*u.pc):
             # Without W_CO or scale dependence (expression 1b)
             self['_X_CO21'] = 2.0e20 * u.Unit('cm-2 K-1 km-1 s')
         else:
@@ -666,21 +666,30 @@ class PhangsAlmaMegaTable(StatsTable):
     def calc_co_conversion(
             self, colname='alpha_CO21', unit='Msun pc-2 K-1 km-1 s',
             method='N12', line_ratio=None, Zprime=None,
-            I_CO_cloud=None, I_CO_kpc=None, Sigma_else_kpc=None):
+            I_CO_cloud=None, vdisp_mol_150pc=None,
+            I_CO_kpc=None, Sigma_else_kpc=None):
         from CO_conversion_factor import alphaCO
         if line_ratio is None:
-            line_ratio = 0.65  # Leroy+13; den Brok+21
+            line_ratio = 0.65  # Leroy+22 (only used for N12 & B13)
         if method == 'N12':
             alphaCO10 = alphaCO.predict_alphaCO10_N12(
                 Zprime=Zprime, WCO10GMC=I_CO_cloud/line_ratio)
+            alphaCO21 = alphaCO10 / line_ratio
         elif method == 'B13':
             alphaCO10 = alphaCO.predict_alphaCO10_B13(
-                Zprime=Zprime,  # WCO10GMC=I_CO_cloud/line_ratio,
-                WCO10kpc=I_CO_kpc/line_ratio, Sigmaelsekpc=Sigma_else_kpc,
-                suppress_error=True)
+                Zprime=Zprime, WCO10kpc=I_CO_kpc/line_ratio,
+                Sigmaelsekpc=Sigma_else_kpc, suppress_error=True)
+            alphaCO21 = alphaCO10 / line_ratio
+        elif method == 'T24':
+            alphaCO21 = alphaCO.predict_alphaCO21_T24(
+                vdisp_150pc=vdisp_mol_150pc)
+        elif method == 'T24alt':
+            alphaCO21 = alphaCO.predict_alphaCO21_T24(
+                vdisp_150pc=vdisp_mol_150pc,
+                add_metal=True, Zprime=Zprime)
         else:
             raise ValueError(f"Unrecognized method: '{method}'")
-        self[colname] = (alphaCO10 / line_ratio).to(unit)
+        self[colname] = alphaCO21.to(unit)
 
 
 class PhangsAlmaTessellMegaTable(TessellMegaTable, PhangsAlmaMegaTable):
@@ -726,9 +735,8 @@ def add_pixel_stats_to_table(
             print(f"  Add pixel-based GMC statistics @ {res_str} resolution")
 
         # read data files
-        bm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution=postfix_res))
+        bm0_file = Path(data_paths['PHANGS_ALMA_CO21_flat'].format(
+            galaxy=gal_name, product='mom0', masking='narrow_broad'))
         sm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
             galaxy=gal_name, product='mom0',
             postfix_masking='_strict', postfix_resolution=postfix_res))
@@ -763,7 +771,7 @@ def add_pixel_stats_to_table(
                 sew = hdul[0].data * u.Unit(hdul[0].header['BUNIT'])
             with fits.open(seew_file) as hdul:
                 seew = hdul[0].data * u.Unit(hdul[0].header['BUNIT'])
-            if not (bm0.shape == sm0.shape == sem0.shape ==
+            if not (sm0.shape == sem0.shape ==
                     sew.shape == seew.shape):
                 raise ValueError("Input maps have inconsistent shape")
             mask = (sm0 > 0) & (sew > 0)
@@ -974,9 +982,8 @@ def add_object_stats_to_table(
         cprops_file = Path(data_paths['PHANGS_ALMA_CPROPS'].format(
             galaxy=gal_name, postfix_resolution=postfix_res,
             postfix_sensitivity=''))
-        bm0_file = Path(data_paths['PHANGS_ALMA_CO21'].format(
-            galaxy=gal_name, product='mom0',
-            postfix_masking='_broad', postfix_resolution=postfix_res))
+        bm0_file = Path(data_paths['PHANGS_ALMA_CO21_flat'].format(
+            galaxy=gal_name, product='mom0', masking='narrow_broad'))
         if not (cprops_file.is_file() and bm0_file.is_file()):
             if verbose:
                 print("    Some input file not found -- will do a dry run")
@@ -1176,9 +1183,19 @@ def calc_high_level_params_in_table(
         # column to save the output
         colname='alpha_CO21_B13',
         # input parameters
-        method='B13', Zprime=t['Zprime_scaling'],
-        I_CO_cloud=t[f"<I_CO21_pix_{res_str}>"], I_CO_kpc=t['I_CO21'],
+        method='B13', Zprime=t['Zprime_scaling'], I_CO_kpc=t['I_CO21'],
         Sigma_else_kpc=t['Sigma_star']+t['Sigma_atom'])
+    t.calc_co_conversion(
+        # column to save the output
+        colname='alpha_CO21_T24',
+        # input parameters
+        method='T24', vdisp_mol_150pc=t["<vdisp_mol_pix_150pc>"])
+    t.calc_co_conversion(
+        # column to save the output
+        colname='alpha_CO21_T24alt',
+        # input parameters
+        method='T24alt', vdisp_mol_150pc=t["<vdisp_mol_pix_150pc>"],
+        Zprime=t['Zprime_scaling'])
 
 
 def build_alma_table_from_base_table(

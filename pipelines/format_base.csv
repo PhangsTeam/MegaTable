@@ -20,6 +20,12 @@
 "e_I_22um","MJy sr-1",".1e","Stats error on region-average 22um intensity (WISE4)"
 "I_CO21","K km s-1",".3e","Region-average CO(2-1) line intensity (PHANGS-ALMA)"
 "e_I_CO21","K km s-1",".1e","Stats error on region-average CO(2-1) line intensity (PHANGS-ALMA)"
+"I_HCN10","K km s-1",".3e","Region-average HCN(1-0) line intensity (ALMOND)"
+"e_I_HCN10","K km s-1",".1e","Stats error on region-average HCN(1-0) line intensity (ALMOND)"
+"I_HCO+10","K km s-1",".3e","Region-average HCO+(1-0) line intensity (ALMOND)"
+"e_I_HCO+10","K km s-1",".1e","Stats error on region-average HCO+(1-0) line intensity (ALMOND)"
+"I_CS21","K km s-1",".3e","Region-average CS(2-1) line intensity (ALMOND)"
+"e_I_CS21","K km s-1",".1e","Stats error on region-average CS(2-1) line intensity (ALMOND)"
 "I_HI","K km s-1",".3e","Region-average HI 21cm line intensity (PHANGS-HI)"
 "e_I_HI","K km s-1",".1e","Stats error on region-average HI 21cm line intensity (PHANGS-HI)"
 
@@ -50,7 +56,7 @@
 
 "Zprime_scaling","1",".3e","Gas-phase metallicity relative to solar (scaling relation-based prediction; Sun+20)"
 
-"Sigma_SFR","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (fiducial: HaW4recal>FUVW4recal>HaW4>FUVW4>NUVW4>W4ONLY)"
+"Sigma_SFR","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (fiducial: HaW4recal>FUVW4recal>W4ONLY)"
 "e_Sigma_SFR","Msun yr-1 kpc-2",".1e","Stats error on region-average SFR surface density (fiducial)"
 "Sigma_SFR_HaW4recal","Msun yr-1 kpc-2",".3e","Region-average SFR surface density (Halpha + WISE4; Belfiore+22)"
 "e_Sigma_SFR_HaW4recal","Msun yr-1 kpc-2",".1e","Stats error on region-average SFR surface density (Halpha + WISE4; Belfiore+22)"
@@ -68,8 +74,9 @@
 "Sigma_atom","Msun pc-2",".3e","Region-average atomic gas surface density (PHANGS-HI)"
 "e_Sigma_atom","Msun pc-2",".1e","Stats error on region-average atomic gas surface density (PHANGS-HI)"
 
-"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: S20>Galactic)"
-"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 Zprime-based power law)"
+"alpha_CO21","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (fiducial: SL24>S20>Galactic)"
+"alpha_CO21_SL24","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Schinnerer&Leroy+24 composite)"
+"alpha_CO21_S20","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Sun+20 power-law Z' scaling)"
 "alpha_CO21_Galactic","Msun pc-2 K-1 km-1 s",".3e","CO(2-1)-to-H2 conversion factor (Galactic value)"
 
 "Sigma_mol","Msun pc-2",".3e","Region-average molecular gas surface density (PHANGS-ALMA)"

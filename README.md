@@ -7,7 +7,7 @@ This repository contains the source code for generating rich multiwavelength dat
 + [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S)
 + [Sun, Leroy, Ostriker, et al. (2023), *"Star Formation Laws and Efficiencies across 80 Nearby Galaxies"*](https://ui.adsabs.harvard.edu/abs/2023ApJ...945L..19S)
 
-The current version of this repository corresponds to PHANGS mega-tables **version 4.1**. The latest published version is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
+The current version of this repository corresponds to PHANGS mega-tables **version 4.2**. The latest published version is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
 
 ## Code Architecture
 

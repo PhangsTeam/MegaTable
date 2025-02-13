@@ -1,28 +1,40 @@
 # MegaTable
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6584841.svg)](https://doi.org/10.5281/zenodo.6584841)
+[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
 
 This repository contains the source code for generating rich multiwavelength data tables (a.k.a. the "mega-tables") for [the PHANGS team](https://sites.google.com/view/phangs/home). The table construction and data aggregation schemes are described in the following papers:
 
 + [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S)
 + [Sun, Leroy, Ostriker, et al. (2023), *"Star Formation Laws and Efficiencies across 80 Nearby Galaxies"*](https://ui.adsabs.harvard.edu/abs/2023ApJ...945L..19S)
 
-The current version of this repository corresponds to PHANGS mega-tables **version 4.2**. The latest published version is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
+The current version of this repository corresponds to PHANGS mega-table products internal release **version 4.2**. The latest published version of the PHANGS mega-table products is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
 
-## Code Architecture
+## Content description
 
-This repository consists of a python module named `mega_table` and a suite of python scripts and configuration files in the `pipelines` subdirectory.
+**[Important note] If you want to use the PHANGS mega-table products but do *not* plan to ingest more data into them or make your own mega-tables, you likely do not need the code in this repository. The PHANGS mega-table products (available at the CADC archive link above) can be read in and analyzed with `astropy.table.Table`.**
 
-The `mega_table` module provides the core infrastructure for table creation, manipulation, and input/output. This module relies heavily on the [`astropy.table`](https://docs.astropy.org/en/stable/table/index.html) subpackage. Most of the tools in this module are offered through three python classes:
+This repository offers a python module named `mega_table`, which provides the core infrastructure for mega-table creation, manipulation, and input/output. Most of the tools in this module are offered through three python classes:
 + `mega_table.table.RadialMegaTable`: Assemble measurements in radial bins with a given width
 + `mega_table.table.TessellMegaTable`: Assemble measurements according to a given tessellation pattern
 + `mega_table.table.ApertureMegaTable`: Assemble measurements in arbitrarily placed, fixed size apertures
 
-The `pipelines` subdirectory includes the actual production code for the PHANGS mega-tables:
+In addition, the `pipelines` directory includes the actual production code for the PHANGS mega-table products. We publish all code here for reproducibility and hope that this serves as a template for creating mega-tables possibly for different targets with different sets of data. Key files in this directory include:
 + `config_data_path.json`: This file specifies the path to the underlying datasets on disk
 + `config_tables.json`: This file provides input parameters for table creation (e.g., table naming convention, bin width, FoV extent)
 + `format_*.csv`: These files controls the column-by-column content of the output tables (e.g., column names, physical units, descriptions)
-+ `make_*.py`: These are the python scripts that define and incorporate the multiwavelength measurements in the PHANGS mega-tables
++ `make_*.py`: These are the python scripts that create mega-tables from scratch and ingest multiwavelength measurements into them
+
+## Dependencies
+
+The core `mega_table` module depends on the following packages:
++ [`numpy`](https://numpy.org/)
++ [`scipy`](https://scipy.org/)
++ [`astropy`](https://www.astropy.org/)
+
+If you would like to modify and run the scripts in the `pipelines` directory (e.g., to make your own mega-tables for some other galaxies), then you may also need the following packages depending on which part of the script is relevant:
++ [`reproject`](https://reproject.readthedocs.io/en/stable/index.html)
++ [`CO_conversion_factor`](https://github.com/astrojysun/COConversionFactor)
 
 ## Contact
 

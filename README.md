@@ -5,7 +5,7 @@
 
 This repository contains the source code for generating rich multiwavelength data tables (a.k.a. the "mega-tables") for [the PHANGS team](https://sites.google.com/view/phangs/home). The current state of this repository matches the **version 4.2** internal release of the PHANGS mega-table products. The latest published version of the PHANGS mega-table products is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
 
-The content of these mega-tables (and data aggregation schemes) are described in the following papers:
+The structure and content of these mega-tables are described in the following papers:
 
 + [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S)
 + [Sun, Leroy, Ostriker, et al. (2023), *"Star Formation Laws and Efficiencies across 80 Nearby Galaxies"*](https://ui.adsabs.harvard.edu/abs/2023ApJ...945L..19S)

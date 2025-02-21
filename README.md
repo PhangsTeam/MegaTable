@@ -3,16 +3,20 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6584841.svg)](https://doi.org/10.5281/zenodo.6584841)
 [![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
 
-This repository contains the source code for generating rich multiwavelength data tables (a.k.a. the "mega-tables") for [the PHANGS team](https://sites.google.com/view/phangs/home). The table construction and data aggregation schemes are described in the following papers:
+This repository contains the source code for generating rich multiwavelength data tables (a.k.a. the "mega-tables") for [the PHANGS team](https://sites.google.com/view/phangs/home). The current state of this repository matches the **version 4.2** internal release of the PHANGS mega-table products. The latest published version of the PHANGS mega-table products is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
+
+The content of these mega-tables (and data aggregation schemes) are described in the following papers:
 
 + [Sun, Leroy, Rosolowsky, et al. (2022), *"Molecular Cloud Populations in the Context of Their Host Galaxy Environments: A Multiwavelength Perspective"*](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S)
 + [Sun, Leroy, Ostriker, et al. (2023), *"Star Formation Laws and Efficiencies across 80 Nearby Galaxies"*](https://ui.adsabs.harvard.edu/abs/2023ApJ...945L..19S)
 
-The current version of this repository corresponds to PHANGS mega-table products internal release **version 4.2**. The latest published version of the PHANGS mega-table products is **version 4.0** (in the [PHANGS CADC archive](https://www.canfar.net/storage/vault/list/phangs/RELEASES/Sun_etal_2022)).
+Below is a figure from [Sun et al. (2022)](https://ui.adsabs.harvard.edu/abs/2022AJ....164...43S) showing *part of* the data aggregation workflow:
 
-## Content description
+![Figure 1 in Sun et al. (2022)](https://content.cld.iop.org/journals/1538-3881/164/2/43/revision1/ajac74bdf1_lr.jpg "Figure 1 in Sun et al. (2022)")
 
-**[Important note] If you want to use the PHANGS mega-table products but do *not* plan to ingest more data into them or make your own mega-tables, you likely do not need the code in this repository. The PHANGS mega-table products (available at the CADC archive link above) can be read in and analyzed with `astropy.table.Table`.**
+## Code description
+
+**[Important note] If you want to use the PHANGS mega-table products but do *not* plan to ingest more data into them or make your own mega-tables, you likely do not need the code in this repository. The PHANGS mega-table products (available in the CADC archive, see link above) can be read in and analyzed with `astropy.table.Table`.**
 
 This repository offers a python module named `mega_table`, which provides the core infrastructure for mega-table creation, manipulation, and input/output. Most of the tools in this module are offered through three python classes:
 + `mega_table.table.RadialMegaTable`: Assemble measurements in radial bins with a given width

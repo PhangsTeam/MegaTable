@@ -1,0 +1,64 @@
+site_name: MegaTable
+site_description: Documentation for the MegaTable Python package
+site_url: https://astrojysun.github.io/MegaTable/
+repo_name: astrojysun/MegaTable
+repo_url: https://github.com/astrojysun/MegaTable
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Usage examples: usage_examples.md
+  - API:
+      - Overview: api/index.md
+      - Core: api/core.md
+      - Table: api/table.md
+      - Utilities: api/utils.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: blue
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: blue
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_object_full_path: false
+            show_category_heading: true
+            show_if_no_docstring: false
+            inherited_members: true
+            members_order: source
+            separate_signature: true
+            unwrap_annotated: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/astrojysun/MegaTable

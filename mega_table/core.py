@@ -1,13 +1,19 @@
 import time
 import warnings
+from typing import Any, Callable, MutableMapping, Optional, Sequence, Union
+
 import numpy as np
+from numpy.typing import ArrayLike
 from scipy.spatial import cKDTree
 from astropy import units as u
 from astropy.table import QTable
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
-from .utils import identical_units, reduce_image_input, HDU_types
+from .utils import (
+    HDU_types, ImageInput, UnitLike, identical_units, reduce_image_input)
+
+Statistic = Callable[..., Any]
 
 
 ######################################################################
@@ -27,57 +33,60 @@ class BaseTable(object):
 
     __name__ = "BaseTable"
 
-    def __init__(self, table=None):
+    def __init__(self, table: Optional[Any] = None) -> None:
         if table is not None:
             self.table = QTable(table)
         else:
             self.table = QTable()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.table.__str__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.table.__repr__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.table)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Any) -> Any:
         return self.table[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         self.table[key] = value
 
     @property
-    def colnames(self):
+    def colnames(self) -> list[str]:
         return self.table.colnames
 
     @property
-    def info(self):
+    def info(self) -> Any:
         return self.table.info
 
     @property
-    def meta(self):
+    def meta(self) -> MutableMapping[str, Any]:
         return self.table.meta
 
     def format(
-            self, colnames=None, units=None, formats=None,
-            descriptions=None, ignore_missing=False):
+            self, colnames: Optional[Sequence[str]] = None,
+            units: Optional[Sequence[UnitLike]] = None,
+            formats: Optional[Sequence[str]] = None,
+            descriptions: Optional[Sequence[str]] = None,
+            ignore_missing: bool = False) -> None:
         """
         Format table content.
 
         Parameters
         ----------
-        colnames : array-like, optional
+        colnames : sequence of str, optional
             Names of the columns to keep. Columns in the new table
             will be ordered according to this parameter.
-        units : array-like, optional
+        units : sequence, optional
             Units to which each kept column should be converted.
             Items can be either `~astropy.units.Unit` objects or
             their string representations.
-        formats : array-like, optional
+        formats : sequence of str, optional
             Format specifiers for each kept column.
-        descriptions : array-like, optional
+        descriptions : sequence of str, optional
             Descriptions of each kept column.
         ignore_missing : bool, optional
             Whether to ignore the error when any key in ``colnames``
@@ -109,14 +118,14 @@ class BaseTable(object):
         self.table = t
 
     def write(
-            self, filename, keep_metadata=True, add_timestamp=True,
-            **kwargs):
+            self, filename: str, keep_metadata: bool = True,
+            add_timestamp: bool = True, **kwargs: Any) -> None:
         """
         Write table to file.
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the file to write to.
         keep_metadata : bool, optional
             Whether to keep existing metadata (Default: True)
@@ -124,7 +133,8 @@ class BaseTable(object):
             Whether to add a time stamp in the metadata
             (Default: True)
         **kwargs
-            Keyword arguments to be passed to `~astropy.table.write`
+            Additional keyword arguments passed to
+            `~astropy.table.Table.write`.
         """
         t = self.table.copy()
         if not keep_metadata:
@@ -159,9 +169,10 @@ class StatsTable(BaseTable):
 
     # ----------------------------------------------------------------
 
-    def find_coords_in_regions(self, ra, dec):
+    def find_coords_in_regions(
+            self, ra: ArrayLike, dec: ArrayLike) -> np.ndarray:
         """
-        Placeholder function (to be overwritten by descendant classes)
+        Find region membership for input sky coordinates.
 
         Parameters
         ----------
@@ -170,20 +181,23 @@ class StatsTable(BaseTable):
         dec : array_like
             Declination of the coordinates in question
 
-        Return
-        ------
-        flagarr : 2-D boolean array
+        Returns
+        -------
+        ndarray
             A boolean array indicating whether each region contains
             each input coordinate. The shape of this array is:
-            [# of coordinates, # of regions]
+            ``(n_coordinate, n_region)``.
         """
         return np.full([len(ra), len(self)], False)
 
     # ----------------------------------------------------------------
 
     def calc_catalog_stats(
-            self, entry, ra, dec, stat_func=None, weight=None,
-            colname='new_col', unit='', **kwargs):
+            self, entry: ArrayLike, ra: ArrayLike, dec: ArrayLike,
+            stat_func: Optional[Statistic] = None,
+            weight: Optional[ArrayLike] = None,
+            colname: str = 'new_col', unit: UnitLike = '',
+            **kwargs: Any) -> None:
         """
         Calculate statistics of a catalog entry within each region.
 
@@ -197,19 +211,19 @@ class StatsTable(BaseTable):
 
         Parameters
         ----------
-        entry : np.ndarray
+        entry : array_like
             The catalog entry in question.
-        ra : np.ndarray
+        ra : array_like
             RA coordinates of the listed objects.
-        dec : np.ndarray
+        dec : array_like
             Dec coordinates of the listed objects.
         stat_func : callable
-            A function that accepts an array of values, and return a
+            A function that accepts an array of values and returns a
             scalar value (which is the calculated statistics). If
             'weight' is not None, this function should also accept a
             keyword named 'weights', which specifies the statistical
             weight of each value in the array.
-        weight : np.ndarray, optional
+        weight : array_like, optional
             If not None, this keyword should be an ndarray specifying
             the statistical weight of each row in the catalog.
             Note that in this case, the broadcasted weight array will
@@ -217,10 +231,10 @@ class StatsTable(BaseTable):
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
+        unit : str or `~astropy.units.UnitBase`, optional
             Physical unit of the output values (default='').
         **kwargs
-            Keyword arguments to be passed to 'stat_func'
+            Additional keyword arguments passed to `stat_func`.
         """
         if weight is not None:
             weights = np.broadcast_to(weight, entry.shape)
@@ -258,21 +272,24 @@ class StatsTable(BaseTable):
     # ----------------------------------------------------------------
 
     def calc_image_stats(
-            self, image, ihdu=0, header=None,
-            stat_func=None, weight=None,
-            colname='new_col', unit='', suppress_error=False,
-            **kwargs):
+            self, image: ImageInput, ihdu: int = 0,
+            header: Optional[fits.Header] = None,
+            stat_func: Optional[Statistic] = None,
+            weight: Optional[ArrayLike] = None,
+            colname: str = 'new_col', unit: UnitLike = '',
+            suppress_error: bool = False, **kwargs: Any) -> None:
         """
         Calculate statistics of an image within each region.
 
         Parameters
         ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
+        image : str, bytes, path-like, `~astropy.io.fits.HDUList`,
+            FITS HDU, or ndarray
             The image to calculate statistics for.
         ihdu : int, optional
             If 'image' is a str or an HDUList, this keyword should
             specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
+        header : `~astropy.io.fits.Header`, optional
             If 'image' is an ndarray, this keyword should be a FITS
             header providing the WCS information.
         stat_func : callable
@@ -281,7 +298,7 @@ class StatsTable(BaseTable):
             'weight' is not None, this function should also accept a
             keyword named 'weights', which specifies the statistical
             weight of each value in the array.
-        weight : np.ndarray, optional
+        weight : array_like, optional
             If not None, this keyword should be an ndarray specifying
             the statistical weight of each pixel in the input image.
             Note that in this case, the broadcasted weight array will
@@ -289,14 +306,14 @@ class StatsTable(BaseTable):
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
+        unit : str or `~astropy.units.UnitBase`, optional
             Physical unit of the output values (default='').
             If unit='header', the 'BUNIT' entry in the header is used.
         suppress_error : bool, optional
             Whether to suppress the error message if 'image' looks
             like a file but is not found on disk (default=False)
         **kwargs
-            Keyword arguments to be passed to 'stat_func'
+            Additional keyword arguments passed to `stat_func`.
         """
 
         data, hdr, wcs = reduce_image_input(
@@ -339,13 +356,14 @@ class StatsTable(BaseTable):
     # ----------------------------------------------------------------
 
     def create_maps_from_columns(
-            self, colnames, header, allow_region_overlap=False):
+            self, colnames: Sequence[str], header: fits.Header,
+            allow_region_overlap: bool = False) -> list[Any]:
         """
         Create 2D maps from data in columns based on a FITS header.
 
         Parameters
         ----------
-        colnames : iterable
+        colnames : sequence of str
             Name of the columns to create 2D maps for.
         header : `~astropy.fits.Header`
             FITS header defining the WCS of the output 2D maps.
@@ -355,9 +373,11 @@ class StatsTable(BaseTable):
             If True, overlapping regions will be allowed, in which
             case later rows (regions) will overwrite earlier rows.
 
-        Return
-        ------
-        arrays : list of ~numpy.ndarray
+        Returns
+        -------
+        list
+            List of two-dimensional arrays or quantity arrays built from
+            the requested columns.
         """
         wcs = WCS(header).celestial
         # find pixels in regions
@@ -425,8 +445,9 @@ class GeneralRegionTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def __init__(self, region_defs, names=None):
-
+    def __init__(
+            self, region_defs: Sequence[Any],
+            names: Optional[Sequence[Any]] = None) -> None:
         # verify the region definitions
         for ireg, reg_def in enumerate(region_defs):
             if (not isinstance(reg_def, HDU_types) and
@@ -442,9 +463,10 @@ class GeneralRegionTable(StatsTable):
         self['REGION'] = names
         self.meta['TBLTYPE'] = self.__name__
 
-    def find_coords_in_regions(self, ra, dec):
+    def find_coords_in_regions(
+            self, ra: ArrayLike, dec: ArrayLike) -> np.ndarray:
         """
-        Find out which regions contain which input coordinates.
+        Evaluate region membership for each input coordinate.
 
         Parameters
         ----------
@@ -453,12 +475,12 @@ class GeneralRegionTable(StatsTable):
         dec : array_like
             Declination of the coordinates in question
 
-        Return
-        ------
-        flagarr : 2-D boolean array
+        Returns
+        -------
+        ndarray
             A boolean array indicating whether each region contains
             each input coordinate. The shape of this array is:
-            [# of coordinates, # of regions]
+            ``(n_coordinate, n_region)``.
         """
         # initialize flag array
         flagarr = np.full([len(ra), len(self)], False)
@@ -535,10 +557,11 @@ class VoronoiTessTable(StatsTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, center_ra, center_dec, fov_radius,
-            seeds_ra=None, seeds_dec=None,
-            seed_spacing=None, tile_shape='square'):
-
+            self, center_ra: float, center_dec: float, fov_radius: float,
+            seeds_ra: Optional[ArrayLike] = None,
+            seeds_dec: Optional[ArrayLike] = None,
+            seed_spacing: Optional[float] = None,
+            tile_shape: str = 'square') -> None:
         # if seed locations are specified, write them into the table
         if seeds_ra is not None and seeds_dec is not None:
             ras, decs = np.broadcast_arrays(seeds_ra, seeds_dec)
@@ -604,9 +627,11 @@ class VoronoiTessTable(StatsTable):
 
     # ----------------------------------------------------------------
 
-    def find_coords_in_regions(self, ra, dec, fill_value=-1):
+    def find_coords_in_regions(
+            self, ra: ArrayLike, dec: ArrayLike,
+            fill_value: int = -1) -> np.ndarray:
         """
-        Find out which regions(tiles) contain which input coordinates.
+        Match coordinates to the nearest Voronoi tile.
 
         Parameters
         ----------
@@ -614,13 +639,13 @@ class VoronoiTessTable(StatsTable):
             R.A. of the coordinates in question
         dec : array_like
             Declination of the coordinates in question
-        fill_value : float, optional
+        fill_value : int, optional
             The index value to return for input coordinates that have
             no matched regions (default: -1).
 
-        Return
-        ------
-        indices : 1-D index array
+        Returns
+        -------
+        ndarray
             An index array indicating which tile each input coordinate
             belongs to. The length of this array equals the number of
             input coordinates.
@@ -656,9 +681,11 @@ class VoronoiTessTable(StatsTable):
     # ----------------------------------------------------------------
 
     def resample_image(
-            self, image, ihdu=0, header=None,
-            colname='new_col', unit='', suppress_error=False,
-            fill_outside='nearest'):
+            self, image: ImageInput, ihdu: int = 0,
+            header: Optional[fits.Header] = None,
+            colname: str = 'new_col', unit: UnitLike = '',
+            suppress_error: bool = False,
+            fill_outside: Union[str, float] = 'nearest') -> None:
         """
         Resample an image at the location of the Voronoi seeds.
 
@@ -667,18 +694,19 @@ class VoronoiTessTable(StatsTable):
 
         Parameters
         ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
+        image : str, bytes, path-like, `~astropy.io.fits.HDUList`, 
+            FITS HDU, or ndarray
             The image to be resampled.
         ihdu : int, optional
             If 'image' is a str or an HDUList, this keyword should
             specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
+        header : `~astropy.io.fits.Header`, optional
             If 'image' is an ndarray, this keyword should be a FITS
             header providing the WCS information.
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
+        unit : str or `~astropy.units.UnitBase`, optional
             Physical unit of the output values (default='').
             If unit='header', the 'BUNIT' entry in the header is used.
         fill_outside : {'nearest', float}, optional

@@ -1,11 +1,16 @@
 import warnings
+from typing import Any, Optional, Sequence, Union
+
 import numpy as np
+from numpy.typing import ArrayLike
 from functools import partial
 from astropy import units as u
+from astropy.io import fits
 from astropy.table import QTable
 from astropy.coordinates import SkyCoord
 from .core import GeneralRegionTable, VoronoiTessTable
-from .utils import deproject, identical_units, reduce_image_input
+from .utils import (
+    ImageInput, UnitLike, deproject, identical_units, reduce_image_input)
 
 
 ######################################################################
@@ -49,9 +54,10 @@ class RadialMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, gal_ra_deg, gal_dec_deg, rgal_bin_arcsec,
-            gal_incl_deg=0, gal_posang_deg=0, rgal_max_arcsec=None):
-
+            self, gal_ra_deg: float, gal_dec_deg: float,
+            rgal_bin_arcsec: float, gal_incl_deg: float = 0,
+            gal_posang_deg: float = 0,
+            rgal_max_arcsec: Optional[float] = None) -> None:
         if rgal_max_arcsec is None:
             nring = 20
         else:
@@ -60,9 +66,40 @@ class RadialMegaTable(GeneralRegionTable):
         # function that determines whether a set of coordinates locate
         # inside the ring between rmin and rmax
         def coord2bool(
-                ra, dec, rmin=None, rmax=None,
-                gal_ra=None, gal_dec=None,
-                gal_incl=None, gal_posang=None):
+                ra: ArrayLike, dec: ArrayLike,
+                rmin: Optional[float] = None,
+                rmax: Optional[float] = None,
+                gal_ra: Optional[float] = None,
+                gal_dec: Optional[float] = None,
+                gal_incl: Optional[float] = None,
+                gal_posang: Optional[float] = None) -> np.ndarray:
+            """
+            Flag coordinates that fall within a radial annulus.
+
+            Parameters
+            ----------
+            ra : array_like
+                Right ascension values in degrees.
+            dec : array_like
+                Declination values in degrees.
+            rmin : float, optional
+                Inner radius of the annulus in degrees.
+            rmax : float, optional
+                Outer radius of the annulus in degrees.
+            gal_ra : float, optional
+                Galaxy center right ascension in degrees.
+            gal_dec : float, optional
+                Galaxy center declination in degrees.
+            gal_incl : float, optional
+                Galaxy inclination in degrees.
+            gal_posang : float, optional
+                Galaxy position angle in degrees.
+
+            Returns
+            -------
+            ndarray
+                Boolean mask selecting coordinates inside the annulus.
+            """
             projrad, projang = deproject(
                 ra=ra, dec=dec, center_coord=(gal_ra, gal_dec),
                 incl=gal_incl, pa=gal_posang)
@@ -100,7 +137,7 @@ class RadialMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, **kwargs):
+    def read(cls, filename: str, **kwargs: Any) -> "RadialMegaTable":
         """
         Read (and reconstruct) a RadialMegaTable object from file.
 
@@ -111,9 +148,10 @@ class RadialMegaTable(GeneralRegionTable):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
-        Return
-        ------
-        table : RadialMegaTable
+        Returns
+        -------
+        RadialMegaTable
+            Reconstructed table instance.
         """
         t = QTable.read(filename, **kwargs)
 
@@ -181,18 +219,50 @@ class StripeMegaTable(GeneralRegionTable):
     __name__ = "StripeMegaTable"
 
     def __init__(
-            self, gal_ra_deg, gal_dec_deg, gal_posang_deg,
-            xbin_arcsec, xmax_arcsec, ymax_arcsec=None):
-
+            self, gal_ra_deg: float, gal_dec_deg: float,
+            gal_posang_deg: float, xbin_arcsec: float,
+            xmax_arcsec: float,
+            ymax_arcsec: Optional[float] = None) -> None:
         if ymax_arcsec is None:
             ymax_arcsec = xmax_arcsec
 
         nbin = int(np.ceil(xmax_arcsec / xbin_arcsec)) * 2
 
         def coord2bool(
-                ra, dec,
-                gal_ra_deg=None, gal_dec_deg=None, gal_posang_deg=None,
-                xmin_arcsec=None, xmax_arcsec=None, ymax_arcsec=None):
+                ra: ArrayLike, dec: ArrayLike,
+                gal_ra_deg: Optional[float] = None,
+                gal_dec_deg: Optional[float] = None,
+                gal_posang_deg: Optional[float] = None,
+                xmin_arcsec: Optional[float] = None,
+                xmax_arcsec: Optional[float] = None,
+                ymax_arcsec: Optional[float] = None) -> np.ndarray:
+            """
+            Flag coordinates that fall within one stripe.
+
+            Parameters
+            ----------
+            ra : array_like
+                Right ascension values in degrees.
+            dec : array_like
+                Declination values in degrees.
+            gal_ra_deg : float, optional
+                Galaxy center right ascension in degrees.
+            gal_dec_deg : float, optional
+                Galaxy center declination in degrees.
+            gal_posang_deg : float, optional
+                Galaxy position angle in degrees.
+            xmin_arcsec : float, optional
+                Lower major-axis boundary in arcseconds.
+            xmax_arcsec : float, optional
+                Upper major-axis boundary in arcseconds.
+            ymax_arcsec : float, optional
+                Minor-axis half-width in arcseconds.
+
+            Returns
+            -------
+            ndarray
+                Boolean mask selecting coordinates inside the stripe.
+            """
             _, _, _, _, dmaj_deg, dmin_deg = deproject(
                 ra=ra, dec=dec, center_coord=(gal_ra_deg, gal_dec_deg),
                 incl=0, pa=gal_posang_deg, return_offset=True)
@@ -232,7 +302,7 @@ class StripeMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, **kwargs):
+    def read(cls, filename: str, **kwargs: Any) -> "StripeMegaTable":
         """
         Read (and reconstruct) a StripeMegaTable object from file.
 
@@ -243,9 +313,10 @@ class StripeMegaTable(GeneralRegionTable):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
-        Return
-        ------
-        table : StripeMegaTable
+        Returns
+        -------
+        StripeMegaTable
+            Reconstructed table instance.
         """
         t = QTable.read(filename, **kwargs)
 
@@ -305,13 +376,37 @@ class ApertureMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, aperture_ra_deg, aperture_dec_deg,
-            aperture_size_arcsec, aperture_names=None):
-
+            self, aperture_ra_deg: ArrayLike, aperture_dec_deg: ArrayLike,
+            aperture_size_arcsec: float,
+            aperture_names: Optional[Sequence[str]] = None) -> None:
         # function that determines whether a set of coordinates locate
         # inside an aperture
         def coord2bool(
-                ra, dec, aper_ra=None, aper_dec=None, aper_size=None):
+                ra: ArrayLike, dec: ArrayLike,
+                aper_ra: Optional[float] = None,
+                aper_dec: Optional[float] = None,
+                aper_size: Optional[float] = None) -> np.ndarray:
+            """
+            Flag coordinates that fall within one circular aperture.
+
+            Parameters
+            ----------
+            ra : array_like
+                Right ascension values in degrees.
+            dec : array_like
+                Declination values in degrees.
+            aper_ra : float, optional
+                Aperture center right ascension in degrees.
+            aper_dec : float, optional
+                Aperture center declination in degrees.
+            aper_size : float, optional
+                Aperture radius in arcseconds.
+
+            Returns
+            -------
+            ndarray
+                Boolean mask selecting coordinates inside the aperture.
+            """
             coords = SkyCoord(ra*u.deg, dec*u.deg)
             center_coord = SkyCoord(aper_ra*u.deg, aper_dec*u.deg)
             angl_sep = center_coord.separation(coords)
@@ -343,7 +438,7 @@ class ApertureMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, **kwargs):
+    def read(cls, filename: str, **kwargs: Any) -> "ApertureMegaTable":
         """
         Read (and reconstruct) an ApertureMegaTable object from file.
 
@@ -354,14 +449,15 @@ class ApertureMegaTable(GeneralRegionTable):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
-        Return
-        ------
-        table : ApertureMegaTable
+        Returns
+        -------
+        ApertureMegaTable
+            Reconstructed table instance.
         """
         t = QTable.read(filename, **kwargs)
 
         # input file should be a valid ApertureMegaTable output
-        if 'TLBTYPE' not in t.meta:
+        if 'TBLTYPE' not in t.meta:
             raise ValueError("Input file not recognized")
         if t.meta['TBLTYPE'] != 'ApertureMegaTable':
             raise ValueError(
@@ -385,9 +481,11 @@ class ApertureMegaTable(GeneralRegionTable):
     # ----------------------------------------------------------------
 
     def resample_image(
-            self, image, ihdu=0, header=None,
-            colname='new_col', unit='', suppress_error=False,
-            fill_outside='nearest'):
+            self, image: ImageInput, ihdu: int = 0,
+            header: Optional[fits.Header] = None,
+            colname: str = 'new_col', unit: UnitLike = '',
+            suppress_error: bool = False,
+            fill_outside: Union[str, float] = 'nearest') -> None:
         """
         Resample an image at the location of the aperture centers.
 
@@ -396,18 +494,19 @@ class ApertureMegaTable(GeneralRegionTable):
 
         Parameters
         ----------
-        image : str, fits.HDUList, fits.HDU, or np.ndarray
+        image : str, bytes, path-like, `~astropy.io.fits.HDUList`,
+            FITS HDU, or ndarray
             The image to be resampled.
         ihdu : int, optional
             If 'image' is a str or an HDUList, this keyword should
             specify which HDU (extension) to use (default=0)
-        header : astropy.fits.Header, optional
+        header : `~astropy.io.fits.Header`, optional
             If 'image' is an ndarray, this keyword should be a FITS
             header providing the WCS information.
         colname : str, optional
             Name of a column in the table to save the output values.
             Default: 'new_col'
-        unit : str or astropy.unit.Unit, optional
+        unit : str or `~astropy.units.UnitBase`, optional
             Physical unit of the output values (default='').
             If unit='header', the 'BUNIT' entry in the header is used.
         fill_outside : {'nearest', float}, optional
@@ -505,8 +604,9 @@ class TessellMegaTable(VoronoiTessTable):
     # ----------------------------------------------------------------
 
     def __init__(
-            self, center_ra_deg, center_dec_deg, fov_radius_arcsec,
-            tile_size_arcsec, tile_shape='hexagon'):
+            self, center_ra_deg: float, center_dec_deg: float,
+            fov_radius_arcsec: float, tile_size_arcsec: float,
+            tile_shape: str = 'hexagon') -> None:
         super().__init__(
             center_ra=center_ra_deg, center_dec=center_dec_deg,
             fov_radius=fov_radius_arcsec/3600,
@@ -523,7 +623,7 @@ class TessellMegaTable(VoronoiTessTable):
     # ----------------------------------------------------------------
 
     @classmethod
-    def read(cls, filename, **kwargs):
+    def read(cls, filename: str, **kwargs: Any) -> "TessellMegaTable":
         """
         Read (and reconstruct) a TessellMegaTable object from file.
 
@@ -534,9 +634,10 @@ class TessellMegaTable(VoronoiTessTable):
         **kwargs
             Keyword arguments to be passed to `~astropy.table.read`
 
-        Return
-        ------
-        table : TessellMegaTable
+        Returns
+        -------
+        TessellMegaTable
+            Reconstructed table instance.
         """
         t = QTable.read(filename, **kwargs)
 
@@ -566,21 +667,33 @@ class TessellMegaTable(VoronoiTessTable):
     # ----------------------------------------------------------------
 
     def show_tiles_on_sky(
-            self, ax=None, image=None, ffigkw={}, **scatterkw):
+            self, ax: Optional[Any] = None, image: Optional[Any] = None,
+            ffigkw: Optional[dict[str, Any]] = None,
+            **scatterkw: Any) -> Any:
         """
-        Show RA-Dec locations of the tile centers on top of an image.
+        Plot tile centers on an image or Matplotlib axes.
 
+        Parameters
+        ----------
         ax : `~matplotlib.axes.Axes`, optional
-            If 'image' is None, this is the Axes instance in which to
-            make a scatter plot showing the tile centers.
-        image : see below
-            The image on which to overplot the tile centers.
-            This will be passed to `aplpy.FITSFigure`.
+            Axes on which to plot the tile centers when `image` is not
+            supplied. If omitted, the current axes are created and used.
+        image : Any, optional
+            Image-like input accepted by `aplpy.FITSFigure`. When
+            provided, the markers are overplotted on that image.
         ffigkw : dict, optional
-            Keyword arguments to be passed to `aplpy.FITSFigure`
-        **scatterkw :
-            Keyword arguments to be passed to `plt.scatter`
+            Keyword arguments passed to `aplpy.FITSFigure`.
+        **scatterkw
+            Keyword arguments passed to the marker plotting call.
+
+        Returns
+        -------
+        Any
+            `aplpy.FITSFigure` when `image` is supplied, otherwise the
+            Matplotlib axes containing the scatter plot.
         """
+        if ffigkw is None:
+            ffigkw = {}
         if image is not None:
             # show image using aplpy and overplot tile centers
             from aplpy import FITSFigure

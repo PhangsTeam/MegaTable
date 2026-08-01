@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mega_table"
+version = "4.3.0"
+description = "Build and manipulate multiwavelength data tables for galaxy observations"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [{ name = "Jiayi Sun" }]
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.urls]
+Homepage = "https://github.com/astrojysun/MegaTable"
+Documentation = "https://astrojysun.github.io/MegaTable/"
+Repository = "https://github.com/astrojysun/MegaTable"
+
+[tool.setuptools.packages.find]
+include = ["mega_table*"]

@@ -1,17 +1,46 @@
 import os
+from typing import Any, Optional, Sequence, Tuple, Union
+
 import numpy as np
+from numpy.typing import ArrayLike
 from pathlib import Path
 from astropy import units as u
+from astropy.units import Quantity, UnitBase
 from astropy.wcs import WCS
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 
 HDU_types = (fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU)
+UnitLike = Union[str, UnitBase]
+ImageInput = Union[
+    str, bytes, os.PathLike, fits.HDUList,
+    fits.PrimaryHDU, fits.ImageHDU, fits.CompImageHDU, np.ndarray,
+]
+CenterCoord = Union[
+    SkyCoord,
+    Tuple[Union[float, Quantity], Union[float, Quantity]],
+]
 
 # --------------------------------------------------------------------
 
 
-def identical_units(u1, u2):
+def identical_units(u1: UnitLike, u2: UnitLike) -> bool:
+    """
+    Check whether two units are exactly identical.
+
+    Parameters
+    ----------
+    u1 : str or `~astropy.units.UnitBase`
+        First unit specification.
+    u2 : str or `~astropy.units.UnitBase`
+        Second unit specification.
+
+    Returns
+    -------
+    bool
+        `True` when the two inputs represent the same unit exactly,
+        not merely equivalent units.
+    """
     if not u.Unit(u1).is_equivalent(u.Unit(u2)):
         return False
     elif (u.Unit(u1) / u.Unit(u2)).to('') != 1:
@@ -23,8 +52,20 @@ def identical_units(u1, u2):
 # --------------------------------------------------------------------
 
 
-def calc_pixel_area(header):
-    from astropy.wcs import WCS
+def calc_pixel_area(header: fits.Header) -> Quantity:
+    """
+    Calculate the projected area of one image pixel.
+
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        FITS header describing a celestial image.
+
+    Returns
+    -------
+    `~astropy.units.Quantity`
+        Pixel area returned by the WCS projection.
+    """
     wcs = WCS(header)
     return wcs.proj_plane_pixel_area()
 
@@ -32,8 +73,32 @@ def calc_pixel_area(header):
 # --------------------------------------------------------------------
 
 
-def calc_pixel_per_beam(header, suppress_no_beam_error=True):
-    from astropy.wcs import WCS
+def calc_pixel_per_beam(
+        header: fits.Header,
+        suppress_no_beam_error: bool = True) -> Optional[float]:
+    """
+    Calculate the number of pixels per synthesized beam.
+
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        FITS header describing a radio image.
+    suppress_no_beam_error : bool, optional
+        If `True`, return `None` when the header does not contain beam
+        information. If `False`, re-raise the missing-beam exception.
+
+    Returns
+    -------
+    float or None
+        Number of pixels per beam, or `None` when no beam is present and
+        `suppress_no_beam_error` is `True`.
+
+    Raises
+    ------
+    radio_beam.beam.NoBeamException
+        Raised when beam information is missing and
+        `suppress_no_beam_error` is `False`.
+    """
     from radio_beam import Beam
     from radio_beam.beam import NoBeamException
     try:
@@ -50,21 +115,21 @@ def calc_pixel_per_beam(header, suppress_no_beam_error=True):
 # --------------------------------------------------------------------
 
 
-def nanaverage(a, **kwargs):
+def nanaverage(a: ArrayLike, **kwargs: Any) -> Any:
     """
-    Compute weighted average along a specified axis, ignoring NaNs.
+    Compute a weighted average while ignoring NaN values.
 
     Parameters
     ----------
     a : array_like
         Array containing data to be averaged.
     **kwargs
-        Keyword arguments to be passed to `~numpy.ma.average`
+        Additional keyword arguments passed to `~numpy.ma.average`.
 
-    Return
-    ------
-    avg : ndarray or scalar
-        Return the average along the specified axis.
+    Returns
+    -------
+    ndarray or scalar
+        Weighted average along the requested axis.
     """
     avg = np.ma.average(np.ma.array(a, mask=np.isnan(a)), **kwargs)
     avg = np.ma.filled(avg, np.nan)
@@ -74,21 +139,21 @@ def nanaverage(a, **kwargs):
 # --------------------------------------------------------------------
 
 
-def nanrms(a, **kwargs):
+def nanrms(a: ArrayLike, **kwargs: Any) -> Any:
     """
-    Compute the weighted rms along a specified axis, ignoring NaNs.
+    Compute a weighted root-mean-square while ignoring NaN values.
 
     Parameters
     ----------
     a : array_like
-        Array containing data to be averaged.
+        Array containing data to be summarized.
     **kwargs
-        Keyword arguments to be passed to `~numpy.ma.average`
+        Additional keyword arguments passed to `~numpy.ma.average`.
 
-    Return
-    ------
-    rms : ndarray or scalar
-        Return the rms along the specified axis.
+    Returns
+    -------
+    ndarray or scalar
+        Root-mean-square along the requested axis.
     """
     rms = np.sqrt(np.ma.average(
         np.ma.array(a, mask=np.isnan(a))**2, **kwargs))
@@ -100,29 +165,42 @@ def nanrms(a, **kwargs):
 
 
 def reduce_image_input(
-        image, ihdu, header, suppress_error=False):
+        image: ImageInput,
+        ihdu: int = 0,
+        header: Optional[fits.Header] = None,
+        suppress_error: bool = False,
+) -> Tuple[Optional[np.ndarray], Optional[fits.Header], Optional[WCS]]:
     """
-    Reduce any combination of input values to (data, header, wcs).
+    Normalize image inputs to data, header, and WCS objects.
 
     Parameters
     ----------
-    image : str, fits.HDUList, fits.HDU, or np.ndarray
-        The input image.
+    image : str, bytes, path-like, `~astropy.io.fits.HDUList`, FITS HDU,
+        or ndarray
+        Image source to normalize.
     ihdu : int, optional
-        If 'image' is a str or an HDUList, this keyword should
-        specify which HDU (extension) to use (default=0)
-    header : astropy.fits.Header, optional
-        If 'image' is an ndarray, this keyword should be a FITS
-        header providing the WCS information.
+        HDU index to use when `image` is a FITS filename or HDU list.
+    header : `~astropy.io.fits.Header`, optional
+        FITS header describing the array when `image` is an ndarray.
     suppress_error : bool, optional
-        Whether to suppress the error message if 'image' looks
-        like a file but is not found on disk (default=False)
+        If `True`, return `(None, None, None)` instead of raising when
+        `image` looks like a file path but does not exist.
 
     Returns
     -------
-    data : np.ndarray
-    hdr : fits.Header object
-    wcs : astropy.wcs.WCS object
+    data : ndarray or None
+        Image data array.
+    hdr : `~astropy.io.fits.Header` or None
+        Header associated with the image data.
+    wcs : `~astropy.wcs.WCS` or None
+        Celestial WCS built from `hdr`.
+
+    Raises
+    ------
+    ValueError
+        Raised when the input image cannot be found, is not
+        two-dimensional, has inconsistent dimensions, or does not use
+        celestial RA/Dec axes.
     """
     if isinstance(image, np.ndarray):
         data = image
@@ -160,10 +238,22 @@ def reduce_image_input(
 
 
 def deproject(
-        center_coord=None, incl=0*u.deg, pa=0*u.deg,
-        header=None, wcs=None, naxis=None, ra=None, dec=None,
-        return_offset=False):
-
+        center_coord: Optional[CenterCoord] = None,
+        incl: Union[float, Quantity] = 0*u.deg,
+        pa: Union[float, Quantity] = 0*u.deg,
+        header: Optional[fits.Header] = None,
+        wcs: Optional[WCS] = None,
+        naxis: Optional[Sequence[int]] = None,
+        ra: Optional[Union[ArrayLike, Quantity]] = None,
+        dec: Optional[Union[ArrayLike, Quantity]] = None,
+        return_offset: bool = False,
+) -> Union[
+    Tuple[np.ndarray, np.ndarray],
+    Tuple[
+        np.ndarray, np.ndarray, np.ndarray,
+        np.ndarray, np.ndarray, np.ndarray,
+    ],
+]:
     """
     Calculate deprojected coordinates from sky coordinates.
 
@@ -181,35 +271,36 @@ def deproject(
 
     Parameters
     ----------
-    center_coord : `~astropy.coordinates.SkyCoord` object or 2-tuple
-        Sky coordinates of the disk center
-    incl : `~astropy.units.Quantity` object or number, optional
-        Inclination angle of the disk (0 degree means face-on)
-        Default is 0 degree.
-    pa : `~astropy.units.Quantity` object or number, optional
-        Position angle of the disk (red/receding side, North->East)
-        Default is 0 degree.
-    header : `~astropy.io.fits.Header` object, optional
-        FITS header specifying the WCS and size of the output 2D maps
-    wcs : `~astropy.wcs.WCS` object, optional
-        WCS of the output 2D maps
-    naxis : array-like (with two elements), optional
-        Size of the output 2D maps
-    ra : array-like, optional
-        RA coordinate of the sky locations of interest
-    dec : array-like, optional
-        DEC coordinate of the sky locations of interest
+    center_coord : `~astropy.coordinates.SkyCoord` or 2-tuple, optional
+        Sky coordinates of the disk center.
+    incl : number or `~astropy.units.Quantity`, optional
+        Disk inclination angle. Zero degrees corresponds to a face-on
+        disk.
+    pa : number or `~astropy.units.Quantity`, optional
+        Disk position angle for the receding major axis, measured from
+        north through east.
+    header : `~astropy.io.fits.Header`, optional
+        FITS header specifying the WCS and output map shape.
+    wcs : `~astropy.wcs.WCS`, optional
+        WCS of the output maps when `header` is not supplied.
+    naxis : sequence of int, optional
+        Two-element map shape associated with `wcs`.
+    ra : array_like or `~astropy.units.Quantity`, optional
+        Right ascension values to deproject when working from explicit
+        coordinates instead of a WCS description.
+    dec : array_like or `~astropy.units.Quantity`, optional
+        Declination values to deproject when working from explicit
+        coordinates instead of a WCS description.
     return_offset : bool, optional
-        Whether to also return angular offset coordinates together with
-        the deprojected radii and angles. Default is to not return.
+        If `True`, also return intermediate offset coordinates in both
+        sky and disk frames.
 
     Returns
     -------
-    deprojected_coordinates : list of arrays
-        If `return_offset` is set to True, the returned arrays include
-        deprojected radii, projected angles, as well as angular offset
-        coordinates along the RA-Dec and major-minor directions;
-        otherwise only the former two arrays will be returned.
+    deprojected_coordinates : tuple of ndarray
+        Returns `(radius_deg, projang_deg)` by default. When
+        `return_offset` is `True`, the returned tuple becomes
+        `(radius_deg, projang_deg, dx_deg, dy_deg, dmaj_deg, dmin_deg)`.
 
     Notes
     -----

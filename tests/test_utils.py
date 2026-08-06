@@ -8,7 +8,6 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 from mega_table.utils import deproject, reduce_image_input
-from conftest import make_simple_header
 
 
 # ======================================================================

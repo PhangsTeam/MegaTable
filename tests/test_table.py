@@ -11,7 +11,6 @@ from astropy import units as u
 from astropy.io import fits
 
 from mega_table import ApertureMegaTable, RadialMegaTable, TessellMegaTable
-from conftest import make_simple_header
 
 
 # ======================================================================

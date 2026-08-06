@@ -25,7 +25,7 @@ pip install .
 Install from GitHub:
 
 ```bash
-pip install "git+https://github.com/astrojysun/MegaTable.git"
+pip install "git+https://github.com/PhangsTeam/MegaTable.git"
 ```
 
 

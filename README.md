@@ -1,8 +1,8 @@
 # MegaTable
 
+[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
 [![Docs](https://img.shields.io/badge/docs-MkDocs-blue)](docs/index.md)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6584841.svg)](https://doi.org/10.5281/zenodo.6584841)
-[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
 
 ``mega_table`` is a Python package for building and manipulating multiwavelength data tables (a.k.a. "mega-tables") for galaxy observations. The package provides table abstractions for radial bins, tessellations, apertures, and general region-based statistics.
 
@@ -21,7 +21,7 @@ pip install .
 Install from GitHub:
 
 ```bash
-pip install "git+https://github.com/astrojysun/MegaTable.git"
+pip install "git+https://github.com/PhangsTeam/MegaTable.git"
 ```
 
 ## Documentation

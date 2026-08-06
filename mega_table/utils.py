@@ -205,6 +205,9 @@ def reduce_image_input(
     if isinstance(image, np.ndarray):
         data = image
         hdr = header
+        if hdr is None:
+            raise ValueError(
+                "Input image is an ndarray but no header was supplied")
     elif isinstance(image, HDU_types):
         data = image.data
         hdr = image.header

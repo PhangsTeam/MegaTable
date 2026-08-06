@@ -7,7 +7,7 @@ name = "mega_table"
 version = "4.3.0"
 description = "Build and manipulate multiwavelength data tables for galaxy observations"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [{ name = "Jiayi Sun" }]
 dependencies = [
@@ -25,9 +25,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/astrojysun/MegaTable"
+Homepage = "https://github.com/PhangsTeam/MegaTable"
 Documentation = "https://astrojysun.github.io/MegaTable/"
-Repository = "https://github.com/astrojysun/MegaTable"
 
 [tool.setuptools.packages.find]
 include = ["mega_table*"]

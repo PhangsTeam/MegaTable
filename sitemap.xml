@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/usage_examples/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/api/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/api/core/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/api/table/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+    <url>
+         <loc>https://astrojysun.github.io/MegaTable/api/utils/</loc>
+         <lastmod>2026-08-06</lastmod>
+    </url>
+</urlset>
